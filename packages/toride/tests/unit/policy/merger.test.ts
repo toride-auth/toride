@@ -364,6 +364,40 @@ describe("mergePolicies", () => {
     expect(merged.version).toBe("1");
   });
 
+  it("rejects __proto__ key in actors", () => {
+    const base = makePolicy({ actors: {} });
+    const overlayActors = Object.create(null);
+    overlayActors["__proto__"] = { attributes: {} };
+    const overlay = makePolicy({ actors: overlayActors });
+    expect(() => mergePolicies(base, overlay)).toThrow(/Dangerous key/);
+  });
+
+  it("rejects constructor key in resources", () => {
+    const base = makePolicy({ resources: {} });
+    const overlay = makePolicy({
+      resources: {
+        constructor: {
+          roles: ["viewer"],
+          permissions: ["read"],
+        },
+      },
+    });
+    expect(() => mergePolicies(base, overlay)).toThrow(/Dangerous key/);
+  });
+
+  it("rejects prototype key in resources", () => {
+    const base = makePolicy({ resources: {} });
+    const overlay = makePolicy({
+      resources: {
+        prototype: {
+          roles: ["viewer"],
+          permissions: ["read"],
+        },
+      },
+    });
+    expect(() => mergePolicies(base, overlay)).toThrow(/Dangerous key/);
+  });
+
   it("does not include tests from either policy", () => {
     const base = makePolicy({
       tests: [{ name: "t1", actor: { type: "User", id: "1", attributes: {} }, action: "read", resource: { type: "Task", id: "1" }, expected: "allow" }],

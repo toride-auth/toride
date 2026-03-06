@@ -77,8 +77,11 @@ export function createDrizzleAdapter(
             : { _op: "isNull", field: constraint.field, table };
         case "field_includes":
           return { _op: "arrayContains", field: constraint.field, value: constraint.value, table };
-        case "field_contains":
-          return { _op: "like", field: constraint.field, pattern: `%${constraint.value}%`, table };
+        case "field_contains": {
+          // Escape LIKE metacharacters (%, _) in the value before wrapping in wildcards
+          const escaped = String(constraint.value).replace(/[%_\\]/g, "\\$&");
+          return { _op: "like", field: constraint.field, pattern: `%${escaped}%`, table };
+        }
         default: {
           const _exhaustive: never = constraint;
           throw new Error(`Unknown constraint type: ${(constraint as { type: string }).type}`);

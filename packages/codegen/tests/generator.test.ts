@@ -116,6 +116,57 @@ describe("generateTypes", () => {
     expect(output).toContain("getAttributes");
   });
 
+  it("rejects unsafe resource names with special characters", () => {
+    const policy = makePolicy({
+      resources: {
+        'foo"; console.log("pwned");//': {
+          roles: ["viewer"],
+          permissions: ["read"],
+        },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
+  it("rejects unsafe role names", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ['admin"; //injection'],
+          permissions: ["read"],
+        },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
+  it("rejects unsafe permission names", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read\\backslash"],
+        },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
+  it("rejects unsafe relation names", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          relations: {
+            "rel-name": { resource: "Org", cardinality: "one" as const },
+          },
+        },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
   it("produces valid TypeScript (no syntax errors)", () => {
     const output = generateTypes(makePolicy());
     // Basic structural checks

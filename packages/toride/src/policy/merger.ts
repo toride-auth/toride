@@ -11,6 +11,18 @@ import type {
   RelationDef,
 } from "../types.js";
 
+/** Keys that must be rejected to prevent prototype pollution */
+const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Throw if any key in the record is a prototype pollution vector */
+function assertNoDangerousKeys(obj: Record<string, unknown>, context: string): void {
+  for (const key of Object.keys(obj)) {
+    if (DANGEROUS_KEYS.has(key)) {
+      throw new Error(`Dangerous key "${key}" detected in ${context}`);
+    }
+  }
+}
+
 /**
  * Merge two policies into one.
  *
@@ -44,6 +56,8 @@ function mergeActors(
   base: Record<string, ActorDeclaration>,
   overlay: Record<string, ActorDeclaration>,
 ): Record<string, ActorDeclaration> {
+  assertNoDangerousKeys(base, "base actors");
+  assertNoDangerousKeys(overlay, "overlay actors");
   const result: Record<string, ActorDeclaration> = { ...base };
 
   for (const [name, actor] of Object.entries(overlay)) {
@@ -64,6 +78,8 @@ function mergeGlobalRoles(
   overlay?: Record<string, GlobalRole>,
 ): Record<string, GlobalRole> | undefined {
   if (!base && !overlay) return undefined;
+  if (base) assertNoDangerousKeys(base, "base global_roles");
+  if (overlay) assertNoDangerousKeys(overlay, "overlay global_roles");
   return { ...(base ?? {}), ...(overlay ?? {}) };
 }
 
@@ -71,6 +87,8 @@ function mergeResources(
   base: Record<string, ResourceBlock>,
   overlay: Record<string, ResourceBlock>,
 ): Record<string, ResourceBlock> {
+  assertNoDangerousKeys(base, "base resources");
+  assertNoDangerousKeys(overlay, "overlay resources");
   const result: Record<string, ResourceBlock> = {};
 
   // Copy base resources
@@ -134,6 +152,8 @@ function mergeGrants(
   if (!base) return overlay;
   if (!overlay) return base;
 
+  assertNoDangerousKeys(base, "base grants");
+  assertNoDangerousKeys(overlay, "overlay grants");
   const result: Record<string, string[]> = { ...base };
 
   for (const [role, perms] of Object.entries(overlay)) {
@@ -162,6 +182,8 @@ function mergeRelations(
   overlay?: Record<string, RelationDef>,
 ): Record<string, RelationDef> | undefined {
   if (!base && !overlay) return undefined;
+  if (base) assertNoDangerousKeys(base, "base relations");
+  if (overlay) assertNoDangerousKeys(overlay, "overlay relations");
   return { ...(base ?? {}), ...(overlay ?? {}) };
 }
 
@@ -173,6 +195,8 @@ function mergeFieldAccess(
   if (!base) return overlay;
   if (!overlay) return base;
 
+  assertNoDangerousKeys(base, "base field_access");
+  assertNoDangerousKeys(overlay, "overlay field_access");
   const result: Record<string, FieldAccessDef> = { ...base };
 
   for (const [field, def] of Object.entries(overlay)) {

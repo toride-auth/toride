@@ -20,10 +20,11 @@ Options:
 
 async function loadPolicy(filePath: string) {
   const resolved = resolve(filePath);
+  const content = readFileSync(resolved, "utf-8");
   if (resolved.endsWith(".json")) {
-    return loadJson(resolved);
+    return loadJson(content);
   }
-  return loadYaml(resolved);
+  return loadYaml(content);
 }
 
 async function generate(policyPath: string, outputPath: string): Promise<void> {

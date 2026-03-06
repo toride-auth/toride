@@ -79,6 +79,21 @@ describe("DrizzleConstraintAdapter", () => {
     expect(result).toEqual({ _op: "like", field: "name", pattern: "%test%", table: tasksTable });
   });
 
+  it("escapes LIKE metacharacters in field_contains value", () => {
+    const result = adapter.translate({ type: "field_contains", field: "name", value: "100%" });
+    expect(result).toEqual({ _op: "like", field: "name", pattern: "%100\\%%", table: tasksTable });
+  });
+
+  it("escapes underscore in field_contains value", () => {
+    const result = adapter.translate({ type: "field_contains", field: "name", value: "foo_bar" });
+    expect(result).toEqual({ _op: "like", field: "name", pattern: "%foo\\_bar%", table: tasksTable });
+  });
+
+  it("escapes backslash in field_contains value", () => {
+    const result = adapter.translate({ type: "field_contains", field: "name", value: "a\\b" });
+    expect(result).toEqual({ _op: "like", field: "name", pattern: "%a\\\\b%", table: tasksTable });
+  });
+
   it("translates relation", () => {
     const childQuery = { _op: "eq", field: "status", value: "active" };
     const result = adapter.relation("project", "Project", childQuery);
