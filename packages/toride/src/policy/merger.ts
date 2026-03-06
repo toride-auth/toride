@@ -103,25 +103,17 @@ function mergeResourceBlock(
   const rules = appendArrays(base.rules, overlay.rules);
   const field_access = mergeFieldAccess(base.field_access, overlay.field_access);
 
-  const result: Record<string, unknown> = { roles, permissions };
+  const result: ResourceBlock = {
+    roles,
+    permissions,
+    ...(grants && Object.keys(grants).length > 0 ? { grants } : {}),
+    ...(relations && Object.keys(relations).length > 0 ? { relations } : {}),
+    ...(derived_roles && derived_roles.length > 0 ? { derived_roles } : {}),
+    ...(rules && rules.length > 0 ? { rules } : {}),
+    ...(field_access && Object.keys(field_access).length > 0 ? { field_access } : {}),
+  };
 
-  if (grants && Object.keys(grants).length > 0) {
-    result.grants = grants;
-  }
-  if (relations && Object.keys(relations).length > 0) {
-    result.relations = relations;
-  }
-  if (derived_roles && derived_roles.length > 0) {
-    result.derived_roles = derived_roles;
-  }
-  if (rules && rules.length > 0) {
-    result.rules = rules;
-  }
-  if (field_access && Object.keys(field_access).length > 0) {
-    result.field_access = field_access;
-  }
-
-  return result as ResourceBlock;
+  return result;
 }
 
 function unionArrays(a: string[], b: string[]): string[] {
