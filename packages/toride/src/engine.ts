@@ -3,6 +3,7 @@
 // T064: Wire up buildConstraints() and translateConstraints()
 // T068-T072: explain(), permittedActions(), resolvedRoles(), canBatch(), audit callbacks
 // T083: Wire up snapshot() method
+// T095: Wire up canField() and permittedFields()
 
 import type {
   ActorRef,
@@ -27,6 +28,10 @@ import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-b
 import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
 import { snapshot as snapshotImpl } from "./snapshot.js";
 import type { PermissionSnapshot } from "./snapshot.js";
+import {
+  canField as canFieldImpl,
+  permittedFields as permittedFieldsImpl,
+} from "./field-access.js";
 
 /**
  * Main authorization engine.
@@ -119,6 +124,42 @@ export class Toride {
     options?: CheckOptions,
   ): Promise<PermissionSnapshot> {
     return snapshotImpl(this, actor, resources, options);
+  }
+
+  /**
+   * T095: Check if an actor can perform a field-level operation on a specific field.
+   * Restricted fields require the actor to have a role listed in field_access.
+   * Unlisted fields are unrestricted: any actor with the resource-level permission can access them.
+   */
+  async canField(
+    actor: ActorRef,
+    operation: "read" | "update",
+    resource: ResourceRef,
+    field: string,
+    options?: CheckOptions,
+  ): Promise<boolean> {
+    const resourceBlock = this.policy.resources[resource.type];
+    if (!resourceBlock) {
+      return false;
+    }
+    return canFieldImpl(this, actor, operation, resource, field, resourceBlock.field_access, options);
+  }
+
+  /**
+   * T095: Return the list of declared field_access field names the actor can access
+   * for the given operation. Only returns explicitly declared fields.
+   */
+  async permittedFields(
+    actor: ActorRef,
+    operation: "read" | "update",
+    resource: ResourceRef,
+    options?: CheckOptions,
+  ): Promise<string[]> {
+    const resourceBlock = this.policy.resources[resource.type];
+    if (!resourceBlock) {
+      return [];
+    }
+    return permittedFieldsImpl(this, actor, operation, resource, resourceBlock.field_access, options);
   }
 
   /**

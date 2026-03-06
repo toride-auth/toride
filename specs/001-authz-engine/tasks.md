@@ -259,14 +259,14 @@
 
 ### Tests for User Story 9
 
-- [ ] T091 [P] [US9] Write unit tests for `canField()` and `permittedFields()` (restricted fields, unrestricted fields, role-based access) in `packages/toride/tests/unit/engine/field-access.test.ts`
-- [ ] T092 [P] [US9] Write integration tests for field-level access scenarios in `packages/toride/tests/integration/field-access.test.ts`
+- [X] T091 [P] [US9] Write unit tests for `canField()` and `permittedFields()` (restricted fields, unrestricted fields, role-based access) in `packages/toride/tests/unit/engine/field-access.test.ts`
+- [X] T092 [P] [US9] Write integration tests for field-level access scenarios in `packages/toride/tests/integration/field-access.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T093 [US9] Implement `canField()` (resolve roles, check field_access for the field, unrestricted if field not listed) in `packages/toride/src/field-access.ts`
-- [ ] T094 [US9] Implement `permittedFields()` (for all declared field_access entries, return accessible ones plus all unrestricted fields) in `packages/toride/src/field-access.ts`
-- [ ] T095 [US9] Wire up `canField()` and `permittedFields()` on `Toride` class in `packages/toride/src/engine.ts`
+- [X] T093 [US9] Implement `canField()` (resolve roles, check field_access for the field, unrestricted if field not listed) in `packages/toride/src/field-access.ts`
+- [X] T094 [US9] Implement `permittedFields()` (for all declared field_access entries, return accessible ones plus all unrestricted fields) in `packages/toride/src/field-access.ts`
+- [X] T095 [US9] Wire up `canField()` and `permittedFields()` on `Toride` class in `packages/toride/src/engine.ts`
 
 **Checkpoint**: `canField(actor, "read", Employee:42, "salary")` returns correct results based on role. Unlisted fields are unrestricted.
 
