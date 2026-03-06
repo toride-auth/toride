@@ -6,6 +6,5 @@ FROM mcr.microsoft.com/devcontainers/base:ubuntu
 # like Node.js, Python, Go, etc.
 # =============================================================================
 
-# Examples:
-#   RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-#   RUN apt-get update && apt-get install -y redis-tools && rm -rf /var/lib/apt/lists/*
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/

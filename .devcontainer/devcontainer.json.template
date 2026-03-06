@@ -26,9 +26,7 @@
   //   "ghcr.io/devcontainers/features/node:1": { "version": "20" }
   //   "ghcr.io/devcontainers/features/python:1": { "version": "3.12" }
   //   "ghcr.io/devcontainers/features/go:1": { "version": "1.22" }
-  "features": {
-    "ghcr.io/kenfdev/devcontainer-feature/devenv:1": {}
-  },
+  "features": {},
   // CUSTOMIZE: Add VS Code extensions for your project.
   // Each worktree container installs its own copy.
   "customizations": {
