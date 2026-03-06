@@ -64,18 +64,18 @@
 
 ### Tests for User Story 1
 
-- [ ] T024 [P] [US1] Write unit tests for role resolution (direct roles only) in `packages/toride/tests/unit/evaluation/role-resolver.test.ts`
-- [ ] T025 [P] [US1] Write unit tests for grant evaluation (role-to-permission mapping, `all` keyword) in `packages/toride/tests/unit/evaluation/rule-engine.test.ts`
-- [ ] T026 [P] [US1] Write integration tests for basic `can()` scenarios (allow, deny, default-deny, `all` grants) in `packages/toride/tests/integration/basic-can.test.ts`
+- [X] T024 [P] [US1] Write unit tests for role resolution (direct roles only) in `packages/toride/tests/unit/evaluation/role-resolver.test.ts`
+- [X] T025 [P] [US1] Write unit tests for grant evaluation (role-to-permission mapping, `all` keyword) in `packages/toride/tests/unit/evaluation/rule-engine.test.ts`
+- [X] T026 [P] [US1] Write integration tests for basic `can()` scenarios (allow, deny, default-deny, `all` grants) in `packages/toride/tests/integration/basic-can.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T027 [US1] Implement per-check resolver cache (`Map<string, Promise<T>>` keyed by method:type:id) in `packages/toride/src/evaluation/cache.ts`
-- [ ] T028 [US1] Implement direct role resolution (call `resolver.getRoles()`, no derivation yet) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T029 [US1] Implement grant evaluation (map resolved roles to permissions via `grants`, resolve `all` to declared permissions) in `packages/toride/src/evaluation/rule-engine.ts`
-- [ ] T030 [US1] Implement `Toride` class with `can()` method (create cache, resolve direct roles, check grants, return boolean with default-deny) in `packages/toride/src/engine.ts`
-- [ ] T031 [US1] Implement `createToride()` typed factory function in `packages/toride/src/engine.ts`
-- [ ] T032 [US1] Wire up `Toride`, `createToride` exports in `packages/toride/src/index.ts`
+- [X] T027 [US1] Implement per-check resolver cache (`Map<string, Promise<T>>` keyed by method:type:id) in `packages/toride/src/evaluation/cache.ts`
+- [X] T028 [US1] Implement direct role resolution (call `resolver.getRoles()`, no derivation yet) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T029 [US1] Implement grant evaluation (map resolved roles to permissions via `grants`, resolve `all` to declared permissions) in `packages/toride/src/evaluation/rule-engine.ts`
+- [X] T030 [US1] Implement `Toride` class with `can()` method (create cache, resolve direct roles, check grants, return boolean with default-deny) in `packages/toride/src/engine.ts`
+- [X] T031 [US1] Implement `createToride()` typed factory function in `packages/toride/src/engine.ts`
+- [X] T032 [US1] Wire up `Toride`, `createToride` exports in `packages/toride/src/index.ts`
 
 **Checkpoint**: `can(actor, "update", Task:42)` returns `true` for an actor with `editor` role granting `[read, update]`, and `false` for actors without roles (default-deny). `all` grants resolve to all declared permissions.
 
