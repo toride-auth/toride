@@ -259,14 +259,14 @@
 
 ### Tests for User Story 9
 
-- [ ] T091 [P] [US9] Write unit tests for `canField()` and `permittedFields()` (restricted fields, unrestricted fields, role-based access) in `packages/toride/tests/unit/engine/field-access.test.ts`
-- [ ] T092 [P] [US9] Write integration tests for field-level access scenarios in `packages/toride/tests/integration/field-access.test.ts`
+- [X] T091 [P] [US9] Write unit tests for `canField()` and `permittedFields()` (restricted fields, unrestricted fields, role-based access) in `packages/toride/tests/unit/engine/field-access.test.ts`
+- [X] T092 [P] [US9] Write integration tests for field-level access scenarios in `packages/toride/tests/integration/field-access.test.ts`
 
 ### Implementation for User Story 9
 
-- [ ] T093 [US9] Implement `canField()` (resolve roles, check field_access for the field, unrestricted if field not listed) in `packages/toride/src/field-access.ts`
-- [ ] T094 [US9] Implement `permittedFields()` (for all declared field_access entries, return accessible ones plus all unrestricted fields) in `packages/toride/src/field-access.ts`
-- [ ] T095 [US9] Wire up `canField()` and `permittedFields()` on `Toride` class in `packages/toride/src/engine.ts`
+- [X] T093 [US9] Implement `canField()` (resolve roles, check field_access for the field, unrestricted if field not listed) in `packages/toride/src/field-access.ts`
+- [X] T094 [US9] Implement `permittedFields()` (for all declared field_access entries, return accessible ones plus all unrestricted fields) in `packages/toride/src/field-access.ts`
+- [X] T095 [US9] Wire up `canField()` and `permittedFields()` on `Toride` class in `packages/toride/src/engine.ts`
 
 **Checkpoint**: `canField(actor, "read", Employee:42, "salary")` returns correct results based on role. Unlisted fields are unrestricted.
 
@@ -276,18 +276,18 @@
 
 **Purpose**: Satellite packages, policy management, and final integration
 
-- [ ] T096 [P] Implement `mergePolicies()` (additive composition, conflict detection for grants, silent append for rules) in `packages/toride/src/policy/merger.ts`
-- [ ] T097 [P] Implement `setPolicy()` (atomic swap, in-flight checks use old policy) in `packages/toride/src/engine.ts`
-- [ ] T098 [P] Implement `@toride/codegen` generator (read policy, emit TypeScript types for Actions, Resources, RoleMap, PermissionMap, RelationMap, TypedRelationResolver) in `packages/codegen/src/generator.ts`
-- [ ] T099 [P] Implement `toride-codegen` CLI entry point with `-o` and `--watch` flags in `packages/codegen/src/cli.ts`
-- [ ] T100 [P] Implement `@toride/prisma` PrismaConstraintAdapter (`createPrismaAdapter` factory with translation rules per contract) in `packages/prisma/src/index.ts`
-- [ ] T101 [P] Implement `@toride/drizzle` DrizzleConstraintAdapter (`createDrizzleAdapter` factory with translation rules per contract) in `packages/drizzle/src/index.ts`
-- [ ] T102 Write unit tests for `mergePolicies()` and `setPolicy()` in `packages/toride/tests/unit/policy/merger.test.ts`
-- [ ] T103 [P] Write unit tests for `@toride/codegen` in `packages/codegen/tests/generator.test.ts`
-- [ ] T104 [P] Write unit tests for `@toride/prisma` adapter in `packages/prisma/tests/adapter.test.ts`
-- [ ] T105 [P] Write unit tests for `@toride/drizzle` adapter in `packages/drizzle/tests/adapter.test.ts`
-- [ ] T106 Run quickstart.md validation (verify all code examples compile and produce expected outputs)
-- [ ] T107 Final export audit: verify all public API types and functions are exported from `packages/toride/src/index.ts`
+- [X] T096 [P] Implement `mergePolicies()` (additive composition, conflict detection for grants, silent append for rules) in `packages/toride/src/policy/merger.ts`
+- [X] T097 [P] Implement `setPolicy()` (atomic swap, in-flight checks use old policy) in `packages/toride/src/engine.ts`
+- [X] T098 [P] Implement `@toride/codegen` generator (read policy, emit TypeScript types for Actions, Resources, RoleMap, PermissionMap, RelationMap, TypedRelationResolver) in `packages/codegen/src/generator.ts`
+- [X] T099 [P] Implement `toride-codegen` CLI entry point with `-o` and `--watch` flags in `packages/codegen/src/cli.ts`
+- [X] T100 [P] Implement `@toride/prisma` PrismaConstraintAdapter (`createPrismaAdapter` factory with translation rules per contract) in `packages/prisma/src/index.ts`
+- [X] T101 [P] Implement `@toride/drizzle` DrizzleConstraintAdapter (`createDrizzleAdapter` factory with translation rules per contract) in `packages/drizzle/src/index.ts`
+- [X] T102 Write unit tests for `mergePolicies()` and `setPolicy()` in `packages/toride/tests/unit/policy/merger.test.ts`
+- [X] T103 [P] Write unit tests for `@toride/codegen` in `packages/codegen/tests/generator.test.ts`
+- [X] T104 [P] Write unit tests for `@toride/prisma` adapter in `packages/prisma/tests/adapter.test.ts`
+- [X] T105 [P] Write unit tests for `@toride/drizzle` adapter in `packages/drizzle/tests/adapter.test.ts`
+- [X] T106 Run quickstart.md validation (verify all code examples compile and produce expected outputs)
+- [X] T107 Final export audit: verify all public API types and functions are exported from `packages/toride/src/index.ts`
 
 ---
 
