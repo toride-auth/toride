@@ -67,3 +67,10 @@ export type {
   ConstraintResult,
   ConstraintAdapter,
 } from "./partial/constraint-types.js";
+
+// ─── Testing Utilities (T087-T089) ──────────────────────────────
+export { createMockResolver } from "./testing/mock-resolver.js";
+export { parseInlineTests, parseTestFile } from "./testing/test-parser.js";
+export { runTestCases } from "./testing/test-runner.js";
+export type { TestResult } from "./testing/test-runner.js";
+export type { TestFileResult } from "./testing/test-parser.js";

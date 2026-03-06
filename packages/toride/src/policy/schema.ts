@@ -158,3 +158,10 @@ export const PolicySchema = v.object({
   resources: v.record(v.string(), ResourceBlockSchema),
   tests: v.optional(v.array(TestCaseSchema)),
 });
+
+// ─── Test File (separate .test.yaml) ────────────────────────────────
+
+export const TestFileSchema = v.object({
+  policy: v.string(),
+  tests: v.array(TestCaseSchema),
+});
