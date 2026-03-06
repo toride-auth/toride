@@ -215,15 +215,15 @@
 
 ### Tests for User Story 7
 
-- [ ] T079 [P] [US7] Write unit tests for `snapshot()` (permission map generation) in `packages/toride/tests/unit/engine/snapshot.test.ts`
-- [ ] T080 [P] [US7] Write unit tests for `TorideClient` (sync can(), default-deny for unknown resources) in `packages/toride/tests/unit/client/client.test.ts`
+- [X] T079 [P] [US7] Write unit tests for `snapshot()` (permission map generation) in `packages/toride/tests/unit/engine/snapshot.test.ts`
+- [X] T080 [P] [US7] Write unit tests for `TorideClient` (sync can(), default-deny for unknown resources) in `packages/toride/tests/unit/client/client.test.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T081 [US7] Implement `snapshot()` method (evaluate `permittedActions()` for each resource, return `PermissionSnapshot`) in `packages/toride/src/snapshot.ts`
-- [ ] T082 [US7] Implement `TorideClient` class with synchronous `can()` and default-deny for unknown resources in `packages/toride/src/client.ts`
-- [ ] T083 [US7] Wire up `snapshot()` on `Toride` class in `packages/toride/src/engine.ts`
-- [ ] T084 [US7] Wire up `toride/client` subpath export in `packages/toride/src/client.ts` and verify package.json exports
+- [X] T081 [US7] Implement `snapshot()` method (evaluate `permittedActions()` for each resource, return `PermissionSnapshot`) in `packages/toride/src/snapshot.ts`
+- [X] T082 [US7] Implement `TorideClient` class with synchronous `can()` and default-deny for unknown resources in `packages/toride/src/client.ts`
+- [X] T083 [US7] Wire up `snapshot()` on `Toride` class in `packages/toride/src/engine.ts`
+- [X] T084 [US7] Wire up `toride/client` subpath export in `packages/toride/src/client.ts` and verify package.json exports
 
 **Checkpoint**: `snapshot()` returns a `PermissionSnapshot` map. `TorideClient` provides instant sync `can()` checks. Unknown resources return `false`.
 
