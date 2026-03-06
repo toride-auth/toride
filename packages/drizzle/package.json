@@ -2,7 +2,23 @@
   "name": "@toride/drizzle",
   "version": "0.0.1",
   "description": "Drizzle ORM integration for Toride authorization engine",
-  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "toride": "workspace:*"
+  },
   "keywords": ["authorization", "drizzle", "toride"],
   "license": "MIT",
   "repository": {

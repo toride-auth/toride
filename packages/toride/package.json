@@ -2,7 +2,31 @@
   "name": "toride",
   "version": "0.0.1",
   "description": "Relation-aware authorization engine for TypeScript",
-  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "toride": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "yaml": "^2.3.0",
+    "valibot": "^0.31.0"
+  },
   "keywords": ["authorization", "rbac", "rebac", "abac", "permissions"],
   "license": "MIT",
   "repository": {
