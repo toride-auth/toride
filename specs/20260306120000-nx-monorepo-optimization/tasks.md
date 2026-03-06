@@ -19,9 +19,9 @@
 
 **Purpose**: Install Nx and create the workspace configuration
 
-- [ ] T001 Install `nx` as root devDependency via `pnpm add -Dw nx`
-- [ ] T002 Create `nx.json` at repository root per contracts/nx-json.md (extends `nx/presets/npm.json`, namedInputs, targetDefaults for build/test/lint)
-- [ ] T003 Append `.nx/cache` and `.nx/workspace-data` to `.gitignore`
+- [X] T001 Install `nx` as root devDependency via `pnpm add -Dw nx`
+- [X] T002 Create `nx.json` at repository root per contracts/nx-json.md (extends `nx/presets/npm.json`, namedInputs, targetDefaults for build/test/lint)
+- [X] T003 Append `.nx/cache` and `.nx/workspace-data` to `.gitignore`
 
 **Checkpoint**: `pnpm exec nx show projects` lists all 4 packages
 
