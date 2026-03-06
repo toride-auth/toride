@@ -237,15 +237,15 @@
 
 ### Tests for User Story 8
 
-- [ ] T085 [P] [US8] Write unit tests for mock resolver construction from test case data in `packages/toride/tests/unit/testing/mock-resolver.test.ts`
-- [ ] T086 [P] [US8] Write integration tests for declarative test runner (pass/fail scenarios, global role derivation from attributes) in `packages/toride/tests/integration/declarative-tests.test.ts`
+- [X] T085 [P] [US8] Write unit tests for mock resolver construction from test case data in `packages/toride/tests/unit/testing/mock-resolver.test.ts`
+- [X] T086 [P] [US8] Write integration tests for declarative test runner (pass/fail scenarios, global role derivation from attributes) in `packages/toride/tests/integration/declarative-tests.test.ts`
 
 ### Implementation for User Story 8
 
-- [ ] T087 [US8] Implement test case model parsing (inline `tests:` section in policy + separate `.test.yaml` files) in `packages/toride/src/testing/test-parser.ts`
-- [ ] T088 [US8] Implement mock resolver construction from test case `roles`, `relations`, `attributes` maps in `packages/toride/src/testing/mock-resolver.ts`
-- [ ] T089 [US8] Implement test runner (load policy, create mock resolver per test case, run `can()`, compare with `expected`) in `packages/toride/src/testing/test-runner.ts`
-- [ ] T090 [US8] Implement `toride test` CLI command with glob pattern support and pass/fail output in `packages/toride/src/cli.ts`
+- [X] T087 [US8] Implement test case model parsing (inline `tests:` section in policy + separate `.test.yaml` files) in `packages/toride/src/testing/test-parser.ts`
+- [X] T088 [US8] Implement mock resolver construction from test case `roles`, `relations`, `attributes` maps in `packages/toride/src/testing/mock-resolver.ts`
+- [X] T089 [US8] Implement test runner (load policy, create mock resolver per test case, run `can()`, compare with `expected`) in `packages/toride/src/testing/test-runner.ts`
+- [X] T090 [US8] Implement `toride test` CLI command with glob pattern support and pass/fail output in `packages/toride/src/cli.ts`
 
 **Checkpoint**: YAML test cases with inline mocks execute correctly. `toride test` CLI reports pass/fail with clear output. Global roles derived from actor attributes without mock override.
 
