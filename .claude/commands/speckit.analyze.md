@@ -24,9 +24,35 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 ## Execution Steps
 
+### 0. Interview the user about analysis focus and concerns BEFORE running analysis
+
+Before performing any analysis, conduct a focused interview using the **AskUserQuestion** tool to understand what the user is most concerned about and where to focus the analysis.
+
+**Interview process**:
+- Ask ONE question at a time via AskUserQuestion
+- Tailor questions to the specific artifacts that exist (spec, plan, tasks)
+- When you believe you have sufficient understanding, ask: "I think I understand what you want me to focus on. Do you have any other concerns or areas you'd like me to pay special attention to?"
+- Continue if the user raises new points
+- Stop only when you have clear understanding AND the user confirms nothing more to add
+
+**What to ask about** (adapt based on the project — skip irrelevant areas):
+- Are there specific areas of the spec/plan/tasks that feel weak or uncertain?
+- Any known inconsistencies or gaps the user suspects but hasn't verified?
+- Which categories matter most? (e.g., security alignment, coverage completeness, terminology consistency)
+- Are there specific constitution principles the user is worried about violating?
+- Any recent changes that might have introduced inconsistencies?
+- Should certain areas be prioritized over others in the analysis?
+- Are there known tradeoffs or deviations the user made intentionally (so they aren't flagged as issues)?
+- What severity level should trigger a blocking recommendation? (CRITICAL only, or HIGH too?)
+
+**Key rules**:
+- Do NOT start the analysis during the interview
+- If the user provided focus context in $ARGUMENTS, acknowledge it and ask deeper follow-ups
+- Use the interview answers to prioritize and weight the detection passes
+
 ### 1. Initialize Analysis Context
 
-Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks [SPECS_DIR]` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. If `$ARGUMENTS` starts with a path to a specs directory (e.g., `specs/20260306120000-...`), pass it as the SPECS_DIR positional argument to the script. Derive absolute paths:
 
 - SPEC = FEATURE_DIR/spec.md
 - PLAN = FEATURE_DIR/plan.md

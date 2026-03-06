@@ -26,49 +26,57 @@ The text the user typed after `/speckit.specify` in the triggering message **is*
 
 Given that feature description, do this:
 
-1. **Generate a concise short name** (2-4 words) for the branch:
-   - Analyze the feature description and extract the most meaningful keywords
-   - Create a 2-4 word short name that captures the essence of the feature
-   - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
-   - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
-   - Keep it concise but descriptive enough to understand the feature at a glance
-   - Examples:
-     - "I want to add user authentication" → "user-auth"
-     - "Implement OAuth2 integration for the API" → "oauth2-api-integration"
-     - "Create a dashboard for analytics" → "analytics-dashboard"
-     - "Fix payment processing timeout bug" → "fix-payment-timeout"
+1. **Deep-dive interview the user BEFORE writing anything**:
 
-2. **Check for existing branches before creating new one**:
+   Before generating any spec content, conduct a thorough interview using the **AskUserQuestion** tool. The goal is to deeply understand the user's intent, constraints, concerns, and vision. Do NOT write the spec until you have a clear, complete understanding.
 
-   a. First, fetch all remote branches to ensure we have the latest information:
+   **Interview process**:
+   - Ask ONE question at a time via AskUserQuestion
+   - Cover all dimensions: functional scope, user types, edge cases, tradeoffs, constraints, success metrics, UX expectations, security concerns, integration points, and anything else that's relevant
+   - Questions must be non-obvious and specific to the feature — never ask generic or boilerplate questions
+   - Dig deeper on answers that reveal complexity or ambiguity — follow up aggressively
+   - After each answer, assess whether your understanding is complete enough to write a high-quality spec
+   - When you believe you have sufficient understanding, ask the user: "I think I have a clear picture now. Do you have any other concerns, constraints, or details you'd like to add before I write the spec?"
+   - Continue asking if the user raises new points
+   - Stop only when:
+     - You have clear understanding of all critical dimensions, AND
+     - The user confirms they have nothing more to add (or says "done", "proceed", "go ahead", etc.)
 
-      ```bash
-      git fetch --all --prune
-      ```
+   **What to ask about** (adapt to the specific feature — skip irrelevant areas, go deep on relevant ones):
+   - Who are the users/actors? What are their goals and pain points?
+   - What's in scope vs explicitly out of scope?
+   - What are the most important success criteria from the user's perspective?
+   - Are there existing systems, patterns, or constraints this must integrate with?
+   - What are the biggest risks or concerns?
+   - Are there tradeoffs the user has already considered? (e.g., simplicity vs flexibility, security vs convenience)
+   - Edge cases: what happens when things go wrong? Empty states? Concurrent access?
+   - Non-functional expectations: performance, scale, availability?
+   - UX preferences: how should this feel to the end user?
+   - Any hard constraints or non-negotiables?
+   - Anything the user has seen elsewhere that they want to emulate or avoid?
 
-   b. Find the highest feature number across all sources for the short-name:
-      - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
-      - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
-      - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
+   **Key rules**:
+   - Do NOT generate the spec during the interview — focus entirely on understanding
+   - Do NOT ask questions that have obvious answers from the feature description
+   - Prefer specific, probing questions over broad ones (e.g., "Should failed auth attempts lock the account after N tries, or just rate-limit?" not "What about security?")
+   - Use the user's answers to generate increasingly targeted follow-up questions
 
-   c. Determine the next available number:
-      - Extract all numbers from all three sources
-      - Find the highest number N
-      - Use N+1 for the new branch number
+2. **Generate a short name and create the feature directory**:
 
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
-      - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
-      - PowerShell example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" -Json -Number 5 -ShortName "user-auth" "Add user authentication"`
+   a. Analyze the feature description and generate a concise short name (2-4 words, kebab-case):
+      - Use action-noun format when possible (e.g., "user-auth", "fix-payment-timeout")
+      - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
+      - Examples:
+        - "I want to add user authentication" → "user-auth"
+        - "Implement OAuth2 integration for the API" → "oauth2-api-integration"
+        - "Create a dashboard for analytics" → "analytics-dashboard"
 
-   **IMPORTANT**:
-   - Check all three sources (remote branches, local branches, specs directories) to find the highest number
-   - Only match branches/directories with the exact short-name pattern
-   - If no existing branches/directories found with this short-name, start with number 1
-   - You must only ever run this script once per feature
-   - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
-   - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
+   b. Generate a UTC timestamp prefix in `YYYYMMDDHHmmss` format (e.g., `20260306143022`)
+
+   c. Create the feature directory and spec file:
+      - Directory: `specs/<YYYYMMDDHHmmss>-<short-name>/` (e.g., `specs/20260306143022-user-auth/`)
+      - Spec file: `specs/<YYYYMMDDHHmmss>-<short-name>/spec.md`
+      - Checklists directory: `specs/<YYYYMMDDHHmmss>-<short-name>/checklists/`
 
 3. Load `.specify/templates/spec-template.md` to understand required sections.
 
@@ -76,9 +84,9 @@ Given that feature description, do this:
 
     1. Parse user description from Input
        If empty: ERROR "No feature description provided"
-    2. Extract key concepts from description
+    2. Extract key concepts from description AND interview answers
        Identify: actors, actions, data, constraints
-    3. For unclear aspects:
+    3. For unclear aspects (most should already be resolved from the interview):
        - Make informed guesses based on context and industry standards
        - Only mark with [NEEDS CLARIFICATION: specific question] if:
          - The choice significantly impacts feature scope or user experience
@@ -97,7 +105,7 @@ Given that feature description, do this:
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+5. Write the specification to the spec file using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) AND interview answers while preserving section order and headings.
 
 6. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
@@ -146,7 +154,7 @@ Given that feature description, do this:
 
    c. **Handle Validation Results**:
 
-      - **If all items pass**: Mark checklist complete and proceed to step 6
+      - **If all items pass**: Mark checklist complete and proceed to step 5d
 
       - **If items fail (excluding [NEEDS CLARIFICATION])**:
         1. List the failing items and specific issues
@@ -181,9 +189,7 @@ Given that feature description, do this:
 
    d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
 
-7. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
-
-**NOTE:** The script creates and checks out the new branch and initializes the spec file before writing.
+7. Report completion with spec file path, checklist results, and readiness for the next phase (`/speckit.clarify` or `/speckit.plan`).
 
 ## General Guidelines
 

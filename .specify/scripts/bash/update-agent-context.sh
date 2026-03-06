@@ -34,9 +34,10 @@
 #    - Can update single agents or all existing agent files
 #    - Creates default Claude file if no agent files exist
 #
-# Usage: ./update-agent-context.sh [agent_type]
+# Usage: ./update-agent-context.sh [agent_type] [specs_dir]
 # Agent types: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|codebuddy|amp|shai|kiro-cli|agy|bob|qodercli
-# Leave empty to update all existing agent files
+# specs_dir: Optional explicit specs directory (e.g., specs/20260306120000-my-feature)
+# Leave agent_type empty to update all existing agent files
 
 set -e
 
@@ -52,11 +53,14 @@ set -o pipefail
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
+# Parse arguments: agent type and optional explicit specs dir
+AGENT_TYPE="${1:-}"
+EXPLICIT_SPECS_DIR="${2:-}"
+
 # Get all paths and variables from common functions
-eval $(get_feature_paths)
+eval $(get_feature_paths "$EXPLICIT_SPECS_DIR")
 
 NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
-AGENT_TYPE="${1:-}"
 
 # Agent-specific file paths  
 CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"

@@ -73,8 +73,8 @@ check_feature_branch() {
     fi
 
     if [[ ! "$branch" =~ ^[0-9]{3}- ]]; then
-        echo "ERROR: Not on a feature branch. Current branch: $branch" >&2
-        echo "Feature branches should be named like: 001-feature-name" >&2
+        echo "WARNING: Branch '$branch' does not follow ###-feature-name convention." >&2
+        echo "Pass an explicit specs directory argument (e.g., specs/20260306120000-my-feature) to resolve." >&2
         return 1
     fi
 
@@ -125,6 +125,7 @@ find_feature_dir_by_prefix() {
 }
 
 get_feature_paths() {
+    local explicit_dir="${1:-}"
     local repo_root=$(get_repo_root)
     local current_branch=$(get_current_branch)
     local has_git_repo="false"
@@ -133,8 +134,18 @@ get_feature_paths() {
         has_git_repo="true"
     fi
 
-    # Use prefix-based lookup to support multiple branches per spec
-    local feature_dir=$(find_feature_dir_by_prefix "$repo_root" "$current_branch")
+    local feature_dir
+    if [[ -n "$explicit_dir" ]]; then
+        # Resolve to absolute path relative to REPO_ROOT if not already absolute
+        if [[ "$explicit_dir" != /* ]]; then
+            feature_dir="$repo_root/$explicit_dir"
+        else
+            feature_dir="$explicit_dir"
+        fi
+    else
+        # Use prefix-based lookup to support multiple branches per spec
+        feature_dir=$(find_feature_dir_by_prefix "$repo_root" "$current_branch")
+    fi
 
     cat <<EOF
 REPO_ROOT='$repo_root'
