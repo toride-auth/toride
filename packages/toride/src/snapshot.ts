@@ -39,12 +39,12 @@ export async function snapshot(
   resources: ResourceRef[],
   options?: CheckOptions,
 ): Promise<PermissionSnapshot> {
-  const result: PermissionSnapshot = {};
-
-  for (const resource of resources) {
-    const key = `${resource.type}:${resource.id}`;
-    result[key] = await engine.permittedActions(actor, resource, options);
-  }
-
-  return result;
+  const entries = await Promise.all(
+    resources.map(async (resource) => {
+      const key = `${resource.type}:${resource.id}`;
+      const actions = await engine.permittedActions(actor, resource, options);
+      return [key, actions] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
 }
