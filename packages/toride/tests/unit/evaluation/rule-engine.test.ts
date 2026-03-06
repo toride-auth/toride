@@ -7,20 +7,23 @@ import type {
   RelationResolver,
   ResourceBlock,
   ExplainResult,
+  Policy,
 } from "../../../src/types.js";
 
 describe("evaluate (grant evaluation)", () => {
-  let evaluate: (
+  let evaluateRaw: (
     actor: ActorRef,
     action: string,
     resource: ResourceRef,
     resourceBlock: ResourceBlock,
     resolver: RelationResolver,
+    policy: Policy,
+    options?: { maxDerivedRoleDepth?: number },
   ) => Promise<ExplainResult>;
 
   beforeAll(async () => {
     const mod = await import("../../../src/evaluation/rule-engine.js");
-    evaluate = mod.evaluate;
+    evaluateRaw = mod.evaluate;
   });
 
   const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
@@ -43,6 +46,22 @@ describe("evaluate (grant evaluation)", () => {
       admin: ["all"],
     },
   };
+
+  const minimalPolicy: Policy = {
+    version: "1",
+    actors: { User: { attributes: {} } },
+    resources: { Task: taskBlock },
+  };
+
+  function evaluate(
+    a: ActorRef,
+    action: string,
+    r: ResourceRef,
+    block: ResourceBlock,
+    resolver: RelationResolver,
+  ): Promise<ExplainResult> {
+    return evaluateRaw(a, action, r, block, resolver, minimalPolicy);
+  }
 
   it("grants permission when role has explicit permission", async () => {
     const result = await evaluate(actor, "update", resource, taskBlock, makeResolver(["editor"]));

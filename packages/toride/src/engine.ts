@@ -60,7 +60,9 @@ export class Toride {
       };
     }
 
-    return evaluate(actor, action, resource, resourceBlock, this.resolver);
+    return evaluate(actor, action, resource, resourceBlock, this.resolver, this.policy, {
+      maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
+    });
   }
 }
 
