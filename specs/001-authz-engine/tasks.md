@@ -193,15 +193,15 @@
 
 ### Tests for User Story 6
 
-- [ ] T073 [P] [US6] Write unit tests for all validation error scenarios (undeclared roles, unknown relations, invalid operators, mismatched actor attributes, derivation pattern conflicts) in `packages/toride/tests/unit/policy/validator.test.ts`
-- [ ] T074 [P] [US6] Write unit tests for strict mode warnings (unused roles, unreachable rules, redundant derived_roles) in `packages/toride/tests/unit/policy/strict-validator.test.ts`
+- [X] T073 [P] [US6] Write unit tests for all validation error scenarios (undeclared roles, unknown relations, invalid operators, mismatched actor attributes, derivation pattern conflicts) in `packages/toride/tests/unit/policy/validator.test.ts`
+- [X] T074 [P] [US6] Write unit tests for strict mode warnings (unused roles, unreachable rules, redundant derived_roles) in `packages/toride/tests/unit/policy/strict-validator.test.ts`
 
 ### Implementation for User Story 6
 
-- [ ] T075 [US6] Enhance cross-reference validator with comprehensive checks: undeclared roles in grants, unknown relations in `on_relation`, invalid `$actor.x` references against actor declarations, `from_global_role` referencing undeclared global roles in `packages/toride/src/policy/validator.ts`
-- [ ] T076 [US6] Implement logical path generation for all error messages (e.g., `resources.Task.grants references undeclared role "edtor"`) in `packages/toride/src/policy/validator.ts`
-- [ ] T077 [US6] Implement strict mode static analysis (unused roles, unreachable rules, redundant derivations) as warnings in `packages/toride/src/policy/validator.ts`
-- [ ] T078 [US6] Implement `toride validate` CLI command (errors-only default, `--strict` flag for warnings) in `packages/toride/src/cli.ts`
+- [X] T075 [US6] Enhance cross-reference validator with comprehensive checks: undeclared roles in grants, unknown relations in `on_relation`, invalid `$actor.x` references against actor declarations, `from_global_role` referencing undeclared global roles in `packages/toride/src/policy/validator.ts`
+- [X] T076 [US6] Implement logical path generation for all error messages (e.g., `resources.Task.grants references undeclared role "edtor"`) in `packages/toride/src/policy/validator.ts`
+- [X] T077 [US6] Implement strict mode static analysis (unused roles, unreachable rules, redundant derivations) as warnings in `packages/toride/src/policy/validator.ts`
+- [X] T078 [US6] Implement `toride validate` CLI command (errors-only default, `--strict` flag for warnings) in `packages/toride/src/cli.ts`
 
 **Checkpoint**: Invalid policies produce clear, path-annotated errors. `toride validate` exits 0/1 correctly. `--strict` shows additional warnings without failing on warnings alone.
 

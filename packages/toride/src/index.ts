@@ -4,6 +4,18 @@ export const VERSION = "0.0.1";
 // ─── Policy Loading (T020) ────────────────────────────────────────
 export { loadYaml, loadJson } from "./policy/parser.js";
 
+// ─── Policy Validation (T075-T077) ──────────────────────────────
+export {
+  validatePolicy,
+  validatePolicyResult,
+  validatePolicyStrict,
+} from "./policy/validator.js";
+export type {
+  ValidationDiagnostic,
+  ValidationResult,
+  StrictValidationResult,
+} from "./policy/validator.js";
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 export type {
   ActorRef,
