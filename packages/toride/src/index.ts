@@ -57,6 +57,9 @@ export { ValidationError, CycleError, DepthLimitError } from "./types.js";
 // ─── Engine (T030/T031) ──────────────────────────────────────────
 export { Toride, createToride } from "./engine.js";
 
+// ─── Snapshot (T081/T084) ────────────────────────────────────────
+export type { PermissionSnapshot } from "./snapshot.js";
+
 // ─── Constraint AST Types (T016) ─────────────────────────────────
 export type {
   Constraint,
