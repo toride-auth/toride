@@ -60,9 +60,23 @@ export class Toride {
       };
     }
 
-    return evaluate(actor, action, resource, resourceBlock, this.resolver, this.policy, {
-      maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
-    });
+    // T052: Forward all options including customEvaluators and maxConditionDepth
+    try {
+      return await evaluate(actor, action, resource, resourceBlock, this.resolver, this.policy, {
+        maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
+        maxConditionDepth: this.options.maxConditionDepth,
+        customEvaluators: this.options.customEvaluators,
+      });
+    } catch {
+      // T052: Fail-closed error handling - any uncaught error denies access
+      return {
+        allowed: false,
+        resolvedRoles: { direct: [], derived: [] },
+        grantedPermissions: [],
+        matchedRules: [],
+        finalDecision: `Denied: evaluation error (fail-closed)`,
+      };
+    }
   }
 }
 

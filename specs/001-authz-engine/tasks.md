@@ -115,20 +115,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T043 [P] [US3] Write unit tests for condition expression evaluator (all operators, cross-references, strict null, logical combinators) in `packages/toride/tests/unit/evaluation/condition.test.ts`
-- [ ] T044 [P] [US3] Write unit tests for rule engine (permit, forbid, forbid-wins, roles-only guard, custom evaluators) in `packages/toride/tests/unit/evaluation/rules.test.ts`
-- [ ] T045 [P] [US3] Write integration tests for conditional rules (permit+forbid scenarios, forbid-wins, fail-closed on errors) in `packages/toride/tests/integration/conditional-rules.test.ts`
+- [X] T043 [P] [US3] Write unit tests for condition expression evaluator (all operators, cross-references, strict null, logical combinators) in `packages/toride/tests/unit/evaluation/condition.test.ts`
+- [X] T044 [P] [US3] Write unit tests for rule engine (permit, forbid, forbid-wins, roles-only guard, custom evaluators) in `packages/toride/tests/unit/evaluation/rules.test.ts`
+- [X] T045 [P] [US3] Write integration tests for conditional rules (permit+forbid scenarios, forbid-wins, fail-closed on errors) in `packages/toride/tests/integration/conditional-rules.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Implement condition expression evaluator (equality, comparison, set ops, existence, pattern ops, negation, cross-references `$actor`/`$resource`/`$env`, logical combinators `any`/`all`) in `packages/toride/src/evaluation/condition.ts`
-- [ ] T047 [US3] Implement nested property resolution (`resource.relation.field` via resolver, with configurable `maxConditionDepth` default 3) in `packages/toride/src/evaluation/condition.ts`
-- [ ] T048 [US3] Implement strict null semantics (undefined/null never equals anything) in `packages/toride/src/evaluation/condition.ts`
-- [ ] T049 [US3] Implement permit/forbid rule evaluation with forbid-wins precedence in `packages/toride/src/evaluation/rule-engine.ts`
-- [ ] T050 [US3] Implement roles-only guard (rules only evaluated for actors with at least one role) in `packages/toride/src/evaluation/rule-engine.ts`
-- [ ] T051 [US3] Implement custom evaluator support (registered functions, fail-closed: forbid error -> matched, permit error -> not matched) in `packages/toride/src/evaluation/rule-engine.ts`
-- [ ] T052 [US3] Implement fail-closed error handling for resolver errors (any exception -> access denied) in `packages/toride/src/engine.ts`
-- [ ] T053 [US3] Implement `cardinality: many` relation resolution with ANY (exists) semantics in conditions in `packages/toride/src/evaluation/condition.ts`
+- [X] T046 [US3] Implement condition expression evaluator (equality, comparison, set ops, existence, pattern ops, negation, cross-references `$actor`/`$resource`/`$env`, logical combinators `any`/`all`) in `packages/toride/src/evaluation/condition.ts`
+- [X] T047 [US3] Implement nested property resolution (`resource.relation.field` via resolver, with configurable `maxConditionDepth` default 3) in `packages/toride/src/evaluation/condition.ts`
+- [X] T048 [US3] Implement strict null semantics (undefined/null never equals anything) in `packages/toride/src/evaluation/condition.ts`
+- [X] T049 [US3] Implement permit/forbid rule evaluation with forbid-wins precedence in `packages/toride/src/evaluation/rule-engine.ts`
+- [X] T050 [US3] Implement roles-only guard (rules only evaluated for actors with at least one role) in `packages/toride/src/evaluation/rule-engine.ts`
+- [X] T051 [US3] Implement custom evaluator support (registered functions, fail-closed: forbid error -> matched, permit error -> not matched) in `packages/toride/src/evaluation/rule-engine.ts`
+- [X] T052 [US3] Implement fail-closed error handling for resolver errors (any exception -> access denied) in `packages/toride/src/engine.ts`
+- [X] T053 [US3] Implement `cardinality: many` relation resolution with ANY (exists) semantics in conditions in `packages/toride/src/evaluation/condition.ts`
 
 **Checkpoint**: Permit rules grant conditional access, forbid rules override all grants, forbid-wins precedence holds, custom evaluators work with fail-closed semantics, resolver errors deny access.
 
