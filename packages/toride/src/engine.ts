@@ -4,12 +4,14 @@
 import type {
   ActorRef,
   ResourceRef,
+  CheckOptions,
   TorideOptions,
   Policy,
   RelationResolver,
   ExplainResult,
 } from "./types.js";
 import { evaluate } from "./evaluation/rule-engine.js";
+import { ResolverCache } from "./evaluation/cache.js";
 
 /**
  * Main authorization engine.
@@ -35,8 +37,9 @@ export class Toride {
     actor: ActorRef,
     action: string,
     resource: ResourceRef,
+    options?: CheckOptions,
   ): Promise<boolean> {
-    const result = await this.evaluate(actor, action, resource);
+    const result = await this.evaluate(actor, action, resource, options);
     return result.allowed;
   }
 
@@ -47,6 +50,7 @@ export class Toride {
     actor: ActorRef,
     action: string,
     resource: ResourceRef,
+    checkOptions?: CheckOptions,
   ): Promise<ExplainResult> {
     // Look up resource block; unknown resource type → default deny
     const resourceBlock = this.policy.resources[resource.type];
@@ -60,9 +64,28 @@ export class Toride {
       };
     }
 
-    return evaluate(actor, action, resource, resourceBlock, this.resolver, this.policy, {
-      maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
-    });
+    // Wire up ResolverCache for per-check deduplication
+    const cachedResolver = new ResolverCache(this.resolver);
+    const env = checkOptions?.env ?? {};
+
+    // T052: Forward all options including customEvaluators and maxConditionDepth
+    try {
+      return await evaluate(actor, action, resource, resourceBlock, cachedResolver, this.policy, {
+        maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
+        maxConditionDepth: this.options.maxConditionDepth,
+        customEvaluators: this.options.customEvaluators,
+        env,
+      });
+    } catch {
+      // T052: Fail-closed error handling - any uncaught error denies access
+      return {
+        allowed: false,
+        resolvedRoles: { direct: [], derived: [] },
+        grantedPermissions: [],
+        matchedRules: [],
+        finalDecision: `Denied: evaluation error (fail-closed)`,
+      };
+    }
   }
 }
 
