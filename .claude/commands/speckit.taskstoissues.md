@@ -1,5 +1,7 @@
 ---
 description: Convert existing tasks into actionable, dependency-ordered GitHub issues for the feature based on available design artifacts.
+argument-hint: [filter or label options]
+disable-model-invocation: true
 tools: ['github/github-mcp-server/issue_write']
 ---
 

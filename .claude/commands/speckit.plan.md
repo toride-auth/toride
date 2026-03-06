@@ -1,6 +1,8 @@
 ---
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
-handoffs: 
+argument-hint: [tech stack or planning context]
+disable-model-invocation: true
+handoffs:
   - label: Create Tasks
     agent: speckit.tasks
     prompt: Break the plan into tasks
@@ -52,6 +54,8 @@ You **MUST** consider the user input before proceeding (if not empty).
    For each technology choice:
      Task: "Find best practices for {tech} in {domain}"
    ```
+
+   **Web research**: When agents need to fetch web content (docs, articles, blog posts), they MUST use the `/defuddle` skill instead of raw WebFetch/WebSearch. This avoids rate limits and produces cleaner markdown output.
 
 3. **Consolidate findings** in `research.md` using format:
    - Decision: [what was chosen]

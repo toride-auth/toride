@@ -1,6 +1,8 @@
 ---
 description: Create or update the feature specification from a natural language feature description.
-handoffs: 
+argument-hint: <feature description>
+disable-model-invocation: true
+handoffs:
   - label: Build Technical Plan
     agent: speckit.plan
     prompt: Create a plan for the spec. I am building with...
@@ -82,7 +84,6 @@ Given that feature description, do this:
          - The choice significantly impacts feature scope or user experience
          - Multiple reasonable interpretations exist with different implications
          - No reasonable default exists
-       - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
        - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
     4. Fill User Scenarios & Testing section
        If no clear user flow: ERROR "Cannot determine user scenarios"
@@ -155,8 +156,7 @@ Given that feature description, do this:
 
       - **If [NEEDS CLARIFICATION] markers remain**:
         1. Extract all [NEEDS CLARIFICATION: ...] markers from the spec
-        2. **LIMIT CHECK**: If more than 3 markers exist, keep only the 3 most critical (by scope/security/UX impact) and make informed guesses for the rest
-        3. For each clarification needed (max 3), use the **AskUserQuestion** tool to collect the answer interactively. Build the question text in this format:
+        2. For each clarification needed, use the **AskUserQuestion** tool to collect the answer interactively. Keep asking until all markers are resolved. Build the question text in this format:
 
            ```text
            Question [N]: [Topic]
@@ -173,9 +173,10 @@ Given that feature description, do this:
 
            Pass this as the `question` parameter to AskUserQuestion and use the returned answer to resolve the marker.
 
-        4. Number questions sequentially (Q1, Q2, Q3 - max 3 total)
-        5. Ask each question one at a time via AskUserQuestion (do NOT present all at once)
-        6. Update the spec by replacing each [NEEDS CLARIFICATION] marker with the user's selected or provided answer
+        3. Number questions sequentially (Q1, Q2, Q3, ...)
+        4. Ask each question one at a time via AskUserQuestion (do NOT present all at once)
+        5. Update the spec by replacing each [NEEDS CLARIFICATION] marker with the user's selected or provided answer
+        6. Continue asking until ALL [NEEDS CLARIFICATION] markers are resolved
         7. Re-run validation after all clarifications are resolved
 
    d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
@@ -205,11 +206,12 @@ When creating this spec from a user prompt:
 
 1. **Make informed guesses**: Use context, industry standards, and common patterns to fill gaps
 2. **Document assumptions**: Record reasonable defaults in the Assumptions section
-3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers - use only for critical decisions that:
+3. **Mark clarifications** for decisions that:
    - Significantly impact feature scope or user experience
    - Have multiple reasonable interpretations with different implications
    - Lack any reasonable default
-4. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
+4. **Resolve all clarifications**: Use AskUserQuestion repeatedly until every [NEEDS CLARIFICATION] marker is resolved. Do not limit the number of questions.
+5. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
 5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item
 6. **Common areas needing clarification** (only if no reasonable default exists):
    - Feature scope and boundaries (include/exclude specific use cases)

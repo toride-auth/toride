@@ -1,5 +1,7 @@
 ---
 description: Generate a custom checklist for the current feature based on user requirements.
+argument-hint: <checklist domain> [focus areas]
+disable-model-invocation: true
 ---
 
 ## Checklist Purpose: "Unit Tests for English"
@@ -37,7 +39,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - All file paths must be absolute.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
+2. **Clarify intent (dynamic)**: Derive initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
    - Only ask about information that materially changes checklist content
    - Be skipped individually if already unambiguous in `$ARGUMENTS`
@@ -45,7 +47,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    Generation algorithm:
    1. Extract signals: feature domain keywords (e.g., auth, latency, UX, API), risk indicators ("critical", "must", "compliance"), stakeholder hints ("QA", "review", "security team"), and explicit deliverables ("a11y", "rollback", "contracts").
-   2. Cluster signals into candidate focus areas (max 4) ranked by relevance.
+   2. Cluster signals into candidate focus areas ranked by relevance.
    3. Identify probable audience & timing (author, reviewer, QA, release) if not explicit.
    4. Detect missing dimensions: scope breadth, depth/rigor, risk emphasis, exclusion boundaries, measurable acceptance criteria.
    5. Formulate questions chosen from these archetypes:
@@ -67,7 +69,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Audience: Reviewer (PR) if code-related; Author otherwise
    - Focus: Top 2 relevance clusters
 
-   Ask each question one at a time using the **AskUserQuestion** tool (label Q1/Q2/Q3 in the question text). After answers: if ≥2 scenario classes (Alternate / Exception / Recovery / Non-Functional domain) remain unclear, you MAY ask up to TWO more targeted follow‑ups (Q4/Q5) via AskUserQuestion with a one-line justification each (e.g., "Unresolved recovery path risk"). Do not exceed five total questions. Skip escalation if user explicitly declines more.
+   Ask each question one at a time using the **AskUserQuestion** tool (label Q1, Q2, Q3, ... in the question text). After answers: if scenario classes (Alternate / Exception / Recovery / Non-Functional domain) remain unclear, continue asking targeted follow‑ups via AskUserQuestion with a one-line justification each (e.g., "Unresolved recovery path risk"). Keep asking until everything is clear. Stop only when all ambiguities are resolved or the user explicitly declines more questions.
 
 3. **Understand user request**: Combine `$ARGUMENTS` + clarifying answers:
    - Derive checklist theme (e.g., security, review, deploy, ux)

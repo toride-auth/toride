@@ -1,5 +1,7 @@
 ---
 description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
+argument-hint: [implementation context or phase]
+disable-model-invocation: true
 ---
 
 ## User Input
