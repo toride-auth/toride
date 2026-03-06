@@ -42,6 +42,9 @@ export type {
 // ─── Error Types (T018) ──────────────────────────────────────────
 export { ValidationError, CycleError, DepthLimitError } from "./types.js";
 
+// ─── Engine (T030/T031) ──────────────────────────────────────────
+export { Toride, createToride } from "./engine.js";
+
 // ─── Constraint AST Types (T016) ─────────────────────────────────
 export type {
   Constraint,
