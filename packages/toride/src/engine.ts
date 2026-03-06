@@ -39,7 +39,7 @@ import {
  * and returns boolean with default-deny semantics.
  */
 export class Toride {
-  private readonly policy: Policy;
+  private policy: Policy;
   private readonly resolver: RelationResolver;
   private readonly options: TorideOptions;
 
@@ -62,6 +62,15 @@ export class Toride {
     const result = await this.evaluateInternal(actor, action, resource, options);
     this.fireDecisionEvent(actor, action, resource, result);
     return result.allowed;
+  }
+
+  /**
+   * T097: Atomic policy swap. In-flight checks capture the resource block
+   * at the start of evaluateInternal, so they complete with the old policy.
+   * JS single-threaded nature ensures the assignment is atomic.
+   */
+  setPolicy(policy: Policy): void {
+    this.policy = policy;
   }
 
   /**

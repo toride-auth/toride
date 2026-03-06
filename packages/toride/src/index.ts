@@ -4,6 +4,9 @@ export const VERSION = "0.0.1";
 // ─── Policy Loading (T020) ────────────────────────────────────────
 export { loadYaml, loadJson } from "./policy/parser.js";
 
+// ─── Policy Merging (T096) ──────────────────────────────────────
+export { mergePolicies } from "./policy/merger.js";
+
 // ─── Policy Validation (T075-T077) ──────────────────────────────
 export {
   validatePolicy,
