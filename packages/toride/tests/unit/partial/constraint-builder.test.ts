@@ -3,34 +3,13 @@
 import { describe, it, expect } from "vitest";
 import type {
   ActorRef,
-  RelationResolver,
   Policy,
 } from "../../../src/types.js";
-import type { ConstraintResult, Constraint } from "../../../src/partial/constraint-types.js";
-import { buildConstraints } from "../../../src/partial/constraint-builder.js";
+import type { Constraint } from "../../../src/partial/constraint-types.js";
+import { buildConstraints, simplify } from "../../../src/partial/constraint-builder.js";
+import { makeResolver } from "../../helpers/test-adapter.js";
 
-// ─── Helpers ──────────────────────────────────────────────────────
-
-function makeResolver(opts: {
-  roles?: Record<string, string[]>;
-  related?: Record<string, Record<string, { type: string; id: string } | { type: string; id: string }[]>>;
-  attributes?: Record<string, Record<string, unknown>>;
-} = {}): RelationResolver {
-  return {
-    getRoles: async (actor: ActorRef, resource: { type: string; id: string }) => {
-      const key = `${actor.id}:${resource.type}:${resource.id}`;
-      return opts.roles?.[key] ?? [];
-    },
-    getRelated: async (resource: { type: string; id: string }, relation: string) => {
-      const key = `${resource.type}:${resource.id}`;
-      return opts.related?.[key]?.[relation] ?? [];
-    },
-    getAttributes: async (ref: { type: string; id: string }) => {
-      const key = `${ref.type}:${ref.id}`;
-      return opts.attributes?.[key] ?? {};
-    },
-  };
-}
+// ---- Helpers ----
 
 const baseActor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
@@ -55,7 +34,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
   };
 }
 
-// ─── Tests ────────────────────────────────────────────────────────
+// ---- Tests ----
 
 describe("buildConstraints", () => {
   describe("unrestricted result", () => {
@@ -84,12 +63,7 @@ describe("buildConstraints", () => {
       expect(result).toEqual({ unrestricted: true });
     });
 
-    it("returns unrestricted:true when direct roles grant the action via 'all'", async () => {
-      const policy = makePolicy();
-      // Since buildConstraints doesn't have a specific resource ID, it
-      // evaluates derivation paths. A direct role on ALL resources of a type
-      // won't apply here - we use global roles or unconditional derivation
-      // instead. Let's use a when-only derived role that always matches.
+    it("returns unrestricted:true when when-only derived role matches", async () => {
       const policyWithAlwaysAdmin = makePolicy({
         resources: {
           Task: {
@@ -158,8 +132,8 @@ describe("buildConstraints", () => {
     });
   });
 
-  describe("has_role constraint nodes", () => {
-    it("emits has_role node for relation-based derived roles", async () => {
+  describe("has_role constraint nodes (Finding 7: structural assertions)", () => {
+    it("emits relation -> has_role structure for relation-based derived roles", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -184,22 +158,29 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(baseActor, "read", "Task", resolver, policy);
 
-      // Should produce constrained result with has_role node
+      // Verify full tree structure, not just node type presence
       expect(result).not.toHaveProperty("unrestricted");
       expect(result).not.toHaveProperty("forbidden");
       expect(result).toHaveProperty("constraints");
 
       const constraints = (result as { constraints: Constraint }).constraints;
-      // Should contain a relation -> has_role structure
-      expect(containsNodeType(constraints, "has_role")).toBe(true);
+      // Should be a relation constraint wrapping a has_role constraint
+      expect(constraints).toEqual({
+        type: "relation",
+        field: "project",
+        resourceType: "Project",
+        constraint: {
+          type: "has_role",
+          actorId: "u1",
+          actorType: "User",
+          role: "admin",
+        },
+      });
     });
   });
 
-  describe("$actor and $env value inlining", () => {
-    it("inlines $actor attribute values into field_eq constraints via forbid rule", async () => {
-      // Use a forbid rule referencing $actor so we can see the inlined value
-      // The actor has the role unconditionally, and a forbid rule creates
-      // a NOT constraint with the inlined actor value
+  describe("$actor and $env value inlining (Finding 7: structural assertions)", () => {
+    it("inlines $actor attribute values into NOT(field_eq) via forbid rule", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -230,13 +211,18 @@ describe("buildConstraints", () => {
       expect(result).toHaveProperty("constraints");
 
       const constraints = (result as { constraints: Constraint }).constraints;
-      // The forbid condition references $actor.department which should be inlined
-      // to "engineering" in a NOT(field_eq(department, "engineering")) structure
-      expect(containsFieldEq(constraints, "department", "engineering")).toBe(true);
-      expect(containsNodeType(constraints, "not")).toBe(true);
+      // Verify exact structure: NOT(field_eq(department, "engineering"))
+      expect(constraints).toEqual({
+        type: "not",
+        child: {
+          type: "field_eq",
+          field: "department",
+          value: "engineering",
+        },
+      });
     });
 
-    it("inlines $env values into concrete constraint nodes via forbid rule", async () => {
+    it("inlines $env values into NOT(field_gt) via forbid rule", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -274,14 +260,20 @@ describe("buildConstraints", () => {
       expect(result).toHaveProperty("constraints");
 
       const constraints = (result as { constraints: Constraint }).constraints;
-      // Should contain field_gt with inlined cutoff value inside a NOT wrapper
-      expect(containsNodeType(constraints, "field_gt")).toBe(true);
-      expect(containsNodeType(constraints, "not")).toBe(true);
+      // Verify exact structure: NOT(field_gt(createdAt, "2024-01-01"))
+      expect(constraints).toEqual({
+        type: "not",
+        child: {
+          type: "field_gt",
+          field: "createdAt",
+          value: "2024-01-01",
+        },
+      });
     });
   });
 
-  describe("forbid rules as NOT constraints", () => {
-    it("wraps forbid rule conditions in NOT constraint", async () => {
+  describe("forbid rules as NOT constraints (Finding 7: structural assertions)", () => {
+    it("wraps forbid rule conditions in AND(always-simplified, NOT(field_eq))", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -312,15 +304,21 @@ describe("buildConstraints", () => {
       expect(result).toHaveProperty("constraints");
 
       const constraints = (result as { constraints: Constraint }).constraints;
-      // Should contain a NOT node wrapping the forbid condition
-      expect(containsNodeType(constraints, "not")).toBe(true);
+      // derived role simplifies to always, combined with NOT(forbid)
+      // simplify(and([always, not(field_eq)])) => not(field_eq)
+      expect(constraints).toEqual({
+        type: "not",
+        child: {
+          type: "field_eq",
+          field: "archived",
+          value: true,
+        },
+      });
     });
   });
 
   describe("constraint simplification", () => {
     it("simplifies and([always, X]) to X", async () => {
-      // We test simplification indirectly: a derivation that always matches
-      // combined with a permit condition should simplify
       const policy = makePolicy({
         resources: {
           Task: {
@@ -346,10 +344,8 @@ describe("buildConstraints", () => {
     });
   });
 
-  describe("unknown constraint for custom evaluators", () => {
-    it("emits unknown node for custom evaluator in forbid conditions", async () => {
-      // Use a forbid rule with custom evaluator so the unknown node
-      // appears as a NOT wrapper around the custom evaluator
+  describe("unknown constraint for custom evaluators (Finding 7: structural assertions)", () => {
+    it("emits NOT(unknown) for custom evaluator in forbid conditions", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -380,39 +376,99 @@ describe("buildConstraints", () => {
       expect(result).toHaveProperty("constraints");
 
       const constraints = (result as { constraints: Constraint }).constraints;
-      expect(containsNodeType(constraints, "unknown")).toBe(true);
+      // Verify exact structure: NOT(unknown("businessHours"))
+      expect(constraints).toEqual({
+        type: "not",
+        child: {
+          type: "unknown",
+          name: "businessHours",
+        },
+      });
+    });
+  });
+
+  describe("prototype pollution guard (Finding 2)", () => {
+    it("rejects __proto__ in actor attribute paths", async () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: { actor_type: "User", when: { "$actor.__proto__.polluted": true } },
+        },
+        resources: {
+          Task: {
+            roles: ["owner"],
+            permissions: ["read"],
+            grants: { owner: ["read"] },
+            derived_roles: [
+              { role: "owner", from_global_role: "superadmin" },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy);
+      // Should NOT grant access via prototype pollution
+      expect(result).toEqual({ forbidden: true });
+    });
+  });
+
+  describe("Finding 1: $resource/$env conditions in actor-only derivation", () => {
+    it("rejects derived role with $resource condition (prevents privilege escalation)", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              // This role has a $resource condition that CANNOT be evaluated
+              // during actor-only derivation. It must NOT be granted silently.
+              { role: "viewer", when: { "$resource.status": "active" } },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy);
+      // Must be forbidden, NOT unrestricted (the old bug was granting access here)
+      expect(result).toEqual({ forbidden: true });
+    });
+
+    it("rejects derived role with $env condition (prevents privilege escalation)", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              { role: "viewer", when: { "$env.feature_flag": true } },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy, { env: { feature_flag: true } });
+      // Must be forbidden because $env conditions cannot be evaluated during derivation
+      expect(result).toEqual({ forbidden: true });
+    });
+  });
+
+  describe("depth guard for simplify (Finding 10)", () => {
+    it("handles deeply nested constraints without stack overflow", () => {
+      // Build a deeply nested NOT chain
+      let constraint: Constraint = { type: "field_eq", field: "a", value: 1 };
+      for (let i = 0; i < 200; i++) {
+        constraint = { type: "not", child: constraint };
+      }
+      // Should not throw; depth guard limits recursion
+      const result = simplify(constraint);
+      expect(result).toBeDefined();
     });
   });
 });
-
-// ─── AST Inspection Helpers ───────────────────────────────────────
-
-function containsNodeType(constraint: Constraint, nodeType: string): boolean {
-  if (constraint.type === nodeType) return true;
-  if (constraint.type === "and" || constraint.type === "or") {
-    return constraint.children.some((c) => containsNodeType(c, nodeType));
-  }
-  if (constraint.type === "not") {
-    return containsNodeType(constraint.child, nodeType);
-  }
-  if (constraint.type === "relation") {
-    return containsNodeType(constraint.constraint, nodeType);
-  }
-  return false;
-}
-
-function containsFieldEq(constraint: Constraint, field: string, value: unknown): boolean {
-  if (constraint.type === "field_eq" && constraint.field === field && constraint.value === value) {
-    return true;
-  }
-  if (constraint.type === "and" || constraint.type === "or") {
-    return constraint.children.some((c) => containsFieldEq(c, field, value));
-  }
-  if (constraint.type === "not") {
-    return containsFieldEq(constraint.child, field, value);
-  }
-  if (constraint.type === "relation") {
-    return containsFieldEq(constraint.constraint, field, value);
-  }
-  return false;
-}

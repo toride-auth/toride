@@ -70,82 +70,69 @@ export async function buildConstraints(
     }
   }
 
-  // Step 2: Evaluate all derivation paths to collect constraints
+  // Step 2: Evaluate all derivation paths to collect constraints.
+  // Cache per-role derivation results to avoid duplicate evaluation (Finding 4).
+  const roleConstraintCache = new Map<string, Constraint[]>();
   const pathConstraints: Constraint[] = [];
 
-  // For each role that grants the action, evaluate derivation paths
-  for (const role of rolesGrantingAction) {
+  async function getRoleConstraints(role: string): Promise<Constraint[]> {
+    const cached = roleConstraintCache.get(role);
+    if (cached !== undefined) return cached;
+    const constraints: Constraint[] = [];
     const derivedEntries = resourceBlock.derived_roles ?? [];
     for (const entry of derivedEntries) {
       if (entry.role !== role) continue;
-
       const constraint = await evaluateDerivedRoleConstraint(
-        entry,
-        actor,
-        resourceType,
-        resolver,
-        policy,
-        resourceBlock,
-        env,
+        entry, actor, resourceType, resolver, policy, resourceBlock,
       );
-
-      if (constraint !== null) {
-        pathConstraints.push(constraint);
-      }
+      if (constraint !== null) constraints.push(constraint);
     }
+    roleConstraintCache.set(role, constraints);
+    return constraints;
   }
 
-  // Step 3: If no derivation paths produced any constraints, check for permit rules
-  // that might still grant access (without role requirements)
+  // For each role that grants the action, evaluate derivation paths
+  for (const role of rolesGrantingAction) {
+    const roleResults = await getRoleConstraints(role);
+    pathConstraints.push(...roleResults);
+  }
+
+  // Step 3: Check for permit rules that might grant access
   const permitRules = (resourceBlock.rules ?? []).filter(
     (r) => r.effect === "permit" && r.permissions.includes(action),
   );
 
-  // If we have derivation paths that matched, we need to consider permit rules too
-  // Permit rules with role guards need the role to already be derivable
   for (const rule of permitRules) {
     if (rule.roles && rule.roles.length > 0) {
-      // Check if any of the required roles have derivation paths
-      const hasDerivablePath = rule.roles.some((role) => {
-        // Check if this role is directly derivable
-        return pathConstraints.length > 0 || rolesGrantingAction.includes(role);
-      });
-      if (!hasDerivablePath) continue;
-    }
+      // Check per-role derivability (Finding 3: check each role individually)
+      const derivableRoleConstraints: Constraint[] = [];
+      for (const role of rule.roles) {
+        const rc = await getRoleConstraints(role);
+        derivableRoleConstraints.push(...rc);
+      }
+      if (derivableRoleConstraints.length === 0) continue;
 
-    // For permit rules, the rule condition becomes a constraint on the resource
-    const ruleConstraint = conditionToConstraint(rule.when, actor, env);
-    if (ruleConstraint !== null) {
-      // If the rule has role guards, combine with role derivation constraints
-      if (rule.roles && rule.roles.length > 0) {
+      // For permit rules, the rule condition becomes a constraint on the resource
+      const ruleConstraint = conditionToConstraint(rule.when, actor, env);
+      if (ruleConstraint !== null) {
         // The rule applies when: (actor has one of the roles) AND (condition matches)
-        // We already know derivation paths exist, so wrap in AND
-        const roleConstraints: Constraint[] = [];
-        for (const role of rule.roles) {
-          for (const entry of resourceBlock.derived_roles ?? []) {
-            if (entry.role !== role) continue;
-            const rc = await evaluateDerivedRoleConstraint(
-              entry, actor, resourceType, resolver, policy, resourceBlock, env,
-            );
-            if (rc !== null) roleConstraints.push(rc);
-          }
-        }
-        if (roleConstraints.length > 0) {
-          pathConstraints.push(
-            simplify({
-              type: "and",
-              children: [
-                roleConstraints.length === 1 ? roleConstraints[0] : { type: "or", children: roleConstraints },
-                ruleConstraint,
-              ],
-            }),
-          );
-        }
-      } else {
-        // No role guard: if the actor has any derivable role, apply the permit condition
-        if (pathConstraints.length > 0) {
-          pathConstraints.push(ruleConstraint);
-        }
+        pathConstraints.push(
+          simplify({
+            type: "and",
+            children: [
+              derivableRoleConstraints.length === 1
+                ? derivableRoleConstraints[0]
+                : { type: "or", children: derivableRoleConstraints },
+              ruleConstraint,
+            ],
+          }),
+        );
+      }
+    } else {
+      // No role guard: if the actor has any derivable role, apply the permit condition
+      const ruleConstraint = conditionToConstraint(rule.when, actor, env);
+      if (ruleConstraint !== null && pathConstraints.length > 0) {
+        pathConstraints.push(ruleConstraint);
       }
     }
   }
@@ -224,11 +211,10 @@ function findRolesGrantingAction(
 async function evaluateDerivedRoleConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
-  resourceType: string,
-  resolver: RelationResolver,
+  _resourceType: string,
+  _resolver: RelationResolver,
   policy: Policy,
   resourceBlock: ResourceBlock,
-  env: Record<string, unknown>,
 ): Promise<Constraint | null> {
   // Pattern 1: from_global_role
   if (entry.from_global_role !== undefined) {
@@ -247,12 +233,12 @@ async function evaluateDerivedRoleConstraint(
 
   // Pattern 4: actor_type + when
   if (entry.actor_type !== undefined && entry.when !== undefined) {
-    return evaluateActorTypeConstraint(entry, actor, env);
+    return evaluateActorTypeConstraint(entry, actor);
   }
 
   // Pattern 5: when only
   if (entry.when !== undefined) {
-    return evaluateWhenOnlyConstraint(entry, actor, env);
+    return evaluateWhenOnlyConstraint(entry, actor);
   }
 
   return null;
@@ -355,7 +341,6 @@ function evaluateRelationIdentityConstraint(
 function evaluateActorTypeConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
-  env: Record<string, unknown>,
 ): Constraint | null {
   // Skip if actor type doesn't match
   if (actor.type !== entry.actor_type) return null;
@@ -372,7 +357,6 @@ function evaluateActorTypeConstraint(
 function evaluateWhenOnlyConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
-  env: Record<string, unknown>,
 ): Constraint | null {
   // Evaluate condition against actor attributes only
   if (!evaluateActorCondition(entry.when!, actor)) return null;
@@ -631,14 +615,19 @@ function resolveStaticValue(
   return value;
 }
 
+/** Property names that must never be traversed (prototype pollution guard). */
+const FORBIDDEN_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
  * Get a nested attribute from an object using dot-separated path.
+ * Guards against prototype pollution by rejecting dangerous property names.
  */
 function getNestedAttribute(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let current: unknown = obj;
 
   for (const part of parts) {
+    if (FORBIDDEN_PROPS.has(part)) return undefined;
     if (current === null || current === undefined || typeof current !== "object") {
       return undefined;
     }
@@ -678,9 +667,11 @@ function evaluateActorCondition(
       const actualValue = getNestedAttribute(actor.attributes, attrName);
       if (actualValue === undefined || actualValue === null) return false;
       if (actualValue !== expectedValue) return false;
+    } else if (key.startsWith("$resource.") || key.startsWith("$env.")) {
+      // $resource and $env conditions cannot be evaluated at actor-derivation time.
+      // Returning false prevents over-permissive grants (privilege escalation).
+      return false;
     }
-    // $resource and $env conditions can't be fully evaluated during derivation
-    // but for actor-only conditions (patterns 1, 4, 5), we only have $actor refs
   }
 
   return true;
@@ -712,11 +703,18 @@ function isOperator(value: ConditionValue): value is ConditionOperator {
  * - not(never) -> always
  * - not(not(X)) -> X
  */
-export function simplify(constraint: Constraint): Constraint {
+/** Maximum recursion depth to prevent stack overflow on deeply nested ASTs. */
+const MAX_SIMPLIFY_DEPTH = 100;
+
+export function simplify(constraint: Constraint, _depth = 0): Constraint {
+  if (_depth > MAX_SIMPLIFY_DEPTH) {
+    // Return the constraint as-is rather than risking a stack overflow.
+    return constraint;
+  }
   switch (constraint.type) {
     case "and": {
       // Recursively simplify children
-      let children = constraint.children.map(simplify);
+      let children = constraint.children.map((c) => simplify(c, _depth + 1));
 
       // Remove always nodes (identity element for AND)
       children = children.filter((c) => c.type !== "always");
@@ -737,7 +735,7 @@ export function simplify(constraint: Constraint): Constraint {
 
     case "or": {
       // Recursively simplify children
-      let children = constraint.children.map(simplify);
+      let children = constraint.children.map((c) => simplify(c, _depth + 1));
 
       // Remove never nodes (identity element for OR)
       children = children.filter((c) => c.type !== "never");
@@ -757,7 +755,7 @@ export function simplify(constraint: Constraint): Constraint {
     }
 
     case "not": {
-      const child = simplify(constraint.child);
+      const child = simplify(constraint.child, _depth + 1);
 
       // not(always) -> never
       if (child.type === "always") return { type: "never" };
@@ -772,7 +770,7 @@ export function simplify(constraint: Constraint): Constraint {
     }
 
     case "relation": {
-      const simplified = simplify(constraint.constraint);
+      const simplified = simplify(constraint.constraint, _depth + 1);
       return { type: "relation", field: constraint.field, resourceType: constraint.resourceType, constraint: simplified };
     }
 

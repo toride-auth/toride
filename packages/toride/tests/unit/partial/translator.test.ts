@@ -1,57 +1,12 @@
 // T055: Unit tests for constraint translation and simplification
 
 import { describe, it, expect } from "vitest";
-import type {
-  Constraint,
-  ConstraintAdapter,
-  LeafConstraint,
-} from "../../../src/partial/constraint-types.js";
+import type { Constraint } from "../../../src/partial/constraint-types.js";
 import { translateConstraints } from "../../../src/partial/translator.js";
 import { simplify } from "../../../src/partial/constraint-builder.js";
+import { makeStringAdapter } from "../../helpers/test-adapter.js";
 
-// ─── Mock Adapter ─────────────────────────────────────────────────
-
-/** Simple string-based adapter for testing translation. */
-function makeStringAdapter(): ConstraintAdapter<string> {
-  return {
-    translate(c: LeafConstraint): string {
-      switch (c.type) {
-        case "field_eq": return `${c.field} = ${JSON.stringify(c.value)}`;
-        case "field_neq": return `${c.field} != ${JSON.stringify(c.value)}`;
-        case "field_gt": return `${c.field} > ${JSON.stringify(c.value)}`;
-        case "field_gte": return `${c.field} >= ${JSON.stringify(c.value)}`;
-        case "field_lt": return `${c.field} < ${JSON.stringify(c.value)}`;
-        case "field_lte": return `${c.field} <= ${JSON.stringify(c.value)}`;
-        case "field_in": return `${c.field} IN ${JSON.stringify(c.values)}`;
-        case "field_nin": return `${c.field} NOT IN ${JSON.stringify(c.values)}`;
-        case "field_exists": return c.exists ? `${c.field} IS NOT NULL` : `${c.field} IS NULL`;
-        case "field_includes": return `${c.field} INCLUDES ${JSON.stringify(c.value)}`;
-        case "field_contains": return `${c.field} CONTAINS ${JSON.stringify(c.value)}`;
-        default: return `UNKNOWN_LEAF`;
-      }
-    },
-    relation(field: string, resourceType: string, childQuery: string): string {
-      return `${field} -> ${resourceType}(${childQuery})`;
-    },
-    hasRole(actorId: string, actorType: string, role: string): string {
-      return `HAS_ROLE(${actorType}:${actorId}, ${role})`;
-    },
-    unknown(name: string): string {
-      return `UNKNOWN(${name})`;
-    },
-    and(queries: string[]): string {
-      return `(${queries.join(" AND ")})`;
-    },
-    or(queries: string[]): string {
-      return `(${queries.join(" OR ")})`;
-    },
-    not(query: string): string {
-      return `NOT(${query})`;
-    },
-  };
-}
-
-// ─── translateConstraints Tests ───────────────────────────────────
+// ---- translateConstraints Tests ----
 
 describe("translateConstraints", () => {
   const adapter = makeStringAdapter();
@@ -161,15 +116,21 @@ describe("translateConstraints", () => {
   it("throws on always/never nodes (should not reach adapter)", () => {
     const always: Constraint = { type: "always" };
     const never: Constraint = { type: "never" };
-    // These should be simplified out before reaching the translator,
-    // but if they do reach it, it should handle them gracefully
-    // The translator should throw since these shouldn't be passed to adapters
     expect(() => translateConstraints(always, adapter)).toThrow();
     expect(() => translateConstraints(never, adapter)).toThrow();
   });
+
+  it("throws on excessively deep constraint ASTs (Finding 10)", () => {
+    // Build a deeply nested NOT chain beyond the depth limit
+    let c: Constraint = { type: "field_eq", field: "a", value: 1 };
+    for (let i = 0; i < 150; i++) {
+      c = { type: "not", child: c };
+    }
+    expect(() => translateConstraints(c, adapter)).toThrow(/maximum recursion depth/);
+  });
 });
 
-// ─── Simplification Tests ─────────────────────────────────────────
+// ---- Simplification Tests ----
 
 describe("simplify", () => {
   it("returns always as-is", () => {

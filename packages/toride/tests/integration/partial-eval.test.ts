@@ -12,8 +12,8 @@ import type {
   Constraint,
   ConstraintResult,
   ConstraintAdapter,
-  LeafConstraint,
 } from "../../src/partial/constraint-types.js";
+import { makeStringAdapter, makeResolver } from "../helpers/test-adapter.js";
 
 describe("partial evaluation integration", () => {
   let createToride: (options: TorideOptions) => {
@@ -29,68 +29,6 @@ describe("partial evaluation integration", () => {
     const parserMod = await import("../../src/policy/parser.js");
     loadYaml = parserMod.loadYaml;
   });
-
-  // ─── Helpers ──────────────────────────────────────────────────────
-
-  function makeResolver(opts: {
-    roles?: Record<string, string[]>;
-    related?: Record<string, Record<string, ResourceRef | ResourceRef[]>>;
-    attributes?: Record<string, Record<string, unknown>>;
-  } = {}): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return opts.roles?.[key] ?? [];
-      },
-      getRelated: async (resource: ResourceRef, relation: string) => {
-        const key = `${resource.type}:${resource.id}`;
-        return opts.related?.[key]?.[relation] ?? [];
-      },
-      getAttributes: async (ref: ResourceRef) => {
-        const key = `${ref.type}:${ref.id}`;
-        return opts.attributes?.[key] ?? {};
-      },
-    };
-  }
-
-  function makeStringAdapter(): ConstraintAdapter<string> {
-    return {
-      translate(c: LeafConstraint): string {
-        switch (c.type) {
-          case "field_eq": return `${c.field} = ${JSON.stringify(c.value)}`;
-          case "field_neq": return `${c.field} != ${JSON.stringify(c.value)}`;
-          case "field_gt": return `${c.field} > ${JSON.stringify(c.value)}`;
-          case "field_gte": return `${c.field} >= ${JSON.stringify(c.value)}`;
-          case "field_lt": return `${c.field} < ${JSON.stringify(c.value)}`;
-          case "field_lte": return `${c.field} <= ${JSON.stringify(c.value)}`;
-          case "field_in": return `${c.field} IN ${JSON.stringify(c.values)}`;
-          case "field_nin": return `${c.field} NOT IN ${JSON.stringify(c.values)}`;
-          case "field_exists": return c.exists ? `${c.field} IS NOT NULL` : `${c.field} IS NULL`;
-          case "field_includes": return `${c.field} INCLUDES ${JSON.stringify(c.value)}`;
-          case "field_contains": return `${c.field} CONTAINS ${JSON.stringify(c.value)}`;
-          default: return "UNKNOWN_LEAF";
-        }
-      },
-      relation(field, resourceType, childQuery) {
-        return `${field} -> ${resourceType}(${childQuery})`;
-      },
-      hasRole(actorId, actorType, role) {
-        return `HAS_ROLE(${actorType}:${actorId}, ${role})`;
-      },
-      unknown(name) {
-        return `UNKNOWN(${name})`;
-      },
-      and(queries) {
-        return `(${queries.join(" AND ")})`;
-      },
-      or(queries) {
-        return `(${queries.join(" OR ")})`;
-      },
-      not(query) {
-        return `NOT(${query})`;
-      },
-    };
-  }
 
   const FULL_POLICY_YAML = `
 version: "1"
@@ -159,7 +97,7 @@ resources:
           $resource.isPublic: true
 `;
 
-  // ─── Acceptance Scenario 1: superadmin = unrestricted ─────────────
+  // ---- Acceptance Scenario 1: superadmin = unrestricted ----
 
   it("returns unrestricted for superadmin", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
@@ -176,7 +114,7 @@ resources:
     expect(result).toEqual({ unrestricted: true });
   });
 
-  // ─── Acceptance Scenario 2: no access = forbidden ──────────────────
+  // ---- Acceptance Scenario 2: no access = forbidden ----
 
   it("returns forbidden for actor with no access paths", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
@@ -193,9 +131,9 @@ resources:
     expect(result).toEqual({ forbidden: true });
   });
 
-  // ─── Acceptance Scenario 3: relation-derived role produces has_role ─
+  // ---- Acceptance Scenario 3: relation-derived role produces has_role ----
 
-  it("produces has_role for relation-derived roles", async () => {
+  it("produces relation -> has_role structure for relation-derived roles", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
     const resolver = makeResolver();
     const engine = createToride({ policy, resolver });
@@ -207,14 +145,18 @@ resources:
 
     const result = await engine.buildConstraints(actor, "read", "Task");
     // Task.viewer can be derived from Project.viewer via project relation
-    // Should produce a constrained result with has_role or relation nodes
+    // Task.editor from assignee relation (identity check)
     expect(result).toHaveProperty("constraints");
+
+    const constraints = (result as { constraints: Constraint }).constraints;
+    // Verify structural content -- should contain relation and/or has_role nodes
+    const str = JSON.stringify(constraints);
+    expect(str).toContain('"type":"relation"');
   });
 
-  // ─── Acceptance Scenario 4: $actor value inlining ──────────────────
+  // ---- Acceptance Scenario 4: $actor value inlining ----
 
   it("inlines actor attribute values into constraints", async () => {
-    // Use a forbid rule so actor attribute gets inlined into a constraint
     const policyYaml = `
 version: "1"
 actors:
@@ -251,15 +193,20 @@ resources:
     expect(result).toHaveProperty("constraints");
     const constraints = (result as { constraints: Constraint }).constraints;
 
-    // Verify the actor's department value is inlined (in a NOT wrapper from forbid)
-    const str = JSON.stringify(constraints);
-    expect(str).toContain("engineering");
+    // Verify exact structure: NOT(field_eq(department, "engineering"))
+    expect(constraints).toEqual({
+      type: "not",
+      child: {
+        type: "field_eq",
+        field: "department",
+        value: "engineering",
+      },
+    });
   });
 
-  // ─── Acceptance Scenario 5: end-to-end with adapter ─────────────────
+  // ---- Acceptance Scenario 5: end-to-end with adapter ----
 
   it("translates constraint AST via adapter", async () => {
-    // Use a forbid rule so the result is constrained (not unrestricted)
     const policyYaml = `
 version: "1"
 actors:
@@ -299,42 +246,69 @@ resources:
       (result as { constraints: Constraint }).constraints,
       adapter,
     );
-    expect(typeof translated).toBe("string");
-    expect(translated.length).toBeGreaterThan(0);
-    // Should contain NOT wrapper from the forbid rule
-    expect(translated).toContain("NOT");
+    // Verify exact translation output
+    expect(translated).toBe('NOT(deleted = true)');
   });
 
-  // ─── Forbid rules produce NOT constraints ───────────────────────────
+  // ---- Finding 8: Forbid rules produce NOT constraints (meaningful assertion) ----
 
-  it("forbid rules produce NOT wrappers in constraints", async () => {
-    const policy = await loadYaml(FULL_POLICY_YAML);
+  it("forbid rules produce NOT wrappers in constraints for an actor with access", async () => {
+    // Use a policy where the actor CAN derive a role, and a forbid rule applies
+    const policyYaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      active: boolean
+resources:
+  Task:
+    roles: [editor]
+    permissions: [read, update, delete]
+    grants:
+      editor: [read, update, delete]
+    derived_roles:
+      - role: editor
+        when:
+          $actor.active: true
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          $resource.archived: true
+`;
+    const policy = await loadYaml(policyYaml);
     const resolver = makeResolver();
     const engine = createToride({ policy, resolver });
     const adapter = makeStringAdapter();
     const actor: ActorRef = {
       type: "User",
       id: "u1",
-      attributes: {},
+      attributes: { active: true },
     };
 
-    // Task has a forbid rule on delete when archived
-    // Actor needs editor role (from_relation: assignee) to have delete access
-    // But we need at least assignee derivation path
     const result = await engine.buildConstraints(actor, "delete", "Task");
+    // The actor has access (editor role) but a forbid rule restricts deletes on archived items
+    // Result MUST be constrained (not forbidden)
+    expect(result).toHaveProperty("constraints");
 
-    // Even if forbidden (no access paths), the test validates the engine handles it
-    if ("constraints" in result) {
-      const translated = engine.translateConstraints(result.constraints, adapter);
-      // The forbid condition should appear as a NOT() wrapper
-      expect(translated).toContain("NOT");
-    }
+    const constraints = (result as { constraints: Constraint }).constraints;
+    // Verify exact structure: NOT(field_eq(archived, true))
+    expect(constraints).toEqual({
+      type: "not",
+      child: {
+        type: "field_eq",
+        field: "archived",
+        value: true,
+      },
+    });
+
+    const translated = engine.translateConstraints(constraints, adapter);
+    expect(translated).toBe("NOT(archived = true)");
   });
 
-  // ─── Custom evaluator produces unknown node ───────────────────────
+  // ---- Custom evaluator produces unknown node ----
 
   it("custom evaluator produces unknown constraint node", async () => {
-    // Use a forbid rule with custom evaluator so the result is constrained
     const policyYaml = `
 version: "1"
 actors:
@@ -371,10 +345,17 @@ resources:
     const result = await engine.buildConstraints(actor, "read", "Task");
     expect(result).toHaveProperty("constraints");
 
-    const translated = engine.translateConstraints(
-      (result as { constraints: Constraint }).constraints,
-      adapter,
-    );
-    expect(translated).toContain("UNKNOWN(businessHours)");
+    const constraints = (result as { constraints: Constraint }).constraints;
+    // Verify exact structure: NOT(unknown("businessHours"))
+    expect(constraints).toEqual({
+      type: "not",
+      child: {
+        type: "unknown",
+        name: "businessHours",
+      },
+    });
+
+    const translated = engine.translateConstraints(constraints, adapter);
+    expect(translated).toBe("NOT(UNKNOWN(businessHours))");
   });
 });

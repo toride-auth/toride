@@ -6,12 +6,8 @@ import type {
   ConstraintAdapter,
 } from "./constraint-types.js";
 
-/** Set of leaf constraint types for quick lookup. */
-const LEAF_TYPES = new Set([
-  "field_eq", "field_neq", "field_gt", "field_gte",
-  "field_lt", "field_lte", "field_in", "field_nin",
-  "field_exists", "field_includes", "field_contains",
-]);
+/** Maximum recursion depth to prevent stack overflow on deeply nested ASTs. */
+const MAX_TRANSLATE_DEPTH = 100;
 
 /**
  * Recursively translate a Constraint AST into a query using the provided adapter.
@@ -28,7 +24,14 @@ const LEAF_TYPES = new Set([
 export function translateConstraints<TQuery>(
   constraint: Constraint,
   adapter: ConstraintAdapter<TQuery>,
+  _depth = 0,
 ): TQuery {
+  if (_depth > MAX_TRANSLATE_DEPTH) {
+    throw new Error(
+      `translateConstraints exceeded maximum recursion depth (${MAX_TRANSLATE_DEPTH}). ` +
+      "The constraint AST may be malformed or excessively nested.",
+    );
+  }
   switch (constraint.type) {
     // Leaf constraints
     case "field_eq":
@@ -46,7 +49,7 @@ export function translateConstraints<TQuery>(
 
     // Relation constraint
     case "relation": {
-      const childQuery = translateConstraints(constraint.constraint, adapter);
+      const childQuery = translateConstraints(constraint.constraint, adapter, _depth + 1);
       return adapter.relation(constraint.field, constraint.resourceType, childQuery);
     }
 
@@ -60,17 +63,17 @@ export function translateConstraints<TQuery>(
 
     // Combinators
     case "and": {
-      const queries = constraint.children.map((c) => translateConstraints(c, adapter));
+      const queries = constraint.children.map((c) => translateConstraints(c, adapter, _depth + 1));
       return adapter.and(queries);
     }
 
     case "or": {
-      const queries = constraint.children.map((c) => translateConstraints(c, adapter));
+      const queries = constraint.children.map((c) => translateConstraints(c, adapter, _depth + 1));
       return adapter.or(queries);
     }
 
     case "not": {
-      const childQuery = translateConstraints(constraint.child, adapter);
+      const childQuery = translateConstraints(constraint.child, adapter, _depth + 1);
       return adapter.not(childQuery);
     }
 
