@@ -17,12 +17,7 @@ function parsePolicy(raw: unknown): Policy {
   if (!result.success) {
     const issue = result.issues[0];
     const path = issue?.path
-      ?.map((p) => {
-        if (typeof p.key === "string" || typeof p.key === "number") {
-          return String(p.key);
-        }
-        return String(p.key);
-      })
+      ?.map((p) => String(p.key))
       .join(".") ?? "";
     throw new ValidationError(
       `Policy validation failed: ${issue?.message ?? "unknown error"}${path ? ` at ${path}` : ""}`,

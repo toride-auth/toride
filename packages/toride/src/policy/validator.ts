@@ -106,6 +106,15 @@ export function validatePolicy(policy: Policy): void {
           }
         }
 
+        if (entry.from_relation !== undefined) {
+          if (!declaredRelations.has(entry.from_relation)) {
+            throw new ValidationError(
+              `${path} references undeclared relation "${entry.from_relation}"`,
+              path,
+            );
+          }
+        }
+
         if (entry.actor_type !== undefined) {
           if (!declaredActorTypes.has(entry.actor_type)) {
             throw new ValidationError(

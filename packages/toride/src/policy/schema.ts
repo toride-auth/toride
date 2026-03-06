@@ -158,6 +158,3 @@ export const PolicySchema = v.object({
   resources: v.record(v.string(), ResourceBlockSchema),
   tests: v.optional(v.array(TestCaseSchema)),
 });
-
-/** Infer the Policy type from the schema to prevent drift. */
-export type PolicyFromSchema = v.InferOutput<typeof PolicySchema>;
