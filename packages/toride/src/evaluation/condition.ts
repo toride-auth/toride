@@ -18,11 +18,23 @@ import type {
 /** Default maximum depth for nested property resolution. */
 const DEFAULT_MAX_CONDITION_DEPTH = 3;
 
+/** Default maximum recursion depth for logical combinator nesting (any/all). */
+const DEFAULT_MAX_COMBINATOR_DEPTH = 10;
+
+/** Module-level set of valid operator keys to avoid per-call allocation. */
+const OPERATOR_KEYS = new Set([
+  "eq", "neq", "gt", "gte", "lt", "lte",
+  "in", "includes", "exists",
+  "startsWith", "endsWith", "contains",
+  "custom",
+]);
+
 /** Sentinel value representing an undefined/missing property. */
 const UNDEFINED_SENTINEL = Symbol("UNDEFINED");
 
 export interface ConditionOptions {
   readonly maxConditionDepth?: number;
+  readonly maxCombinatorDepth?: number;
   readonly customEvaluators?: Record<string, EvaluatorFn>;
   readonly ruleEffect?: "permit" | "forbid";
 }
@@ -41,14 +53,20 @@ export async function evaluateCondition(
   resourceBlock: ResourceBlock,
   policy: Policy,
   options?: ConditionOptions,
+  combinatorDepth: number = 0,
 ): Promise<boolean> {
   const maxDepth = options?.maxConditionDepth ?? DEFAULT_MAX_CONDITION_DEPTH;
+  const maxCombinatorDepth = options?.maxCombinatorDepth ?? DEFAULT_MAX_COMBINATOR_DEPTH;
 
-  // Handle logical combinators
+  // Handle logical combinators with recursion depth limit
   if ("any" in condition && Array.isArray((condition as { any: unknown }).any)) {
+    if (combinatorDepth >= maxCombinatorDepth) {
+      // Fail-closed: excessive nesting -> false
+      return false;
+    }
     const items = (condition as { any: ConditionExpression[] }).any;
     for (const item of items) {
-      if (await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options)) {
+      if (await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options, combinatorDepth + 1)) {
         return true;
       }
     }
@@ -56,9 +74,13 @@ export async function evaluateCondition(
   }
 
   if ("all" in condition && Array.isArray((condition as { all: unknown }).all)) {
+    if (combinatorDepth >= maxCombinatorDepth) {
+      // Fail-closed: excessive nesting -> false
+      return false;
+    }
     const items = (condition as { all: ConditionExpression[] }).all;
     for (const item of items) {
-      if (!(await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options))) {
+      if (!(await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options, combinatorDepth + 1))) {
         return false;
       }
     }
@@ -343,13 +365,7 @@ function isCrossReference(value: string): boolean {
 function isOperator(value: ConditionValue): value is ConditionOperator {
   if (typeof value !== "object" || value === null) return false;
   const keys = Object.keys(value as object);
-  const operatorKeys = [
-    "eq", "neq", "gt", "gte", "lt", "lte",
-    "in", "includes", "exists",
-    "startsWith", "endsWith", "contains",
-    "custom",
-  ];
-  return keys.length === 1 && operatorKeys.includes(keys[0]);
+  return keys.length === 1 && OPERATOR_KEYS.has(keys[0]);
 }
 
 /**

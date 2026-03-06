@@ -547,6 +547,35 @@ describe("evaluateCondition", () => {
     });
   });
 
+  // ─── Recursion depth limit for logical combinators ──────────────────
+
+  describe("combinator recursion depth limit", () => {
+    it("returns false when combinator nesting exceeds maxCombinatorDepth", async () => {
+      // Build deeply nested any/all structure
+      let condition: ConditionExpression = { "$actor.active": true };
+      for (let i = 0; i < 5; i++) {
+        condition = { any: [condition] };
+      }
+      // With maxCombinatorDepth=3, this should fail
+      const result = await evaluateCondition(
+        condition, actor, resource, defaultResolver, env, minimalBlock, minimalPolicy,
+        { maxCombinatorDepth: 3 },
+      );
+      expect(result).toBe(false);
+    });
+
+    it("succeeds when combinator nesting is within limit", async () => {
+      let condition: ConditionExpression = { "$actor.active": true };
+      condition = { all: [condition] };
+      condition = { any: [condition] };
+      // 2 levels of nesting, default limit is 10, should succeed
+      const result = await evaluateCondition(
+        condition, actor, resource, defaultResolver, env, minimalBlock, minimalPolicy,
+      );
+      expect(result).toBe(true);
+    });
+  });
+
   // ─── Depth limit for condition evaluation ──────────────────────────
 
   describe("depth limits", () => {

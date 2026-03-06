@@ -14,7 +14,7 @@ import type {
 
 describe("conditional rules integration", () => {
   let createToride: (options: TorideOptions) => {
-    can: (actor: ActorRef, action: string, resource: ResourceRef) => Promise<boolean>;
+    can: (actor: ActorRef, action: string, resource: ResourceRef, options?: { env?: Record<string, unknown> }) => Promise<boolean>;
   };
   let loadYaml: (input: string) => Promise<Policy>;
 
@@ -254,7 +254,7 @@ resources:
 
   // ─── Env passing through engine ─────────────────────────────────────
 
-  it("passes env to condition evaluator", async () => {
+  it("passes env to condition evaluator via CheckOptions", async () => {
     const ENV_POLICY = `
 version: "1"
 actors:
@@ -279,16 +279,54 @@ resources:
       roles: { "u1:Document:d1": ["editor"] },
       attributes: { "Document:d1": {} },
     });
-    const engine = createToride({
-      policy,
-      resolver,
-      // TODO: env needs to be passed per-check, verify engine supports it
-    });
+    const engine = createToride({ policy, resolver });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     // Without env containing the flag, should deny
     expect(await engine.can(actor, "write", resource)).toBe(false);
+
+    // With env containing the flag, should allow
+    expect(await engine.can(actor, "write", resource, {
+      env: { feature_flags: ["advanced_editing", "dark_mode"] },
+    })).toBe(true);
+
+    // With env containing wrong flag, should deny
+    expect(await engine.can(actor, "write", resource, {
+      env: { feature_flags: ["dark_mode"] },
+    })).toBe(false);
+  });
+
+  // ─── ResolverCache integration: deduplicates resolver calls ─────────
+
+  it("caches resolver calls within a single can() check", async () => {
+    const policy = await loadYaml(POLICY_YAML);
+    let getAttributesCallCount = 0;
+    const cachingResolver: RelationResolver = {
+      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
+        const key = `${actor.id}:${resource.type}:${resource.id}`;
+        const roles: Record<string, string[]> = { "u1:Document:d1": ["admin"] };
+        return roles[key] ?? [];
+      },
+      getRelated: async () => [],
+      getAttributes: async (ref: ResourceRef) => {
+        getAttributesCallCount++;
+        const key = `${ref.type}:${ref.id}`;
+        const attrs: Record<string, Record<string, unknown>> = {
+          "Document:d1": { locked: false, archived: false },
+        };
+        return attrs[key] ?? {};
+      },
+    };
+    const engine = createToride({ policy, resolver: cachingResolver });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true } };
+    const resource: ResourceRef = { type: "Document", id: "d1" };
+
+    // Multiple rules for "delete" will call getAttributes, but cache should deduplicate
+    getAttributesCallCount = 0;
+    await engine.can(actor, "delete", resource);
+    // With cache, getAttributes for Document:d1 should be called at most once
+    expect(getAttributesCallCount).toBeLessThanOrEqual(1);
   });
 
   // ─── Backward compatibility: policies without rules ─────────────────

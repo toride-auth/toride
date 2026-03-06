@@ -24,12 +24,13 @@ import { evaluateCondition } from "./condition.js";
  * Expand grants for resolved roles, handling the `all` keyword.
  * When a grant maps a role to `["all"]`, substitutes with the resource's
  * full `permissions` array.
+ * Returns a Set for O(1) membership checks.
  */
 function expandGrants(
   roles: string[],
   grants: Record<string, string[]>,
   allPermissions: string[],
-): string[] {
+): Set<string> {
   const permissionSet = new Set<string>();
 
   for (const role of roles) {
@@ -47,7 +48,7 @@ function expandGrants(
     }
   }
 
-  return [...permissionSet];
+  return permissionSet;
 }
 
 /**
@@ -90,16 +91,17 @@ export async function evaluate(
     ...new Set([...resolvedRoles.direct, ...derivedRoleNames]),
   ];
 
-  // Step 2: Expand grants
+  // Step 2: Expand grants (returns Set for O(1) lookups)
   const grants = resourceBlock.grants ?? {};
-  const grantedPermissions = expandGrants(
+  const grantedPermissionSet = expandGrants(
     allRoles,
     grants,
     resourceBlock.permissions,
   );
+  const grantedPermissions = [...grantedPermissionSet];
 
   // Step 3: Check if action is in granted permissions (default-deny)
-  let allowed = grantedPermissions.includes(action);
+  let allowed = grantedPermissionSet.has(action);
 
   // Step 4: Evaluate conditional rules
   const rules = resourceBlock.rules ?? [];
@@ -193,6 +195,17 @@ async function evaluateRules(
         });
         continue;
       }
+    }
+
+    // Short-circuit: skip permit condition evaluation once a forbid has matched
+    if (forbidMatched && rule.effect === "permit") {
+      ruleResults.push({
+        effect: rule.effect,
+        matched: false,
+        rule,
+        resolvedValues: {},
+      });
+      continue;
     }
 
     // Evaluate condition with fail-closed semantics
