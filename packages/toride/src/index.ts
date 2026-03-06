@@ -1,2 +1,51 @@
 // toride - Relation-aware authorization engine for TypeScript
 export const VERSION = "0.0.1";
+
+// ─── Policy Loading (T020) ────────────────────────────────────────
+export { loadYaml, loadJson } from "./policy/parser.js";
+
+// ─── Core Runtime Types (T015) ────────────────────────────────────
+export type {
+  ActorRef,
+  ResourceRef,
+  RelationResolver,
+  Policy,
+  TorideOptions,
+  CheckOptions,
+  BatchCheckItem,
+  EvaluatorFn,
+  AttributeType,
+  ActorDeclaration,
+  GlobalRole,
+  RelationDef,
+  DerivedRoleEntry,
+  Rule,
+  FieldAccessDef,
+  ResourceBlock,
+  ConditionExpression,
+  ConditionValue,
+  ConditionOperator,
+  SimpleConditions,
+  TestCase,
+} from "./types.js";
+
+// ─── Evaluation Result Types (T017) ──────────────────────────────
+export type {
+  ExplainResult,
+  ResolvedRolesDetail,
+  DerivedRoleTrace,
+  MatchedRule,
+  DecisionEvent,
+  QueryEvent,
+} from "./types.js";
+
+// ─── Error Types (T018) ──────────────────────────────────────────
+export { ValidationError, CycleError, DepthLimitError } from "./types.js";
+
+// ─── Constraint AST Types (T016) ─────────────────────────────────
+export type {
+  Constraint,
+  LeafConstraint,
+  ConstraintResult,
+  ConstraintAdapter,
+} from "./partial/constraint-types.js";

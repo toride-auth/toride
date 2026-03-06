@@ -42,15 +42,15 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T015 Define core runtime types (`ActorRef`, `ResourceRef`, `CheckOptions`, `BatchCheckItem`, `RelationResolver`, `TorideOptions`) in `packages/toride/src/types.ts`
-- [ ] T016 [P] Define constraint AST types (`Constraint` discriminated union, `LeafConstraint`, `ConstraintResult`, `ConstraintAdapter`) in `packages/toride/src/partial/constraint-types.ts`
-- [ ] T017 [P] Define evaluation result types (`ExplainResult`, `ResolvedRolesDetail`, `DerivedRoleTrace`, `MatchedRule`, `DecisionEvent`, `QueryEvent`) in `packages/toride/src/types.ts`
-- [ ] T018 [P] Define error types (`ValidationError`, `CycleError`, `DepthLimitError`) in `packages/toride/src/types.ts`
-- [ ] T019 Define Valibot schemas for full policy format (`Policy`, `ActorDeclaration`, `GlobalRole`, `ResourceBlock`, `RelationDef`, `DerivedRoleEntry`, `Rule`, `FieldAccessDef`, `ConditionExpression`, `ConditionValue`) in `packages/toride/src/policy/schema.ts`
-- [ ] T020 Implement YAML/JSON parser (`loadYaml`, `loadJson`) using `yaml` package with `prettyErrors: true` and Valibot schema validation in `packages/toride/src/policy/parser.ts`
-- [ ] T021 Implement cross-reference validator (undeclared roles in grants, unknown relations in derived_roles, invalid `$actor` attribute references, mutual exclusivity of derivation patterns) in `packages/toride/src/policy/validator.ts`
-- [ ] T022 Wire up public exports in `packages/toride/src/index.ts` for types, parser, and error classes
-- [ ] T023 Write unit tests for policy parsing and validation (valid policies, structural errors, cross-reference errors with path messages) in `packages/toride/tests/unit/policy/`
+- [X] T015 Define core runtime types (`ActorRef`, `ResourceRef`, `CheckOptions`, `BatchCheckItem`, `RelationResolver`, `TorideOptions`) in `packages/toride/src/types.ts`
+- [X] T016 [P] Define constraint AST types (`Constraint` discriminated union, `LeafConstraint`, `ConstraintResult`, `ConstraintAdapter`) in `packages/toride/src/partial/constraint-types.ts`
+- [X] T017 [P] Define evaluation result types (`ExplainResult`, `ResolvedRolesDetail`, `DerivedRoleTrace`, `MatchedRule`, `DecisionEvent`, `QueryEvent`) in `packages/toride/src/types.ts`
+- [X] T018 [P] Define error types (`ValidationError`, `CycleError`, `DepthLimitError`) in `packages/toride/src/types.ts`
+- [X] T019 Define Valibot schemas for full policy format (`Policy`, `ActorDeclaration`, `GlobalRole`, `ResourceBlock`, `RelationDef`, `DerivedRoleEntry`, `Rule`, `FieldAccessDef`, `ConditionExpression`, `ConditionValue`) in `packages/toride/src/policy/schema.ts`
+- [X] T020 Implement YAML/JSON parser (`loadYaml`, `loadJson`) using `yaml` package with `prettyErrors: true` and Valibot schema validation in `packages/toride/src/policy/parser.ts`
+- [X] T021 Implement cross-reference validator (undeclared roles in grants, unknown relations in derived_roles, invalid `$actor` attribute references, mutual exclusivity of derivation patterns) in `packages/toride/src/policy/validator.ts`
+- [X] T022 Wire up public exports in `packages/toride/src/index.ts` for types, parser, and error classes
+- [X] T023 Write unit tests for policy parsing and validation (valid policies, structural errors, cross-reference errors with path messages) in `packages/toride/tests/unit/policy/`
 
 **Checkpoint**: `loadYaml()` and `loadJson()` parse valid policies into typed `Policy` objects. Invalid policies throw `ValidationError` with logical path messages. All foundational types are exported.
 
