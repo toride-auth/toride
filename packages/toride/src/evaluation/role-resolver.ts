@@ -85,6 +85,7 @@ export async function resolveRoles(
         resourceBlock,
         policy,
         maxDepth,
+        maxDepth,
         visited,
       );
       derived.push(...traces);
@@ -112,6 +113,7 @@ async function evaluateDerivedRole(
   resourceBlock: ResourceBlock,
   policy: Policy,
   depthRemaining: number,
+  maxDepth: number,
   visited: Set<string>,
 ): Promise<DerivedRoleTrace[]> {
   // Pattern 1: from_global_role
@@ -128,6 +130,7 @@ async function evaluateDerivedRole(
       resolver,
       policy,
       depthRemaining,
+      maxDepth,
       visited,
     );
   }
@@ -193,13 +196,14 @@ async function evaluateRelationRole(
   resolver: RelationResolver,
   policy: Policy,
   depthRemaining: number,
+  maxDepth: number,
   visited: Set<string>,
 ): Promise<DerivedRoleTrace[]> {
   // T041: Check depth limit
   if (depthRemaining <= 0) {
     throw new DepthLimitError(
-      `Derived role chain exceeded maximum depth`,
-      DEFAULT_MAX_DERIVED_ROLE_DEPTH,
+      `Derived role chain exceeded maximum depth of ${maxDepth}`,
+      maxDepth,
       "derivation",
     );
   }
@@ -261,10 +265,10 @@ async function evaluateRelationRole(
           relatedBlock,
           policy,
           depthRemaining - 1,
+          maxDepth,
           branchVisited,
         );
-        const allDerivedRoleNames = relatedResult.derived.map((d) => d.role);
-        if (allDerivedRoleNames.includes(requiredRole)) {
+        if (relatedResult.derived.some((d) => d.role === requiredRole)) {
           hasRole = true;
         }
       }
@@ -292,12 +296,13 @@ async function resolveRolesRecursive(
   resourceBlock: ResourceBlock,
   policy: Policy,
   depthRemaining: number,
+  maxDepth: number,
   visited: Set<string>,
 ): Promise<ResolvedRolesDetail> {
   if (depthRemaining <= 0) {
     throw new DepthLimitError(
-      `Derived role chain exceeded maximum depth`,
-      DEFAULT_MAX_DERIVED_ROLE_DEPTH,
+      `Derived role chain exceeded maximum depth of ${maxDepth}`,
+      maxDepth,
       "derivation",
     );
   }
@@ -322,6 +327,7 @@ async function resolveRolesRecursive(
         resourceBlock,
         policy,
         depthRemaining,
+        maxDepth,
         visited,
       );
       derived.push(...traces);
