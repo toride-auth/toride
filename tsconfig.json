@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "references": [
+    { "path": "packages/toride" },
+    { "path": "packages/codegen" },
+    { "path": "packages/prisma" },
+    { "path": "packages/drizzle" }
+  ],
+  "include": [],
+  "exclude": ["node_modules"]
+}

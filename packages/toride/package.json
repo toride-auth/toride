@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "yaml": "^2.3.0",
-    "valibot": "^0.31.0"
+    "valibot": "^1.2.0"
   },
   "keywords": ["authorization", "rbac", "rebac", "abac", "permissions"],
   "license": "MIT",
