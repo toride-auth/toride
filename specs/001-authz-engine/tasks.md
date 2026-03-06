@@ -17,20 +17,20 @@
 
 **Purpose**: Initialize pnpm monorepo with all 4 packages, build tooling, and shared configuration
 
-- [ ] T001 Create root `package.json` with pnpm workspace config and shared scripts
-- [ ] T002 Create `pnpm-workspace.yaml` defining `packages/*` workspace
-- [ ] T003 Create `tsconfig.base.json` with strict mode, ESM, and shared compiler options
-- [ ] T004 [P] Create `packages/toride/package.json` with ESM exports, subpath `./client`, and bin entry for `toride` CLI
-- [ ] T005 [P] Create `packages/toride/tsup.config.ts` with dual entry points (`src/index.ts`, `src/client.ts`) and dts generation
-- [ ] T006 [P] Create `packages/toride/tsconfig.json` extending base config
-- [ ] T007 [P] Create `packages/codegen/package.json` with bin entry `toride-codegen` and `workspace:*` dep on `toride`
-- [ ] T008 [P] Create `packages/codegen/tsup.config.ts` with single entry point and dts generation
-- [ ] T009 [P] Create `packages/prisma/package.json` with `workspace:*` dep on `toride`
-- [ ] T010 [P] Create `packages/prisma/tsup.config.ts` with single entry point and dts generation
-- [ ] T011 [P] Create `packages/drizzle/package.json` with `workspace:*` dep on `toride`
-- [ ] T012 [P] Create `packages/drizzle/tsup.config.ts` with single entry point and dts generation
-- [ ] T013 Create `vitest.workspace.ts` at root pointing to all package test directories
-- [ ] T014 Run `pnpm install` and verify workspace resolution, `pnpm build` scaffold, and `pnpm test` harness
+- [X] T001 Create root `package.json` with pnpm workspace config and shared scripts
+- [X] T002 Create `pnpm-workspace.yaml` defining `packages/*` workspace
+- [X] T003 Create `tsconfig.base.json` with strict mode, ESM, and shared compiler options
+- [X] T004 [P] Create `packages/toride/package.json` with ESM exports, subpath `./client`, and bin entry for `toride` CLI
+- [X] T005 [P] Create `packages/toride/tsup.config.ts` with dual entry points (`src/index.ts`, `src/client.ts`) and dts generation
+- [X] T006 [P] Create `packages/toride/tsconfig.json` extending base config
+- [X] T007 [P] Create `packages/codegen/package.json` with bin entry `toride-codegen` and `workspace:*` dep on `toride`
+- [X] T008 [P] Create `packages/codegen/tsup.config.ts` with single entry point and dts generation
+- [X] T009 [P] Create `packages/prisma/package.json` with `workspace:*` dep on `toride`
+- [X] T010 [P] Create `packages/prisma/tsup.config.ts` with single entry point and dts generation
+- [X] T011 [P] Create `packages/drizzle/package.json` with `workspace:*` dep on `toride`
+- [X] T012 [P] Create `packages/drizzle/tsup.config.ts` with single entry point and dts generation
+- [X] T013 Create `vitest.workspace.ts` at root pointing to all package test directories
+- [X] T014 Run `pnpm install` and verify workspace resolution, `pnpm build` scaffold, and `pnpm test` harness
 
 **Checkpoint**: All 4 packages resolve, `pnpm build` and `pnpm test` run (even if empty). Monorepo is functional.
 

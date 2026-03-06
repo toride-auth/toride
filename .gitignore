@@ -1,2 +1,13 @@
 # Personal worktreeinclude (not tracked)
 .worktreeinclude.local
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test coverage
+coverage/

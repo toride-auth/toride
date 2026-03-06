@@ -2,7 +2,26 @@
   "name": "@toride/codegen",
   "version": "0.0.1",
   "description": "Code generation tools for Toride authorization engine",
-  "main": "index.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "toride-codegen": "./dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "toride": "workspace:*"
+  },
   "keywords": ["authorization", "codegen", "toride"],
   "license": "MIT",
   "repository": {
