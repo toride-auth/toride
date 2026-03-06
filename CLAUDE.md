@@ -1,0 +1,29 @@
+# toride Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2026-03-06
+
+## Active Technologies
+
+- TypeScript (strict mode), Node.js 20+ (current LTS) + `yaml` (YAML 1.2 parsing), Valibot (schema validation), tsup (build) (001-authz-engine)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+npm test && npm run lint
+
+## Code Style
+
+TypeScript (strict mode), Node.js 20+ (current LTS): Follow standard conventions
+
+## Recent Changes
+
+- 001-authz-engine: Added TypeScript (strict mode), Node.js 20+ (current LTS) + `yaml` (YAML 1.2 parsing), Valibot (schema validation), tsup (build)
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
