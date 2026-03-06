@@ -1,0 +1,12 @@
+{
+  "name": "toride",
+  "version": "0.0.1",
+  "description": "Relation-aware authorization engine for TypeScript",
+  "main": "index.js",
+  "keywords": ["authorization", "rbac", "rebac", "abac", "permissions"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toride-auth/toride"
+  }
+}

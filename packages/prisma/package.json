@@ -1,0 +1,12 @@
+{
+  "name": "@toride/prisma",
+  "version": "0.0.1",
+  "description": "Prisma integration for Toride authorization engine",
+  "main": "index.js",
+  "keywords": ["authorization", "prisma", "toride"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toride-auth/toride"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@toride/drizzle",
+  "version": "0.0.1",
+  "description": "Drizzle ORM integration for Toride authorization engine",
+  "main": "index.js",
+  "keywords": ["authorization", "drizzle", "toride"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toride-auth/toride"
+  }
+}

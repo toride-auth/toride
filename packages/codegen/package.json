@@ -1,0 +1,12 @@
+{
+  "name": "@toride/codegen",
+  "version": "0.0.1",
+  "description": "Code generation tools for Toride authorization engine",
+  "main": "index.js",
+  "keywords": ["authorization", "codegen", "toride"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toride-auth/toride"
+  }
+}
