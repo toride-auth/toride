@@ -1,6 +1,7 @@
 // T030: Toride class with can() method
 // T031: createToride() typed factory function
 // T064: Wire up buildConstraints() and translateConstraints()
+// T068-T072: explain(), permittedActions(), resolvedRoles(), canBatch(), audit callbacks
 
 import type {
   ActorRef,
@@ -10,6 +11,9 @@ import type {
   Policy,
   RelationResolver,
   ExplainResult,
+  BatchCheckItem,
+  DecisionEvent,
+  QueryEvent,
 } from "./types.js";
 import type {
   Constraint,
@@ -47,8 +51,111 @@ export class Toride {
     resource: ResourceRef,
     options?: CheckOptions,
   ): Promise<boolean> {
-    const result = await this.evaluate(actor, action, resource, options);
+    const result = await this.evaluateInternal(actor, action, resource, options);
+    this.fireDecisionEvent(actor, action, resource, result);
     return result.allowed;
+  }
+
+  /**
+   * T068: Return full ExplainResult with role derivation traces,
+   * granted permissions, matched rules, and human-readable final decision.
+   */
+  async explain(
+    actor: ActorRef,
+    action: string,
+    resource: ResourceRef,
+    options?: CheckOptions,
+  ): Promise<ExplainResult> {
+    const result = await this.evaluateInternal(actor, action, resource, options);
+    this.fireDecisionEvent(actor, action, resource, result);
+    return result;
+  }
+
+  /**
+   * T069: Check all declared permissions for a resource and return permitted ones.
+   * Uses a shared cache across all per-action evaluations.
+   */
+  async permittedActions(
+    actor: ActorRef,
+    resource: ResourceRef,
+    options?: CheckOptions,
+  ): Promise<string[]> {
+    const resourceBlock = this.policy.resources[resource.type];
+    if (!resourceBlock) {
+      return [];
+    }
+
+    const sharedCache = new ResolverCache(this.resolver);
+    const permitted: string[] = [];
+
+    for (const action of resourceBlock.permissions) {
+      const result = await this.evaluateInternal(
+        actor,
+        action,
+        resource,
+        options,
+        sharedCache,
+      );
+      if (result.allowed) {
+        permitted.push(action);
+      }
+    }
+
+    return permitted;
+  }
+
+  /**
+   * T070: Return flat deduplicated list of all resolved roles (direct + derived).
+   */
+  async resolvedRoles(
+    actor: ActorRef,
+    resource: ResourceRef,
+    options?: CheckOptions,
+  ): Promise<string[]> {
+    const resourceBlock = this.policy.resources[resource.type];
+    if (!resourceBlock) {
+      return [];
+    }
+
+    // Use any action just to trigger evaluation for role resolution;
+    // pick the first permission or use a dummy
+    const action = resourceBlock.permissions[0] ?? "__resolvedRoles__";
+    const result = await this.evaluateInternal(actor, action, { type: resource.type, id: resource.id }, options);
+
+    const directRoles = result.resolvedRoles.direct;
+    const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
+    return [...new Set([...directRoles, ...derivedRoleNames])];
+  }
+
+  /**
+   * T071: Evaluate multiple checks for the same actor with a shared resolver cache.
+   * Returns boolean[] in the same order as the input checks.
+   */
+  async canBatch(
+    actor: ActorRef,
+    checks: BatchCheckItem[],
+    options?: CheckOptions,
+  ): Promise<boolean[]> {
+    if (checks.length === 0) {
+      return [];
+    }
+
+    const sharedCache = new ResolverCache(this.resolver);
+    const results: boolean[] = [];
+
+    for (const check of checks) {
+      const result = await this.evaluateInternal(
+        actor,
+        check.action,
+        check.resource,
+        options,
+        sharedCache,
+      );
+      this.fireDecisionEvent(actor, check.action, check.resource, result);
+      results.push(result.allowed);
+    }
+
+    return results;
   }
 
   /**
@@ -62,7 +169,7 @@ export class Toride {
     options?: CheckOptions,
   ): Promise<ConstraintResult> {
     const cachedResolver = new ResolverCache(this.resolver);
-    return buildConstraintsImpl(
+    const constraintResult = await buildConstraintsImpl(
       actor,
       action,
       resourceType,
@@ -74,6 +181,9 @@ export class Toride {
         customEvaluators: this.options.customEvaluators,
       },
     );
+
+    this.fireQueryEvent(actor, action, resourceType, constraintResult);
+    return constraintResult;
   }
 
   /**
@@ -88,15 +198,95 @@ export class Toride {
   }
 
   /**
-   * Evaluate with full ExplainResult (shared code path for can() and explain()).
+   * T072: Fire onDecision audit callback via microtask (non-blocking).
+   * Errors are silently swallowed to prevent audit failures from affecting authorization.
    */
-  private async evaluate(
+  private fireDecisionEvent(
+    actor: ActorRef,
+    action: string,
+    resource: ResourceRef,
+    result: ExplainResult,
+  ): void {
+    const callback = this.options.onDecision;
+    if (!callback) return;
+
+    const directRoles = result.resolvedRoles.direct;
+    const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
+    const resolvedRoles = [...new Set([...directRoles, ...derivedRoleNames])];
+
+    const event: DecisionEvent = {
+      actor,
+      action,
+      resource,
+      allowed: result.allowed,
+      resolvedRoles,
+      matchedRules: result.matchedRules.map((r) => ({
+        effect: r.effect,
+        matched: r.matched,
+      })),
+      timestamp: new Date(),
+    };
+
+    queueMicrotask(() => {
+      try {
+        callback(event);
+      } catch {
+        // Silently swallow errors - audit must not affect authorization
+      }
+    });
+  }
+
+  /**
+   * T072: Fire onQuery audit callback via microtask (non-blocking).
+   * Errors are silently swallowed.
+   */
+  private fireQueryEvent(
+    actor: ActorRef,
+    action: string,
+    resourceType: string,
+    constraintResult: ConstraintResult,
+  ): void {
+    const callback = this.options.onQuery;
+    if (!callback) return;
+
+    let resultType: "unrestricted" | "forbidden" | "constrained";
+    if ("unrestricted" in constraintResult && constraintResult.unrestricted) {
+      resultType = "unrestricted";
+    } else if ("forbidden" in constraintResult && constraintResult.forbidden) {
+      resultType = "forbidden";
+    } else {
+      resultType = "constrained";
+    }
+
+    const event: QueryEvent = {
+      actor,
+      action,
+      resourceType,
+      resultType,
+      timestamp: new Date(),
+    };
+
+    queueMicrotask(() => {
+      try {
+        callback(event);
+      } catch {
+        // Silently swallow errors - audit must not affect authorization
+      }
+    });
+  }
+
+  /**
+   * Evaluate with full ExplainResult (shared code path for can(), explain(), and helpers).
+   * Accepts an optional pre-existing ResolverCache for shared-cache scenarios (canBatch, permittedActions).
+   */
+  private async evaluateInternal(
     actor: ActorRef,
     action: string,
     resource: ResourceRef,
     checkOptions?: CheckOptions,
+    existingCache?: ResolverCache,
   ): Promise<ExplainResult> {
-    // Look up resource block; unknown resource type → default deny
+    // Look up resource block; unknown resource type -> default deny
     const resourceBlock = this.policy.resources[resource.type];
     if (!resourceBlock) {
       return {
@@ -108,8 +298,8 @@ export class Toride {
       };
     }
 
-    // Wire up ResolverCache for per-check deduplication
-    const cachedResolver = new ResolverCache(this.resolver);
+    // Use existing cache or create a new one
+    const cachedResolver = existingCache ?? new ResolverCache(this.resolver);
     const env = checkOptions?.env ?? {};
 
     // T052: Forward all options including customEvaluators and maxConditionDepth

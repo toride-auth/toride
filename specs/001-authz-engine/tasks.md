@@ -169,17 +169,17 @@
 
 ### Tests for User Story 5
 
-- [ ] T065 [P] [US5] Write unit tests for `explain()` output structure (resolvedRoles, grantedPermissions, matchedRules, finalDecision) in `packages/toride/tests/unit/engine/explain.test.ts`
-- [ ] T066 [P] [US5] Write unit tests for `permittedActions()`, `resolvedRoles()`, and `canBatch()` in `packages/toride/tests/unit/engine/helpers.test.ts`
-- [ ] T067 [P] [US5] Write integration tests for debug scenarios (multiple derivation paths, forbid explanations) in `packages/toride/tests/integration/explain.test.ts`
+- [X] T065 [P] [US5] Write unit tests for `explain()` output structure (resolvedRoles, grantedPermissions, matchedRules, finalDecision) in `packages/toride/tests/unit/engine/explain.test.ts`
+- [X] T066 [P] [US5] Write unit tests for `permittedActions()`, `resolvedRoles()`, and `canBatch()` in `packages/toride/tests/unit/engine/helpers.test.ts`
+- [X] T067 [P] [US5] Write integration tests for debug scenarios (multiple derivation paths, forbid explanations) in `packages/toride/tests/integration/explain.test.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T068 [US5] Implement `explain()` method returning `ExplainResult` with full role derivation traces, granted permissions, matched rules, and human-readable final decision in `packages/toride/src/engine.ts`
-- [ ] T069 [US5] Implement `permittedActions()` (check all declared permissions for a resource, return permitted ones) in `packages/toride/src/engine.ts`
-- [ ] T070 [US5] Implement `resolvedRoles()` (return both direct and derived roles) in `packages/toride/src/engine.ts`
-- [ ] T071 [US5] Implement `canBatch()` with shared resolver cache across all checks in batch in `packages/toride/src/engine.ts`
-- [ ] T072 [US5] Implement `onDecision` and `onQuery` audit event callbacks (async, non-blocking) in `packages/toride/src/engine.ts`
+- [X] T068 [US5] Implement `explain()` method returning `ExplainResult` with full role derivation traces, granted permissions, matched rules, and human-readable final decision in `packages/toride/src/engine.ts`
+- [X] T069 [US5] Implement `permittedActions()` (check all declared permissions for a resource, return permitted ones) in `packages/toride/src/engine.ts`
+- [X] T070 [US5] Implement `resolvedRoles()` (return both direct and derived roles) in `packages/toride/src/engine.ts`
+- [X] T071 [US5] Implement `canBatch()` with shared resolver cache across all checks in batch in `packages/toride/src/engine.ts`
+- [X] T072 [US5] Implement `onDecision` and `onQuery` audit event callbacks (async, non-blocking) in `packages/toride/src/engine.ts`
 
 **Checkpoint**: `explain()` returns complete traces showing all derivation paths. `permittedActions()` lists all allowed actions. `canBatch()` shares cache across checks. Audit callbacks fire without blocking.
 
