@@ -7,9 +7,9 @@ handoffs:
     agent: speckit.analyze
     prompt: Run a project analysis for consistency
     send: true
-  - label: Implement Project
-    agent: speckit.implement
-    prompt: Start the implementation in phases
+  - label: Run with jdi
+    agent: jdi
+    prompt: run
     send: true
 ---
 
@@ -54,13 +54,49 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Parallel execution examples per story
    - Implementation strategy section (MVP first, incremental delivery)
 
-5. **Report**: Output path to generated tasks.md and summary:
-   - Total task count
+5. **Generate jdi task files**: After writing tasks.md, create `.jdi/tasks/` files grouped by phase:
+
+   **Grouping rule**: Each phase heading (`## Phase N: ...`) becomes one jdi task file. This keeps tasks substantial enough to justify the full jdi workflow (plan → implement → review → finalize).
+
+   **File naming**: `NNN-slug.yaml` where NNN is zero-padded (001, 002, ...) and slug is derived from the phase title (lowercase, hyphenated, alphanumeric only).
+
+   **Task file format** (`.jdi/tasks/NNN-slug.yaml`):
+
+   ```yaml
+   title: "Phase title from tasks.md"
+   description: |
+     Phase goal and purpose from tasks.md.
+     Spec: {FEATURE_DIR path}
+
+     Sub-tasks:
+     - T001 Description with file path
+     - T002 [P] Description with file path
+     ...
+
+     Checkpoint: checkpoint criteria from tasks.md
+   status: pending
+   depends_on: []          # list of task filenames this phase depends on
+   current_step: null
+   feedback: null
+   ```
+
+   **Dependency mapping**: Use the "Dependencies & Execution Order" section from the generated tasks.md to populate `depends_on` with the corresponding jdi task filenames. For example, if Phase 3 (US1) depends on Phase 2 (Foundational), then `003-us1-*.yaml` gets `depends_on: ["002-foundation.yaml"]`.
+
+   **Important rules**:
+   - Embed ALL sub-tasks (the `- [ ] T0XX ...` lines) from that phase into the description
+   - Include the phase's checkpoint criteria so reviewers know what "done" means
+   - Reference the spec directory path so jdi agents can read full context
+   - Ensure `.jdi/tasks/` directory exists before writing (create if needed)
+
+6. **Report**: Output path to generated tasks.md, jdi task files, and summary:
+   - Total task count (fine-grained from tasks.md)
+   - jdi task count (grouped by phase)
    - Task count per user story
    - Parallel opportunities identified
    - Independent test criteria for each story
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
+   - jdi integration: List created `.jdi/tasks/` files with their dependencies
 
 Context for task generation: $ARGUMENTS
 
