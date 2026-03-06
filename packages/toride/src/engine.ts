@@ -2,6 +2,7 @@
 // T031: createToride() typed factory function
 // T064: Wire up buildConstraints() and translateConstraints()
 // T068-T072: explain(), permittedActions(), resolvedRoles(), canBatch(), audit callbacks
+// T083: Wire up snapshot() method
 
 import type {
   ActorRef,
@@ -24,6 +25,8 @@ import { evaluate } from "./evaluation/rule-engine.js";
 import { ResolverCache } from "./evaluation/cache.js";
 import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-builder.js";
 import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
+import { snapshot as snapshotImpl } from "./snapshot.js";
+import type { PermissionSnapshot } from "./snapshot.js";
 
 /**
  * Main authorization engine.
@@ -102,6 +105,20 @@ export class Toride {
     }
 
     return permitted;
+  }
+
+  /**
+   * T083: Generate a PermissionSnapshot for a list of resources.
+   * Calls permittedActions() for each resource and returns a map
+   * keyed by "Type:id" with arrays of permitted action strings.
+   * Suitable for serializing to the client via TorideClient.
+   */
+  async snapshot(
+    actor: ActorRef,
+    resources: ResourceRef[],
+    options?: CheckOptions,
+  ): Promise<PermissionSnapshot> {
+    return snapshotImpl(this, actor, resources, options);
   }
 
   /**
