@@ -4,10 +4,14 @@ import type { Policy } from "../../../src/types.js";
 
 describe("cross-reference validator", () => {
   let validatePolicy: (policy: Policy) => void;
+  let validatePolicyResult: (
+    policy: Policy,
+  ) => { errors: { message: string; path: string }[] };
 
   beforeAll(async () => {
     const mod = await import("../../../src/policy/validator.js");
     validatePolicy = mod.validatePolicy;
+    validatePolicyResult = mod.validatePolicyResult;
   });
 
   /** Helper to build a minimal valid policy and override parts. */
@@ -423,5 +427,306 @@ describe("cross-reference validator", () => {
       },
     };
     expect(() => validatePolicy(policy)).not.toThrow();
+  });
+
+  // ─── T073: $actor attribute validation ─────────────────────────
+
+  describe("$actor attribute validation", () => {
+    it("detects invalid $actor attribute in global_role when condition", () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: {
+            actor_type: "User",
+            when: { "$actor.nonExistent": true },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("nonExistent");
+        expect((e as ValidationError).message).toContain("$actor");
+        expect((e as ValidationError).path).toContain("global_roles.superadmin");
+      }
+    });
+
+    it("accepts valid $actor attribute in global_role when condition", () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: {
+            actor_type: "User",
+            when: { "$actor.isSuperAdmin": true },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("detects invalid $actor attribute in derived_role when condition", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["editor"],
+            permissions: ["update"],
+            grants: { editor: ["update"] },
+            derived_roles: [
+              {
+                role: "editor",
+                actor_type: "User",
+                when: { "$actor.unknownAttr": "value" },
+              },
+            ],
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("unknownAttr");
+        expect((e as ValidationError).message).toContain("$actor");
+      }
+    });
+
+    it("detects invalid $actor attribute in rule when condition", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["editor"],
+            permissions: ["read", "update"],
+            grants: { editor: ["read", "update"] },
+            rules: [
+              {
+                effect: "permit" as const,
+                permissions: ["read"],
+                when: { "$actor.nonExistent": true },
+              },
+            ],
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("nonExistent");
+        expect((e as ValidationError).message).toContain("$actor");
+      }
+    });
+
+    it("validates $actor attrs in rules against all actor types when no actor_type", () => {
+      const policy: Policy = {
+        version: "1",
+        actors: {
+          User: {
+            attributes: { email: "string" },
+          },
+          ServiceAccount: {
+            attributes: { scope: "string" },
+          },
+        },
+        resources: {
+          Task: {
+            roles: ["editor"],
+            permissions: ["update"],
+            grants: { editor: ["update"] },
+            rules: [
+              {
+                effect: "permit" as const,
+                permissions: ["update"],
+                when: { "$actor.email": "admin@test.com" },
+              },
+            ],
+          },
+        },
+      };
+      // $actor.email is not valid for ServiceAccount - should error
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("email");
+        expect((e as ValidationError).message).toContain("ServiceAccount");
+      }
+    });
+
+    it("validates $actor attrs in nested any/all conditions", () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: {
+            actor_type: "User",
+            when: {
+              any: [
+                { "$actor.isSuperAdmin": true },
+                { "$actor.badAttr": "value" },
+              ],
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("badAttr");
+      }
+    });
+
+    it("validates $actor attrs with operator-based condition values", () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: {
+            actor_type: "User",
+            when: { "$actor.nonExistent": { eq: true } },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+      try {
+        validatePolicy(policy);
+      } catch (e) {
+        expect((e as ValidationError).message).toContain("nonExistent");
+      }
+    });
+
+    it("accepts $resource and $env references without validation", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["editor"],
+            permissions: ["read", "update"],
+            grants: { editor: ["read", "update"] },
+            rules: [
+              {
+                effect: "permit" as const,
+                permissions: ["read"],
+                when: {
+                  "resource.isPublic": true,
+                  "$env.region": "us-east",
+                },
+              },
+            ],
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("handles deeply nested all/any conditions", () => {
+      const policy = makePolicy({
+        global_roles: {
+          admin: {
+            actor_type: "User",
+            when: {
+              all: [
+                { "$actor.isSuperAdmin": true },
+                {
+                  any: [
+                    { "$actor.department": "engineering" },
+                    {
+                      all: [
+                        { "$actor.email": { endsWith: "@admin.com" } },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+      });
+      // All referenced attributes exist on User
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+  });
+
+  // ─── T073: Multi-error collection ──────────────────────────────
+
+  describe("multi-error collection via validatePolicyResult", () => {
+    it("collects multiple errors without throwing", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: {
+              viewer: ["read"],
+              manager: ["read"],  // undeclared role
+              editor: ["write"],  // undeclared role AND undeclared permission
+            },
+          },
+        },
+      });
+      const result = validatePolicyResult(policy);
+      expect(result.errors.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("returns empty errors for valid policy", () => {
+      const result = validatePolicyResult(makePolicy());
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it("collects errors from multiple sections", () => {
+      const policy = makePolicy({
+        global_roles: {
+          superadmin: {
+            actor_type: "Bot",  // undeclared actor type
+            when: { "$actor.isSuper": true },
+          },
+        },
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: {
+              viewer: ["read"],
+              manager: ["read"],  // undeclared role
+            },
+          },
+        },
+      });
+      const result = validatePolicyResult(policy);
+      expect(result.errors.length).toBeGreaterThanOrEqual(2);
+      expect(result.errors.some((e) => e.message.includes("Bot"))).toBe(true);
+      expect(result.errors.some((e) => e.message.includes("manager"))).toBe(true);
+    });
+
+    it("each error has a logical path", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: {
+              viewer: ["read"],
+              manager: ["read"],
+            },
+          },
+        },
+      });
+      const result = validatePolicyResult(policy);
+      for (const error of result.errors) {
+        expect(error.path).toBeDefined();
+        expect(error.path.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("validatePolicy still throws with all errors in message", () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: {
+              viewer: ["read"],
+              manager: ["read"],
+              editor: ["write"],
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).toThrow(ValidationError);
+    });
   });
 });
