@@ -1,5 +1,6 @@
 // T030: Toride class with can() method
 // T031: createToride() typed factory function
+// T064: Wire up buildConstraints() and translateConstraints()
 
 import type {
   ActorRef,
@@ -10,8 +11,15 @@ import type {
   RelationResolver,
   ExplainResult,
 } from "./types.js";
+import type {
+  Constraint,
+  ConstraintResult,
+  ConstraintAdapter,
+} from "./partial/constraint-types.js";
 import { evaluate } from "./evaluation/rule-engine.js";
 import { ResolverCache } from "./evaluation/cache.js";
+import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-builder.js";
+import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
 
 /**
  * Main authorization engine.
@@ -41,6 +49,42 @@ export class Toride {
   ): Promise<boolean> {
     const result = await this.evaluate(actor, action, resource, options);
     return result.allowed;
+  }
+
+  /**
+   * T064: Build constraint AST for partial evaluation / data filtering.
+   * Returns ConstraintResult with unrestricted/forbidden sentinels or constraint AST.
+   */
+  async buildConstraints(
+    actor: ActorRef,
+    action: string,
+    resourceType: string,
+    options?: CheckOptions,
+  ): Promise<ConstraintResult> {
+    const cachedResolver = new ResolverCache(this.resolver);
+    return buildConstraintsImpl(
+      actor,
+      action,
+      resourceType,
+      cachedResolver,
+      this.policy,
+      {
+        env: options?.env,
+        maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
+        customEvaluators: this.options.customEvaluators,
+      },
+    );
+  }
+
+  /**
+   * T064: Translate constraint AST using an adapter.
+   * Dispatches each constraint node to the adapter's methods.
+   */
+  translateConstraints<TQuery>(
+    constraints: Constraint,
+    adapter: ConstraintAdapter<TQuery>,
+  ): TQuery {
+    return translateConstraintsImpl(constraints, adapter);
   }
 
   /**
