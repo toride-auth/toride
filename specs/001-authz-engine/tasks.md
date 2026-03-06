@@ -142,20 +142,20 @@
 
 ### Tests for User Story 4
 
-- [ ] T054 [P] [US4] Write unit tests for constraint builder (unrestricted, forbidden, constrained, has_role nodes, inlined actor/env values) in `packages/toride/tests/unit/partial/constraint-builder.test.ts`
-- [ ] T055 [P] [US4] Write unit tests for constraint translation and simplification (always/never elimination) in `packages/toride/tests/unit/partial/translator.test.ts`
-- [ ] T056 [P] [US4] Write integration tests for end-to-end partial evaluation scenarios in `packages/toride/tests/integration/partial-eval.test.ts`
+- [X] T054 [P] [US4] Write unit tests for constraint builder (unrestricted, forbidden, constrained, has_role nodes, inlined actor/env values) in `packages/toride/tests/unit/partial/constraint-builder.test.ts`
+- [X] T055 [P] [US4] Write unit tests for constraint translation and simplification (always/never elimination) in `packages/toride/tests/unit/partial/translator.test.ts`
+- [X] T056 [P] [US4] Write integration tests for end-to-end partial evaluation scenarios in `packages/toride/tests/integration/partial-eval.test.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] Implement `buildConstraints()` (evaluate all derivation paths, emit constraints per path, combine with OR) in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T058 [US4] Implement `$actor` and `$env` value inlining into concrete constraint nodes during partial evaluation in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T059 [US4] Implement `has_role` constraint node emission for relation-based derived roles in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T060 [US4] Implement forbid rule application as `NOT` constraints in partial evaluation in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T061 [US4] Implement constraint simplification (`and([always, X])` -> `X`, `or([never, X])` -> `X`, etc.) in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T062 [US4] Implement `unknown` constraint node emission for custom evaluators in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T063 [US4] Implement `translateConstraints()` recursive function dispatching to `ConstraintAdapter` methods in `packages/toride/src/partial/translator.ts`
-- [ ] T064 [US4] Wire up `buildConstraints()` and `translateConstraints()` on `Toride` class in `packages/toride/src/engine.ts`
+- [X] T057 [US4] Implement `buildConstraints()` (evaluate all derivation paths, emit constraints per path, combine with OR) in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T058 [US4] Implement `$actor` and `$env` value inlining into concrete constraint nodes during partial evaluation in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T059 [US4] Implement `has_role` constraint node emission for relation-based derived roles in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T060 [US4] Implement forbid rule application as `NOT` constraints in partial evaluation in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T061 [US4] Implement constraint simplification (`and([always, X])` -> `X`, `or([never, X])` -> `X`, etc.) in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T062 [US4] Implement `unknown` constraint node emission for custom evaluators in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T063 [US4] Implement `translateConstraints()` recursive function dispatching to `ConstraintAdapter` methods in `packages/toride/src/partial/translator.ts`
+- [X] T064 [US4] Wire up `buildConstraints()` and `translateConstraints()` on `Toride` class in `packages/toride/src/engine.ts`
 
 **Checkpoint**: `buildConstraints(superadmin, "read", "Task")` returns `unrestricted: true`. No-access actor returns `forbidden: true`. Relation-derived roles produce `has_role` nodes. Actor values are inlined. Forbid rules produce `NOT` wrappers.
 
