@@ -107,7 +107,11 @@ _copy_from_include_file() {
       shopt -s globstar 2>/dev/null || true
       for f in $line; do
         [[ "$f" == *node_modules* ]] && continue
-        if [[ -f "$f" ]]; then
+        if [[ -d "$f" ]]; then
+          mkdir -p "${target_root}/${f}"
+          cp -a "$f/." "${target_root}/${f}/"
+          info "  Copied: ${f}/ (directory)"
+        elif [[ -f "$f" ]]; then
           mkdir -p "${target_root}/$(dirname "$f")"
           cp "$f" "${target_root}/${f}"
           info "  Copied: ${f}"

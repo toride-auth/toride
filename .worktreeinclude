@@ -6,9 +6,13 @@
 #
 # Lines starting with # are comments. Empty lines are ignored.
 # Patterns are expanded using bash globbing relative to the repo root.
+# Directories matched by globs are copied recursively (including contents).
 
 # Per-worktree local compose overrides (personal volume mounts, etc.)
 .devcontainer/*.local.*
 
 # Per-developer devcontainer config (copied from template)
 .devcontainer/devcontainer.json
+
+.jdi/tasks
+.jdi/archived
