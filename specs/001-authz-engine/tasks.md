@@ -89,19 +89,19 @@
 
 ### Tests for User Story 2
 
-- [ ] T033 [P] [US2] Write unit tests for all 5 derived role patterns in `packages/toride/tests/unit/evaluation/derived-roles.test.ts`
-- [ ] T034 [P] [US2] Write unit tests for cycle detection and depth limit enforcement in `packages/toride/tests/unit/evaluation/cycle-detection.test.ts`
-- [ ] T035 [P] [US2] Write integration tests for role derivation through relations (Organization admin -> Project admin, superadmin global role, assignee identity) in `packages/toride/tests/integration/derived-roles.test.ts`
+- [X] T033 [P] [US2] Write unit tests for all 5 derived role patterns in `packages/toride/tests/unit/evaluation/derived-roles.test.ts`
+- [X] T034 [P] [US2] Write unit tests for cycle detection and depth limit enforcement in `packages/toride/tests/unit/evaluation/cycle-detection.test.ts`
+- [X] T035 [P] [US2] Write integration tests for role derivation through relations (Organization admin -> Project admin, superadmin global role, assignee identity) in `packages/toride/tests/integration/derived-roles.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T036 [US2] Implement global role evaluation (match actor type, evaluate `when` conditions against actor attributes) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T037 [US2] Implement relation-based role derivation (pattern 2: `from_role` + `on_relation`, call `resolver.getRelated()` + recursive `getRoles()`) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T038 [US2] Implement relation identity derivation (pattern 3: `from_relation`, compare actor ID with relation target) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T039 [US2] Implement actor-type-conditional derivation (patterns 4/5: `actor_type` + `when` conditions on `$actor`/`$resource`) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T040 [US2] Implement path-based cycle detection (`Set<string>` of type:id pairs, clone at branch points) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T041 [US2] Add configurable depth limit (`maxDerivedRoleDepth`, default 5) with `DepthLimitError` in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T042 [US2] Ensure exhaustive evaluation (all derivation paths explored, no short-circuit) and derivation trace recording in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T036 [US2] Implement global role evaluation (match actor type, evaluate `when` conditions against actor attributes) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T037 [US2] Implement relation-based role derivation (pattern 2: `from_role` + `on_relation`, call `resolver.getRelated()` + recursive `getRoles()`) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T038 [US2] Implement relation identity derivation (pattern 3: `from_relation`, compare actor ID with relation target) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T039 [US2] Implement actor-type-conditional derivation (patterns 4/5: `actor_type` + `when` conditions on `$actor`/`$resource`) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T040 [US2] Implement path-based cycle detection (`Set<string>` of type:id pairs, clone at branch points) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T041 [US2] Add configurable depth limit (`maxDerivedRoleDepth`, default 5) with `DepthLimitError` in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T042 [US2] Ensure exhaustive evaluation (all derivation paths explored, no short-circuit) and derivation trace recording in `packages/toride/src/evaluation/role-resolver.ts`
 
 **Checkpoint**: Derived roles work across relations (`org admin -> project admin`), global roles derive from actor attributes, identity relations match actor IDs, cycles throw `CycleError`, depth exceeding 5 throws `DepthLimitError`.
 

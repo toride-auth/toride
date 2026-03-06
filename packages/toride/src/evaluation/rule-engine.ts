@@ -9,8 +9,9 @@ import type {
   RelationResolver,
   ResourceBlock,
   ExplainResult,
+  Policy,
 } from "../types.js";
-import { resolveDirectRoles } from "./role-resolver.js";
+import { resolveRoles } from "./role-resolver.js";
 
 /**
  * Expand grants for resolved roles, handling the `all` keyword.
@@ -58,10 +59,23 @@ export async function evaluate(
   resource: ResourceRef,
   resourceBlock: ResourceBlock,
   resolver: RelationResolver,
+  policy: Policy,
+  options?: { maxDerivedRoleDepth?: number },
 ): Promise<ExplainResult> {
-  // Step 1: Resolve direct roles
-  const resolvedRoles = await resolveDirectRoles(actor, resource, resolver);
-  const allRoles = [...resolvedRoles.direct];
+  // Step 1: Resolve direct + derived roles
+  const resolvedRoles = await resolveRoles(
+    actor,
+    resource,
+    resolver,
+    resourceBlock,
+    policy,
+    options,
+  );
+  // Combine direct and derived roles for grant expansion
+  const derivedRoleNames = resolvedRoles.derived.map((d) => d.role);
+  const allRoles = [
+    ...new Set([...resolvedRoles.direct, ...derivedRoleNames]),
+  ];
 
   // Step 2: Expand grants
   const grants = resourceBlock.grants ?? {};
