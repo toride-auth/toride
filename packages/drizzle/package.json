@@ -19,6 +19,14 @@
   "dependencies": {
     "toride": "workspace:*"
   },
+  "peerDependencies": {
+    "drizzle-orm": ">=0.29.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    }
+  },
   "keywords": ["authorization", "drizzle", "toride"],
   "license": "MIT",
   "repository": {
