@@ -1,0 +1,114 @@
+# Small tier benchmark fixture
+# ~5 resources, 3 roles, simple grants with attribute-based derived roles
+# No conditions on resources, no relations
+# Minimal field_access on 1 resource for canField/permittedFields benchmarks
+
+version: "1"
+
+actors:
+  User:
+    attributes:
+      is_viewer: boolean
+      is_editor: boolean
+      is_admin: boolean
+
+resources:
+  Document:
+    roles: [viewer, editor, admin]
+    permissions: [read, write, delete, publish]
+    grants:
+      viewer: [read]
+      editor: [read, write]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
+    field_access:
+      title:
+        read: [viewer, editor, admin]
+        update: [editor, admin]
+      body:
+        read: [viewer, editor, admin]
+        update: [editor, admin]
+      internal_notes:
+        read: [admin]
+        update: [admin]
+
+  Comment:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete]
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
+
+  Tag:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, delete]
+    grants:
+      viewer: [read]
+      editor: [read, create]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
+
+  Category:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete]
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
+
+  Attachment:
+    roles: [viewer, editor, admin]
+    permissions: [read, upload, delete]
+    grants:
+      viewer: [read]
+      editor: [read, upload]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true

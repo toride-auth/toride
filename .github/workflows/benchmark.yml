@@ -1,0 +1,181 @@
+name: Benchmark
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      # ── Setup ──────────────────────────────────────────────────
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # ── Baseline: benchmark main branch ────────────────────────
+      - name: Checkout main branch for baseline
+        run: git checkout origin/main
+
+      - name: Install dependencies (baseline)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build toride (baseline)
+        run: pnpm exec nx run toride:build
+
+      - name: Run benchmarks (baseline)
+        id: baseline
+        continue-on-error: true
+        run: |
+          cd packages/toride
+          pnpm exec vitest bench --outputJson /tmp/baseline.json
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── PR: benchmark current branch ───────────────────────────
+      - name: Checkout PR branch
+        run: git checkout ${{ github.event.pull_request.head.sha }}
+
+      - name: Install dependencies (PR)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build toride (PR)
+        run: pnpm exec nx run toride:build
+
+      - name: Run benchmarks (PR)
+        id: pr_bench
+        run: |
+          cd packages/toride
+          pnpm exec vitest bench --outputJson /tmp/current.json
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── Compare results ────────────────────────────────────────
+      - name: Compare benchmarks
+        id: compare
+        run: |
+          export BASELINE_SHA="${{ steps.baseline.outputs.sha }}"
+          export GITHUB_SHA="${{ steps.pr_bench.outputs.sha }}"
+          pnpm exec tsx packages/toride/bench/compare.ts \
+            --baseline /tmp/baseline.json \
+            --current /tmp/current.json \
+            --threshold 0.20 \
+            --output /tmp/report.json \
+            --markdown /tmp/summary.md
+        continue-on-error: true
+
+      # ── Distinguish regression from infrastructure failure ─────
+      - name: Check comparison result
+        id: check_result
+        run: |
+          baseline_outcome="${{ steps.baseline.outcome }}"
+          exit_code=${{ steps.compare.outcome == 'success' && '0' || '1' }}
+
+          # First-ever run: baseline benchmarks failed (no bench files on main)
+          if [ "$baseline_outcome" = "failure" ] && [ ! -f /tmp/baseline.json ]; then
+            echo "status=first_run" >> "$GITHUB_OUTPUT"
+            echo "message=First benchmark run — no baseline on main branch yet. Results recorded for future comparisons." >> "$GITHUB_OUTPUT"
+          elif [ ! -f /tmp/report.json ]; then
+            echo "status=error" >> "$GITHUB_OUTPUT"
+            echo "message=Benchmark comparison script failed (infrastructure error). Check logs for details." >> "$GITHUB_OUTPUT"
+          elif [ "$exit_code" = "1" ]; then
+            # Check if report.json indicates regressions
+            has_regression=$(node -e "const r = require('/tmp/report.json'); console.log(r.hasRegression ? 'true' : 'false')" 2>/dev/null || echo "unknown")
+            if [ "$has_regression" = "true" ]; then
+              echo "status=regression" >> "$GITHUB_OUTPUT"
+              echo "message=Performance regression detected." >> "$GITHUB_OUTPUT"
+            else
+              echo "status=error" >> "$GITHUB_OUTPUT"
+              echo "message=Benchmark comparison script exited with an error. Check logs for details." >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "status=ok" >> "$GITHUB_OUTPUT"
+            echo "message=No significant regressions detected." >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Post/update PR comment ─────────────────────────────────
+      - name: Post benchmark comment
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7
+        env:
+          CHECK_STATUS: ${{ steps.check_result.outputs.status }}
+          CHECK_MESSAGE: ${{ steps.check_result.outputs.message }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- toride-benchmark -->';
+
+            let body;
+            if (fs.existsSync('/tmp/summary.md')) {
+              const summary = fs.readFileSync('/tmp/summary.md', 'utf-8');
+              body = `${marker}\n${summary}`;
+            } else {
+              const status = process.env.CHECK_STATUS;
+              const message = process.env.CHECK_MESSAGE;
+              body = `${marker}\n## Benchmark Comparison\n\n${
+                status === 'error'
+                  ? `**Error**: ${message}`
+                  : `**Status**: ${message}`
+              }`;
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      # ── Upload artifacts ───────────────────────────────────────
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: benchmark-results
+          path: |
+            /tmp/baseline.json
+            /tmp/current.json
+            /tmp/report.json
+            /tmp/summary.md
+          retention-days: 90
+          if-no-files-found: warn
+
+      # ── Fail on regression ─────────────────────────────────────
+      - name: Fail on regression
+        if: steps.check_result.outputs.status == 'regression'
+        run: |
+          echo "::error::Performance regression detected. See benchmark comparison comment on the PR for details."
+          exit 1
+
+      - name: Fail on infrastructure error
+        if: steps.check_result.outputs.status == 'error'
+        run: |
+          echo "::error::Benchmark infrastructure failure. This is NOT a performance regression. Check logs for details."
+          exit 1
