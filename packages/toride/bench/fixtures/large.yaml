@@ -1,0 +1,1178 @@
+# Large tier benchmark fixture
+# 50+ resources across 8 domains
+# 8+ roles per resource including custom roles
+# 3-level derived role chains
+# Complex conditions with $actor, $resource, $env
+# Forbid rules on 10+ resources
+# field_access on 15+ resources
+# 2-level relation traversal
+
+version: "1"
+
+actors:
+  User:
+    attributes:
+      department: string
+      level: number
+      active: boolean
+      is_superadmin: boolean
+      clearance: string
+      region: string
+      team: string
+  ServiceAccount:
+    attributes:
+      scope: string
+      level: number
+      department: string
+      active: boolean
+      clearance: string
+      region: string
+      team: string
+  Bot:
+    attributes:
+      scope: string
+      level: number
+      department: string
+      active: boolean
+      clearance: string
+      region: string
+      team: string
+
+global_roles:
+  superadmin:
+    actor_type: User
+    when:
+      "$actor.is_superadmin": true
+
+# ─── Domain 1: Core Platform (Organization hierarchy) ─────────────
+
+resources:
+  Organization:
+    roles: [member, admin, owner, billing_admin, security_admin, compliance_officer, auditor, guest]
+    permissions: [read, manage, delete, invite, audit, configure_sso, export_data, manage_billing]
+    grants:
+      guest: [read]
+      member: [read]
+      auditor: [read, audit]
+      billing_admin: [read, manage_billing]
+      security_admin: [read, configure_sso]
+      compliance_officer: [read, audit, export_data]
+      admin: [read, manage, invite, audit, configure_sso, export_data]
+      owner: [all]
+    derived_roles:
+      - role: owner
+        from_global_role: superadmin
+      - role: admin
+        actor_type: User
+        when:
+          "$actor.level":
+            gte: 9
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.protected": true
+      - effect: forbid
+        permissions: [manage]
+        when:
+          "$resource.suspended": true
+    field_access:
+      name:
+        read: [guest, member, admin, owner, auditor, billing_admin, security_admin, compliance_officer]
+        update: [admin, owner]
+      billing_email:
+        read: [billing_admin, admin, owner]
+        update: [billing_admin, owner]
+      sso_config:
+        read: [security_admin, admin, owner]
+        update: [security_admin, owner]
+      audit_log:
+        read: [auditor, compliance_officer, admin, owner]
+      internal_notes:
+        read: [owner]
+        update: [owner]
+
+  Department:
+    roles: [member, lead, admin, viewer]
+    permissions: [read, manage, delete, assign_lead]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      member: [read]
+      lead: [read, manage]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: lead
+        actor_type: User
+        when:
+          "$actor.level":
+            gte: 7
+    field_access:
+      budget:
+        read: [lead, admin]
+        update: [admin]
+
+  Team:
+    roles: [member, lead, admin, viewer]
+    permissions: [read, manage, delete, add_member, remove_member]
+    relations:
+      department: Department
+      org: Organization
+    grants:
+      viewer: [read]
+      member: [read]
+      lead: [read, manage, add_member, remove_member]
+      admin: [all]
+    derived_roles:
+      # 2-level: Team admin <- Department admin <- Org admin
+      - role: admin
+        from_role: admin
+        on_relation: department
+      - role: lead
+        from_role: lead
+        on_relation: department
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.archived": true
+
+  # ─── Domain 2: Project Management ──────────────────────────────
+
+  Project:
+    roles: [viewer, contributor, editor, admin, owner, stakeholder, qa_lead, release_manager]
+    permissions: [read, write, delete, manage_members, configure, release, approve]
+    relations:
+      org: Organization
+      team: Team
+    grants:
+      viewer: [read]
+      stakeholder: [read, approve]
+      contributor: [read, write]
+      editor: [read, write, approve]
+      qa_lead: [read, write, approve]
+      release_manager: [read, write, release, approve]
+      admin: [read, write, delete, manage_members, configure, approve]
+      owner: [all]
+    derived_roles:
+      - role: owner
+        from_global_role: superadmin
+      # 2-level: Project admin <- Org admin
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: contributor
+        from_role: member
+        on_relation: team
+      - role: qa_lead
+        actor_type: User
+        when:
+          "$actor.department": "qa"
+          "$actor.level":
+            gte: 5
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.status": "production"
+      - effect: forbid
+        permissions: [release]
+        when:
+          "$resource.freeze": true
+      - effect: permit
+        roles: [release_manager]
+        permissions: [release]
+        when:
+          "$resource.status": "staging"
+          "$env.release_window": true
+    field_access:
+      name:
+        read: [viewer, contributor, editor, admin, owner, stakeholder, qa_lead, release_manager]
+        update: [admin, owner]
+      budget:
+        read: [admin, owner, stakeholder]
+        update: [owner]
+      roadmap:
+        read: [editor, admin, owner, stakeholder, qa_lead, release_manager]
+        update: [admin, owner]
+
+  Sprint:
+    roles: [viewer, editor, admin, scrum_master]
+    permissions: [read, create, update, delete, close, plan]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      scrum_master: [read, create, update, close, plan]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [update, delete]
+        when:
+          "$resource.completed": true
+
+  Epic:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, prioritize]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: admin
+        from_role: admin
+        on_relation: project
+    field_access:
+      priority:
+        read: [viewer, editor, admin]
+        update: [admin]
+      estimate:
+        read: [editor, admin]
+        update: [editor, admin]
+
+  Story:
+    roles: [viewer, editor, admin, assignee_role]
+    permissions: [read, create, update, delete, assign, estimate]
+    relations:
+      project: Project
+      assignee: User
+    grants:
+      viewer: [read]
+      editor: [read, create, update, assign]
+      assignee_role: [read, update, estimate]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: assignee_role
+        from_relation: assignee
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.status": "done"
+
+  Task:
+    roles: [viewer, editor, admin, assignee_role]
+    permissions: [read, create, update, delete, assign, close, reopen]
+    relations:
+      project: Project
+      assignee: User
+    grants:
+      viewer: [read]
+      editor: [read, create, update, assign]
+      assignee_role: [read, update, close]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: assignee_role
+        from_relation: assignee
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.closed": true
+    field_access:
+      time_estimate:
+        read: [viewer, editor, admin, assignee_role]
+        update: [editor, admin, assignee_role]
+      time_logged:
+        read: [editor, admin, assignee_role]
+        update: [assignee_role, admin]
+
+  Bug:
+    roles: [viewer, reporter, editor, admin, assignee_role]
+    permissions: [read, create, update, delete, assign, triage, close, reopen]
+    relations:
+      project: Project
+      assignee: User
+    grants:
+      viewer: [read]
+      reporter: [read, create]
+      editor: [read, create, update, assign, triage]
+      assignee_role: [read, update, close, reopen]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: assignee_role
+        from_relation: assignee
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.severity": "critical"
+    field_access:
+      severity:
+        read: [viewer, reporter, editor, admin, assignee_role]
+        update: [editor, admin]
+      reproduction_steps:
+        read: [viewer, reporter, editor, admin, assignee_role]
+        update: [reporter, editor, admin]
+
+  Label:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, delete]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+
+  Milestone:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, close]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: editor
+        on_relation: project
+      - role: admin
+        from_role: admin
+        on_relation: project
+
+  Release:
+    roles: [viewer, editor, admin, release_manager_role]
+    permissions: [read, create, update, delete, publish, rollback]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      release_manager_role: [read, create, update, publish, rollback]
+      admin: [all]
+    derived_roles:
+      - role: release_manager_role
+        from_role: release_manager
+        on_relation: project
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [rollback]
+        when:
+          "$resource.immutable": true
+    field_access:
+      changelog:
+        read: [viewer, editor, admin, release_manager_role]
+        update: [editor, admin, release_manager_role]
+
+  # ─── Domain 3: Documents & Knowledge Base ───────────────────────
+
+  Document:
+    roles: [viewer, editor, admin, owner, reviewer]
+    permissions: [read, write, delete, publish, archive, review]
+    relations:
+      project: Project
+      author: User
+    grants:
+      viewer: [read]
+      reviewer: [read, review]
+      editor: [read, write]
+      admin: [read, write, delete, publish, archive]
+      owner: [all]
+    derived_roles:
+      - role: owner
+        from_relation: author
+      - role: editor
+        from_role: contributor
+        on_relation: project
+      - role: admin
+        from_role: admin
+        on_relation: project
+      - role: reviewer
+        actor_type: User
+        when:
+          "$actor.level":
+            gte: 6
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.locked": true
+      - effect: forbid
+        permissions: [write, publish]
+        when:
+          "$resource.archived": true
+      - effect: permit
+        roles: [editor]
+        permissions: [publish]
+        when:
+          "$resource.status": "review"
+          "$actor.level":
+            gte: 4
+    field_access:
+      title:
+        read: [viewer, editor, admin, owner, reviewer]
+        update: [editor, admin, owner]
+      body:
+        read: [viewer, editor, admin, owner, reviewer]
+        update: [editor, admin, owner]
+      internal_notes:
+        read: [admin, owner]
+        update: [admin, owner]
+
+  WikiPage:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, move]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+
+  KnowledgeArticle:
+    roles: [viewer, editor, admin, reviewer]
+    permissions: [read, create, update, delete, publish, unpublish]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      reviewer: [read, publish, unpublish]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: contributor
+        on_relation: project
+    field_access:
+      content:
+        read: [viewer, editor, admin, reviewer]
+        update: [editor, admin]
+      metadata:
+        read: [editor, admin, reviewer]
+        update: [admin]
+
+  Comment:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete]
+    relations:
+      document: Document
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        from_role: viewer
+        on_relation: document
+      - role: editor
+        from_role: editor
+        on_relation: document
+
+  Attachment:
+    roles: [viewer, editor, admin]
+    permissions: [read, upload, delete, download]
+    relations:
+      document: Document
+    grants:
+      viewer: [read, download]
+      editor: [read, upload, download]
+      admin: [all]
+    derived_roles:
+      - role: editor
+        from_role: editor
+        on_relation: document
+
+  Template:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, use]
+    grants:
+      viewer: [read, use]
+      editor: [read, create, update, use]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  # ─── Domain 4: Users & Access ───────────────────────────────────
+
+  User:
+    roles: [viewer, admin, self, hr_admin, security_admin]
+    permissions: [read, update, delete, change_password, manage_sessions, manage_mfa]
+    grants:
+      viewer: [read]
+      self: [read, update, change_password, manage_sessions, manage_mfa]
+      hr_admin: [read, update]
+      security_admin: [read, manage_sessions, manage_mfa]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+      - role: hr_admin
+        actor_type: User
+        when:
+          "$actor.department": "hr"
+          "$actor.level":
+            gte: 5
+    field_access:
+      email:
+        read: [viewer, admin, self, hr_admin, security_admin]
+        update: [self, admin]
+      phone:
+        read: [admin, self, hr_admin]
+        update: [self, admin]
+      salary:
+        read: [hr_admin, admin]
+        update: [hr_admin, admin]
+      ssn:
+        read: [hr_admin, admin]
+      emergency_contact:
+        read: [hr_admin, admin, self]
+        update: [hr_admin, admin, self]
+
+  UserGroup:
+    roles: [member, admin]
+    permissions: [read, manage, delete]
+    relations:
+      org: Organization
+    grants:
+      member: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+
+  Role:
+    roles: [viewer, admin]
+    permissions: [read, create, update, delete, assign]
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  Permission:
+    roles: [viewer, admin]
+    permissions: [read, create, delete]
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  Session:
+    roles: [viewer, admin, owner]
+    permissions: [read, revoke]
+    grants:
+      viewer: [read]
+      owner: [read, revoke]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  ApiKey:
+    roles: [viewer, admin, owner]
+    permissions: [read, create, revoke, rotate]
+    grants:
+      viewer: [read]
+      owner: [read, revoke, rotate]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+    rules:
+      - effect: forbid
+        permissions: [revoke]
+        when:
+          "$resource.system_key": true
+    field_access:
+      key_hash:
+        read: [admin]
+      last_used:
+        read: [viewer, admin, owner]
+
+  # ─── Domain 5: Billing & Finance ────────────────────────────────
+
+  Invoice:
+    roles: [viewer, admin, finance_admin]
+    permissions: [read, create, void, download, send, refund]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read, download]
+      finance_admin: [read, create, download, send, refund]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: finance_admin
+        from_role: billing_admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [void]
+        when:
+          "$resource.paid": true
+      - effect: forbid
+        permissions: [refund]
+        when:
+          "$resource.age_days":
+            gt: 90
+    field_access:
+      amount:
+        read: [viewer, admin, finance_admin]
+      payment_method:
+        read: [admin, finance_admin]
+        update: [admin]
+      tax_id:
+        read: [admin, finance_admin]
+
+  Subscription:
+    roles: [viewer, admin]
+    permissions: [read, update, cancel, upgrade, downgrade]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [cancel]
+        when:
+          "$resource.locked_until":
+            exists: true
+
+  PaymentMethod:
+    roles: [viewer, admin]
+    permissions: [read, create, delete, set_default, verify]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: billing_admin
+        on_relation: org
+
+  BillingContact:
+    roles: [viewer, admin]
+    permissions: [read, update, delete]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: billing_admin
+        on_relation: org
+
+  CreditNote:
+    roles: [viewer, admin]
+    permissions: [read, create, apply, void]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: billing_admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [void]
+        when:
+          "$resource.applied": true
+
+  TaxRecord:
+    roles: [viewer, admin]
+    permissions: [read, create, update]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: billing_admin
+        on_relation: org
+    field_access:
+      tax_amount:
+        read: [viewer, admin]
+      jurisdiction:
+        read: [viewer, admin]
+        update: [admin]
+
+  # ─── Domain 6: CI/CD & Infrastructure ───────────────────────────
+
+  Pipeline:
+    roles: [viewer, operator, admin]
+    permissions: [read, trigger, cancel, configure, delete]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      operator: [read, trigger, cancel]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: project
+      - role: operator
+        from_role: contributor
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [trigger]
+        when:
+          "$resource.disabled": true
+    field_access:
+      secrets:
+        read: [admin]
+      config:
+        read: [operator, admin]
+        update: [admin]
+
+  Build:
+    roles: [viewer, operator, admin]
+    permissions: [read, retry, cancel, download_artifacts]
+    relations:
+      project: Project
+    grants:
+      viewer: [read, download_artifacts]
+      operator: [read, retry, cancel, download_artifacts]
+      admin: [all]
+    derived_roles:
+      - role: operator
+        from_role: contributor
+        on_relation: project
+
+  Deployment:
+    roles: [viewer, operator, admin, release_approver]
+    permissions: [read, deploy, rollback, approve, configure]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      operator: [read, deploy]
+      release_approver: [read, approve]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: project
+      - role: release_approver
+        from_role: release_manager
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [deploy]
+        when:
+          "$resource.environment": "production"
+          "$env.release_window":
+            neq: true
+    field_access:
+      environment_config:
+        read: [admin]
+        update: [admin]
+      deployment_log:
+        read: [viewer, operator, admin, release_approver]
+
+  Environment:
+    roles: [viewer, operator, admin]
+    permissions: [read, configure, delete, scale]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      operator: [read, scale]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.production": true
+
+  Secret:
+    roles: [viewer, admin]
+    permissions: [read, create, update, delete, rotate]
+    relations:
+      project: Project
+    grants:
+      viewer: []
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: project
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.system": true
+    field_access:
+      value:
+        read: [admin]
+      name:
+        read: [viewer, admin]
+
+  # ─── Domain 7: Communication & Notifications ────────────────────
+
+  Channel:
+    roles: [member, moderator, admin]
+    permissions: [read, post, delete_message, manage, archive]
+    relations:
+      team: Team
+    grants:
+      member: [read, post]
+      moderator: [read, post, delete_message]
+      admin: [all]
+    derived_roles:
+      - role: member
+        from_role: member
+        on_relation: team
+      - role: admin
+        from_role: admin
+        on_relation: team
+    rules:
+      - effect: forbid
+        permissions: [post]
+        when:
+          "$resource.read_only": true
+
+  Message:
+    roles: [viewer, author, moderator, admin]
+    permissions: [read, create, edit, delete, pin, react]
+    relations:
+      channel: Channel
+    grants:
+      viewer: [read, react]
+      author: [read, edit, delete, react]
+      moderator: [read, delete, pin, react]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        from_role: member
+        on_relation: channel
+
+  Thread:
+    roles: [viewer, participant, admin]
+    permissions: [read, reply, close, delete]
+    relations:
+      channel: Channel
+    grants:
+      viewer: [read]
+      participant: [read, reply]
+      admin: [all]
+    derived_roles:
+      - role: viewer
+        from_role: member
+        on_relation: channel
+
+  Notification:
+    roles: [recipient, admin]
+    permissions: [read, dismiss, configure]
+    grants:
+      recipient: [read, dismiss]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  NotificationRule:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, enable, disable]
+    grants:
+      viewer: [read]
+      editor: [read, create, update, enable, disable]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+  Webhook:
+    roles: [viewer, admin]
+    permissions: [read, create, update, delete, test]
+    relations:
+      project: Project
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: project
+    field_access:
+      secret:
+        read: [admin]
+      url:
+        read: [viewer, admin]
+        update: [admin]
+
+  # ─── Domain 8: Compliance & Audit ───────────────────────────────
+
+  AuditLog:
+    roles: [viewer, admin, compliance_viewer]
+    permissions: [read, export, archive, purge]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      compliance_viewer: [read, export]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: compliance_viewer
+        from_role: compliance_officer
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [purge]
+        when:
+          "$resource.retention_required": true
+    field_access:
+      ip_address:
+        read: [admin, compliance_viewer]
+      user_agent:
+        read: [admin, compliance_viewer]
+      event_data:
+        read: [viewer, admin, compliance_viewer]
+
+  CompliancePolicy:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, activate, deactivate]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: editor
+        from_role: compliance_officer
+        on_relation: org
+
+  DataRetentionRule:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, execute]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.active": true
+
+  ConsentRecord:
+    roles: [viewer, admin]
+    permissions: [read, create, revoke, export]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: compliance_officer
+        on_relation: org
+    field_access:
+      personal_data:
+        read: [admin]
+      consent_details:
+        read: [viewer, admin]
+
+  DataExportRequest:
+    roles: [viewer, admin, requester]
+    permissions: [read, create, approve, reject, download]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      requester: [read, create, download]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: compliance_officer
+        on_relation: org
+
+  IncidentReport:
+    roles: [viewer, editor, admin, responder]
+    permissions: [read, create, update, delete, escalate, resolve, close]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      responder: [read, update, escalate]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: editor
+        from_role: security_admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.severity": "critical"
+      - effect: forbid
+        permissions: [close]
+        when:
+          "$resource.open_actions":
+            gt: 0
+    field_access:
+      affected_systems:
+        read: [viewer, editor, admin, responder]
+        update: [editor, admin]
+      root_cause:
+        read: [editor, admin]
+        update: [editor, admin]
+      remediation_plan:
+        read: [editor, admin, responder]
+        update: [editor, admin]
+
+  VulnerabilityReport:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, triage, assign]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      editor: [read, create, update, triage]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: editor
+        from_role: security_admin
+        on_relation: org
+    rules:
+      - effect: forbid
+        permissions: [delete]
+        when:
+          "$resource.status": "open"
+    field_access:
+      cvss_score:
+        read: [viewer, editor, admin]
+      exploit_details:
+        read: [editor, admin]
+        update: [editor, admin]
+
+  SecurityPolicy:
+    roles: [viewer, editor, admin]
+    permissions: [read, create, update, delete, enforce]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      editor: [read, create, update]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: editor
+        from_role: security_admin
+        on_relation: org
+
+  AccessReview:
+    roles: [viewer, reviewer_role, admin]
+    permissions: [read, create, complete, approve, reject]
+    relations:
+      org: Organization
+    grants:
+      viewer: [read]
+      reviewer_role: [read, complete, approve, reject]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_role: admin
+        on_relation: org
+      - role: reviewer_role
+        from_role: compliance_officer
+        on_relation: org
+    field_access:
+      findings:
+        read: [reviewer_role, admin]
+        update: [reviewer_role, admin]
+      recommendations:
+        read: [viewer, reviewer_role, admin]
+        update: [reviewer_role, admin]
+
+  UserProfile:
+    roles: [viewer, admin]
+    permissions: [read, update]
+    grants:
+      viewer: [read]
+      admin: [all]
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin

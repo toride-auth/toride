@@ -33,10 +33,10 @@
 
 **CRITICAL**: No benchmark cases or comparison logic can be implemented until fixtures and setup helper are complete.
 
-- [ ] T004 Create small tier YAML policy fixture (~5 resources, simple roles, no conditions, no derived roles) in `packages/toride/bench/fixtures/small.yaml`
-- [ ] T005 [P] Create medium tier YAML policy fixture (~20 resources, derived roles, conditions, relations, field_access on 3 resources) in `packages/toride/bench/fixtures/medium.yaml`
-- [ ] T006 [P] Create large tier YAML policy fixture (50+ resources, deep derivation chains, complex conditions, forbid rules, field_access on 15+ resources) in `packages/toride/bench/fixtures/large.yaml`
-- [ ] T007 Implement shared benchmark setup helper in `packages/toride/bench/helpers/setup.ts` — exports functions to: load YAML fixture by tier name, create a Toride engine instance from a fixture, provide mock resolvers per tier that return appropriate attributes for condition evaluation (synchronous-like async for isolating engine perf from I/O)
+- [X] T004 Create small tier YAML policy fixture (~5 resources, simple roles, no conditions, no derived roles) in `packages/toride/bench/fixtures/small.yaml`
+- [X] T005 [P] Create medium tier YAML policy fixture (~20 resources, derived roles, conditions, relations, field_access on 3 resources) in `packages/toride/bench/fixtures/medium.yaml`
+- [X] T006 [P] Create large tier YAML policy fixture (50+ resources, deep derivation chains, complex conditions, forbid rules, field_access on 15+ resources) in `packages/toride/bench/fixtures/large.yaml`
+- [X] T007 Implement shared benchmark setup helper in `packages/toride/bench/helpers/setup.ts` — exports functions to: load YAML fixture by tier name, create a Toride engine instance from a fixture, provide mock resolvers per tier that return appropriate attributes for condition evaluation (synchronous-like async for isolating engine perf from I/O)
 
 **Checkpoint**: Setup helper can load all three fixtures and create working engine instances. Verify by importing in a scratch file and calling `can()` against each tier.
 
