@@ -76,11 +76,11 @@
 
 **Independent Test**: Define relation in YAML, provide ResourceRef in attributes, verify nested attribute access (`$resource.org.plan`) works.
 
-- [ ] T016 [US3] Implement relation recognition in `AttributeCache`: when a field matches a declared relation AND value has `type`/`id`, treat as ResourceRef and recursively resolve nested attributes in `packages/toride/src/evaluation/cache.ts`
-- [ ] T017 [US3] Implement cascading inline attributes: extra fields beyond `type`/`id` on a relation-target ResourceRef treated as inline attributes for that referenced resource in `packages/toride/src/evaluation/cache.ts`
-- [ ] T018 [US3] Implement FR-016 strict validation: when a resolver returns a non-ResourceRef value for a declared relation field, throw `ValidationError` in `packages/toride/src/evaluation/cache.ts`
-- [ ] T019 [US3] Rewrite `resolveResourcePath` to traverse relations via attributes (inline + resolver) instead of `getRelated()`, support multi-level paths like `$resource.org.parent` in `packages/toride/src/evaluation/condition.ts`
-- [ ] T020 [US3] Write integration tests for US3 acceptance scenarios: relation via inline ResourceRef, cascading inline attributes on nested ResourceRef, multi-level lazy traversal, FR-016 validation error for bad resolver relation values in `packages/toride/src/__tests__/` (extend or new test file)
+- [X] T016 [US3] Implement relation recognition in `AttributeCache`: when a field matches a declared relation AND value has `type`/`id`, treat as ResourceRef and recursively resolve nested attributes in `packages/toride/src/evaluation/cache.ts`
+- [X] T017 [US3] Implement cascading inline attributes: extra fields beyond `type`/`id` on a relation-target ResourceRef treated as inline attributes for that referenced resource in `packages/toride/src/evaluation/cache.ts`
+- [X] T018 [US3] Implement FR-016 strict validation: when a resolver returns a non-ResourceRef value for a declared relation field, throw `ValidationError` in `packages/toride/src/evaluation/cache.ts`
+- [X] T019 [US3] Rewrite `resolveResourcePath` to traverse relations via attributes (inline + resolver) instead of `getRelated()`, support multi-level paths like `$resource.org.parent` in `packages/toride/src/evaluation/condition.ts`
+- [X] T020 [US3] Write integration tests for US3 acceptance scenarios: relation via inline ResourceRef, cascading inline attributes on nested ResourceRef, multi-level lazy traversal, FR-016 validation error for bad resolver relation values in `packages/toride/src/__tests__/` (extend or new test file)
 
 **Checkpoint**: Relation traversal via attributes works end-to-end. `$resource.org.plan` resolves correctly. `pnpm exec nx run toride:test` passes for US3 scenarios.
 

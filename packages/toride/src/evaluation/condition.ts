@@ -164,6 +164,17 @@ async function evaluatePair(
     maxDepth,
   );
 
+  // T053: If leftValue is an array (from cardinality:many), apply ANY semantics for equality
+  if (Array.isArray(leftValue)) {
+    if (rightValue === UNDEFINED_SENTINEL || rightValue === null || rightValue === undefined) {
+      return false;
+    }
+    return leftValue.some((v) => {
+      if (v === UNDEFINED_SENTINEL || v === null || v === undefined) return false;
+      return v === rightValue;
+    });
+  }
+
   // Strict null semantics: undefined never equals anything
   if (leftValue === UNDEFINED_SENTINEL || leftValue === null || leftValue === undefined) {
     return false;
@@ -216,9 +227,26 @@ async function resolveValue(
 }
 
 /**
+ * Check if a value is ResourceRef-shaped (has `type` and `id` string fields).
+ */
+function isResourceRef(value: unknown): value is ResourceRef {
+  if (typeof value !== "object" || value === null) return false;
+  const obj = value as Record<string, unknown>;
+  return typeof obj.type === "string" && typeof obj.id === "string";
+}
+
+/**
  * Resolve a resource attribute path, handling nested property resolution via relations.
  * T047: $resource.org.name -> resolve org relation, then get name attribute.
  * T053: Cardinality:many -> ANY semantics (returns array of values for further eval).
+ * T019: Full lazy cascading relation traversal via AttributeCache.
+ *
+ * At each path segment:
+ * 1. Resolve attributes for the current resource (via cache, which merges inline + resolver)
+ * 2. Check if the segment is a declared relation with a ResourceRef-shaped value
+ * 3. If yes, recurse with the related resource's block and decremented depth
+ * 4. If array of ResourceRefs (many relation), resolve each and return array (ANY semantics)
+ * 5. If not a relation, fall back to nested attribute object traversal
  */
 async function resolveResourcePath(
   path: string,
@@ -233,7 +261,7 @@ async function resolveResourcePath(
   if (parts.length === 1) {
     // Simple attribute lookup via cache (merges inline + resolver)
     try {
-      const attrs = await cache.resolve(resource);
+      const attrs = await cache.resolve(resource, resourceBlock);
       const val = attrs[parts[0]];
       return val === undefined ? UNDEFINED_SENTINEL : val;
     } catch {
@@ -241,7 +269,7 @@ async function resolveResourcePath(
     }
   }
 
-  // Nested path: first part is a relation name, rest is the attribute path on the related resource
+  // Nested path: first part may be a relation name
   if (depthRemaining <= 0) {
     return UNDEFINED_SENTINEL;
   }
@@ -254,7 +282,7 @@ async function resolveResourcePath(
   if (!relationDef) {
     // Not a relation - might be a nested attribute object
     try {
-      const attrs = await cache.resolve(resource);
+      const attrs = await cache.resolve(resource, resourceBlock);
       const val = getNestedAttribute(attrs, path);
       return val;
     } catch {
@@ -263,16 +291,40 @@ async function resolveResourcePath(
   }
 
   // Resolve the relation target from resource attributes (via cache)
-  // Relation traversal via attributes — deferred full implementation to US3
   try {
-    const attrs = await cache.resolve(resource);
+    const attrs = await cache.resolve(resource, resourceBlock);
     const relValue = attrs[relationName];
-    if (!relValue || typeof relValue !== "object" || relValue === null) {
+
+    if (relValue === null || relValue === undefined) {
       return UNDEFINED_SENTINEL;
     }
 
-    // Check if it's a ResourceRef-shaped value
-    if ("type" in relValue && "id" in relValue) {
+    // T053: Array of ResourceRefs (many relations) -> ANY semantics
+    if (Array.isArray(relValue)) {
+      const results: unknown[] = [];
+      for (const item of relValue) {
+        if (!isResourceRef(item)) continue;
+        const relatedRef = item as ResourceRef;
+        const relatedBlock = policy.resources[relatedRef.type] ?? {
+          roles: [],
+          permissions: [],
+        };
+        const val = await resolveResourcePath(
+          remainingPath,
+          relatedRef,
+          cache,
+          relatedBlock,
+          policy,
+          depthRemaining - 1,
+        );
+        results.push(val);
+      }
+      // Return array for ANY semantics evaluation
+      return results.length > 0 ? results : UNDEFINED_SENTINEL;
+    }
+
+    // Single ResourceRef-shaped value
+    if (isResourceRef(relValue)) {
       const relatedRef = relValue as ResourceRef;
       const relatedBlock = policy.resources[relatedRef.type] ?? {
         roles: [],
@@ -288,7 +340,12 @@ async function resolveResourcePath(
       );
     }
 
-    // Array of ResourceRefs (many relations) — deferred to US3
+    // Not a ResourceRef or array - treat as plain attribute
+    if (typeof relValue === "object") {
+      const val = getNestedAttribute(relValue as Record<string, unknown>, remainingPath);
+      return val;
+    }
+
     return UNDEFINED_SENTINEL;
   } catch {
     return UNDEFINED_SENTINEL;
