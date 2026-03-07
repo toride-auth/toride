@@ -19,7 +19,7 @@
 
 **Purpose**: No new project setup needed — existing monorepo. Prepare branch for breaking changes.
 
-- [ ] T001 Verify all 4 packages build and test green before starting changes: `pnpm run build && pnpm run test`
+- [X] T001 Verify all 4 packages build and test green before starting changes: `pnpm run build && pnpm run test`
 
 ---
 
