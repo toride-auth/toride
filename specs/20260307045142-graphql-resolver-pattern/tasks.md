@@ -92,12 +92,12 @@
 
 **Independent Test**: Define derived_roles with `when` conditions and `from_role + on_relation`, verify correct role assignment without any getRoles function.
 
-- [ ] T021 [US4] Rewrite `resolveRoles` and `resolveDirectRoles` in role-resolver: remove all `getRoles()` calls, derive roles entirely from `derived_roles` entries evaluated against attributes (via `AttributeCache`) in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T022 [US4] Update Pattern 2 (`from_role + on_relation`) to resolve relation targets from attributes instead of `getRelated()`, check actor roles on related resource via `derived_roles` recursion in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T023 [US4] Update Pattern 3 (`from_relation`) to resolve relation identity from attributes instead of `getRelated()` in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T024 [P] [US4] Update Pattern 4 and 5 (`when` conditions) to evaluate against resource attributes (via `AttributeCache`) in addition to actor attributes in `packages/toride/src/evaluation/role-resolver.ts`
-- [ ] T025 [US4] Update `buildConstraints` derived role evaluation to work with new relation model (attributes instead of `getRelated`) in `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T026 [US4] Write integration tests for US4 acceptance scenarios: owner via `$resource.owner_id eq $actor.id`, inherited role via `from_role + on_relation`, migration from `getRoles` to attribute-based conditions in `packages/toride/src/__tests__/` (extend or new test file)
+- [X] T021 [US4] Rewrite `resolveRoles` and `resolveDirectRoles` in role-resolver: remove all `getRoles()` calls, derive roles entirely from `derived_roles` entries evaluated against attributes (via `AttributeCache`) in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T022 [US4] Update Pattern 2 (`from_role + on_relation`) to resolve relation targets from attributes instead of `getRelated()`, check actor roles on related resource via `derived_roles` recursion in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T023 [US4] Update Pattern 3 (`from_relation`) to resolve relation identity from attributes instead of `getRelated()` in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T024 [P] [US4] Update Pattern 4 and 5 (`when` conditions) to evaluate against resource attributes (via `AttributeCache`) in addition to actor attributes in `packages/toride/src/evaluation/role-resolver.ts`
+- [X] T025 [US4] Update `buildConstraints` derived role evaluation to work with new relation model (attributes instead of `getRelated`) in `packages/toride/src/partial/constraint-builder.ts`
+- [X] T026 [US4] Write integration tests for US4 acceptance scenarios: owner via `$resource.owner_id eq $actor.id`, inherited role via `from_role + on_relation`, migration from `getRoles` to attribute-based conditions in `packages/toride/src/__tests__/` (extend or new test file)
 
 **Checkpoint**: All 5 derived role patterns work with attribute-based resolution. No `getRoles` anywhere. `pnpm exec nx run toride:test` passes for US4 scenarios.
 

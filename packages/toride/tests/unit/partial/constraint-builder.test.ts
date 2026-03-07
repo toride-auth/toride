@@ -413,8 +413,8 @@ describe("buildConstraints", () => {
     });
   });
 
-  describe("Finding 1: $resource/$env conditions in actor-only derivation", () => {
-    it("rejects derived role with $resource condition (prevents privilege escalation)", async () => {
+  describe("Finding 1: $resource/$env conditions in derived role constraints", () => {
+    it("emits field constraint for derived role with $resource condition (T025)", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -422,8 +422,7 @@ describe("buildConstraints", () => {
             permissions: ["read"],
             grants: { viewer: ["read"] },
             derived_roles: [
-              // This role has a $resource condition that CANNOT be evaluated
-              // during actor-only derivation. It must NOT be granted silently.
+              // T025: $resource conditions now emit field constraints instead of being rejected
               { role: "viewer", when: { "$resource.status": "active" } },
             ],
           },
@@ -433,11 +432,14 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
-      // Must be forbidden, NOT unrestricted (the old bug was granting access here)
-      expect(result).toEqual({ forbidden: true });
+      // T025: Now emits a field constraint for $resource.status
+      expect("constraints" in result).toBe(true);
+      if ("constraints" in result) {
+        expect(result.constraints).toEqual({ type: "field_eq", field: "status", value: "active" });
+      }
     });
 
-    it("rejects derived role with $env condition (prevents privilege escalation)", async () => {
+    it("inlines $env condition in derived role constraint when env provided (T025)", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -454,7 +456,49 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy, { env: { feature_flag: true } });
-      // Must be forbidden because $env conditions cannot be evaluated during derivation
+      // T025: $env.feature_flag is inlined and matches -> unrestricted
+      expect(result).toEqual({ unrestricted: true });
+    });
+
+    it("rejects derived role with $env condition when env value does not match", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              { role: "viewer", when: { "$env.feature_flag": true } },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy, { env: { feature_flag: false } });
+      // $env.feature_flag is false, does not match true -> forbidden
+      expect(result).toEqual({ forbidden: true });
+    });
+
+    it("rejects derived role with $env condition when env not provided", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              { role: "viewer", when: { "$env.feature_flag": true } },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy);
+      // No env provided -> $env.feature_flag is undefined -> null -> never -> forbidden
       expect(result).toEqual({ forbidden: true });
     });
   });

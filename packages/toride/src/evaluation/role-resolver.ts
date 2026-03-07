@@ -14,6 +14,7 @@ import type {
 } from "../types.js";
 import { CycleError, DepthLimitError } from "../types.js";
 import type { AttributeCache } from "./cache.js";
+import { evaluateCondition } from "./condition.js";
 
 /** Default maximum depth for derived role chain traversal. */
 const DEFAULT_MAX_DERIVED_ROLE_DEPTH = 5;
@@ -134,12 +135,12 @@ async function evaluateDerivedRole(
 
   // Pattern 4: actor_type + when
   if (entry.actor_type !== undefined && entry.when !== undefined) {
-    return evaluateActorTypeCondition(entry, actor);
+    return evaluateActorTypeCondition(entry, actor, resource, cache, resourceBlock, policy);
   }
 
   // Pattern 5: when only (no actor_type, no other pattern fields)
   if (entry.when !== undefined) {
-    return evaluateWhenOnly(entry, actor);
+    return evaluateWhenOnly(entry, actor, resource, cache, resourceBlock, policy);
   }
 
   return [];
@@ -387,18 +388,28 @@ async function evaluateRelationIdentity(
 // ─── Pattern 4: Actor-type + when ────────────────────────────────────
 
 /**
- * T039: Evaluate actor-type-conditional derivation.
+ * T039/T024: Evaluate actor-type-conditional derivation.
  * Requires actor type match AND condition satisfaction.
+ * Now async to support $resource.* references via AttributeCache.
+ *
+ * Evaluation strategy (Design decision 5):
+ * - Actor part evaluated eagerly; if actor_type fails, resource part never evaluated.
+ * - $env conditions are fail-closed (Design decision 4).
  */
-function evaluateActorTypeCondition(
+async function evaluateActorTypeCondition(
   entry: DerivedRoleEntry,
   actor: ActorRef,
-): DerivedRoleTrace[] {
-  // Silently skip if actor type doesn't match
+  resource: ResourceRef,
+  cache: AttributeCache,
+  resourceBlock: ResourceBlock,
+  policy: Policy,
+): Promise<DerivedRoleTrace[]> {
+  // Silently skip if actor type doesn't match (eager actor evaluation)
   if (actor.type !== entry.actor_type) return [];
 
-  // Evaluate condition
-  if (!evaluateActorCondition(entry.when!, actor)) return [];
+  // Use full condition evaluator for $resource.* support
+  const matched = await evaluateRoleCondition(entry.when!, actor, resource, cache, resourceBlock, policy);
+  if (!matched) return [];
 
   return [
     {
@@ -411,13 +422,19 @@ function evaluateActorTypeCondition(
 // ─── Pattern 5: when-only ────────────────────────────────────────────
 
 /**
- * T039: Evaluate when-only condition (no actor type restriction).
+ * T039/T024: Evaluate when-only condition (no actor type restriction).
+ * Now async to support $resource.* references via AttributeCache.
  */
-function evaluateWhenOnly(
+async function evaluateWhenOnly(
   entry: DerivedRoleEntry,
   actor: ActorRef,
-): DerivedRoleTrace[] {
-  if (!evaluateActorCondition(entry.when!, actor)) return [];
+  resource: ResourceRef,
+  cache: AttributeCache,
+  resourceBlock: ResourceBlock,
+  policy: Policy,
+): Promise<DerivedRoleTrace[]> {
+  const matched = await evaluateRoleCondition(entry.when!, actor, resource, cache, resourceBlock, policy);
+  if (!matched) return [];
 
   return [
     {
@@ -427,12 +444,48 @@ function evaluateWhenOnly(
   ];
 }
 
-// ─── Minimal Actor Condition Evaluator (US2 scope) ────────────────────
+// ─── Role Condition Evaluator (T024: full context) ────────────────────
 
 /**
- * Evaluate a condition expression against actor attributes.
- * Minimal implementation for US2 — handles $actor.x attribute matching.
- * Full condition evaluation deferred to US3.
+ * T024: Evaluate a condition expression in the full evaluation context.
+ * Uses the condition evaluator from condition.ts to support $resource.*,
+ * $actor.*, and $env.* references.
+ *
+ * Design decisions:
+ * - $env conditions are fail-closed (return false) to prevent privilege escalation.
+ *   This is handled by the condition evaluator's strict null semantics.
+ * - Errors during evaluation are caught and treated as fail-closed (false).
+ */
+async function evaluateRoleCondition(
+  condition: ConditionExpression,
+  actor: ActorRef,
+  resource: ResourceRef,
+  cache: AttributeCache,
+  resourceBlock: ResourceBlock,
+  policy: Policy,
+): Promise<boolean> {
+  try {
+    return await evaluateCondition(
+      condition,
+      actor,
+      resource,
+      cache,
+      {}, // empty env — $env conditions will resolve to undefined -> fail-closed
+      resourceBlock,
+      policy,
+    );
+  } catch {
+    // Fail-closed: errors during evaluation -> role not assigned
+    return false;
+  }
+}
+
+// ─── Minimal Actor Condition Evaluator (Pattern 1 only) ────────────────────
+
+/**
+ * Evaluate a condition expression against actor attributes only.
+ * Used for Pattern 1 (global roles) which only reference actor attributes.
+ * $resource and $env conditions are fail-closed.
  */
 /** Maximum nesting depth for any/all combinators in actor conditions (fail-closed). */
 const MAX_ACTOR_COMBINATOR_DEPTH = 10;
@@ -468,7 +521,8 @@ function evaluateActorCondition(
 
       if (actualValue !== expectedValue) return false;
     }
-    // Other condition types ($resource, $env) are deferred to US3
+    // $resource and $env conditions -> fail-closed (return false)
+    if (key.startsWith("$resource.") || key.startsWith("$env.")) return false;
   }
 
   return true;

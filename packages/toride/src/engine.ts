@@ -187,7 +187,7 @@ export class Toride {
     // Use any action just to trigger evaluation for role resolution;
     // pick the first permission or use a dummy
     const action = resourceBlock.permissions[0] ?? "__resolvedRoles__";
-    const result = await this.evaluateInternal(actor, action, { type: resource.type, id: resource.id }, options);
+    const result = await this.evaluateInternal(actor, action, resource, options);
 
     const directRoles = result.resolvedRoles.direct;
     const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
