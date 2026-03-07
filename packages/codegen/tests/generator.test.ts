@@ -13,7 +13,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
         roles: ["viewer", "editor", "admin"],
         permissions: ["read", "update", "delete", "create_task"],
         relations: {
-          org: { resource: "Organization", cardinality: "one" as const },
+          org: "Organization",
         },
         grants: {
           viewer: ["read"],
@@ -25,8 +25,8 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
         roles: ["viewer", "editor"],
         permissions: ["read", "update", "delete"],
         relations: {
-          project: { resource: "Project", cardinality: "one" as const },
-          assignee: { resource: "User", cardinality: "one" as const },
+          project: "Project",
+          assignee: "User",
         },
         grants: {
           viewer: ["read"],
@@ -79,10 +79,10 @@ describe("generateTypes", () => {
     const output = generateTypes(makePolicy());
     expect(output).toContain("export interface RelationMap");
     expect(output).toMatch(/Project:/);
-    expect(output).toMatch(/org.*type.*"Organization".*cardinality.*"one"/s);
+    expect(output).toMatch(/org.*"Organization"/s);
     expect(output).toMatch(/Task:/);
-    expect(output).toMatch(/project.*type.*"Project".*cardinality.*"one"/s);
-    expect(output).toMatch(/assignee.*type.*"User".*cardinality.*"one"/s);
+    expect(output).toMatch(/project.*"Project"/s);
+    expect(output).toMatch(/assignee.*"User"/s);
   });
 
   it("handles resources with no relations", () => {
@@ -108,12 +108,10 @@ describe("generateTypes", () => {
     expect(output).toContain("export type Resources = never");
   });
 
-  it("generates TypedRelationResolver interface", () => {
+  it("generates TypedResolvers type", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface TypedRelationResolver");
-    expect(output).toContain("getRelated");
-    expect(output).toContain("getRoles");
-    expect(output).toContain("getAttributes");
+    expect(output).toContain("export type TypedResolvers");
+    expect(output).toContain("Promise<Record<string, unknown>>");
   });
 
   it("rejects unsafe resource names with special characters", () => {
@@ -159,7 +157,7 @@ describe("generateTypes", () => {
           roles: ["viewer"],
           permissions: ["read"],
           relations: {
-            "rel-name": { resource: "Org", cardinality: "one" as const },
+            "rel-name": "Org",
           },
         },
       },
