@@ -503,6 +503,64 @@ describe("buildConstraints", () => {
     });
   });
 
+  describe("fail-closed for unsupported cross-constraint operators (security)", () => {
+    it("returns forbidden when actor-resource cross-constraint uses unsupported operator like startsWith", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              {
+                role: "viewer",
+                when: { "$actor.email": { startsWith: "$resource.domain" } },
+              },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = {
+        type: "User",
+        id: "u1",
+        attributes: { email: "alice@example.com" },
+      };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy);
+      // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
+      expect(result).toEqual({ forbidden: true });
+    });
+
+    it("returns forbidden when actor-resource cross-constraint uses contains operator", async () => {
+      const policy = makePolicy({
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            derived_roles: [
+              {
+                role: "viewer",
+                when: { "$actor.name": { contains: "$resource.keyword" } },
+              },
+            ],
+          },
+        },
+      });
+      const actor: ActorRef = {
+        type: "User",
+        id: "u1",
+        attributes: { name: "Alice" },
+      };
+      const resolver = makeResolver();
+
+      const result = await buildConstraints(actor, "read", "Task", resolver, policy);
+      // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
+      expect(result).toEqual({ forbidden: true });
+    });
+  });
+
   describe("depth guard for simplify (Finding 10)", () => {
     it("handles deeply nested constraints without stack overflow", () => {
       // Build a deeply nested NOT chain

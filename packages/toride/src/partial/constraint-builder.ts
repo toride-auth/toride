@@ -639,7 +639,9 @@ function actorResourceCrossConstraint(
     case "lte":
       return { type: "field_gte", field: resourceField, value: leftValue };
     default:
-      return null;
+      // Fail-closed: unsupported operators (startsWith, endsWith, contains, custom)
+      // must not silently pass — deny access to maintain security invariant
+      return { type: "never" };
   }
 }
 
