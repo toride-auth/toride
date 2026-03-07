@@ -267,7 +267,7 @@ describe("strict mode validation", () => {
             admin: ["all"],
           },
           relations: {
-            project: { resource: "Project", cardinality: "one" as const },
+            project: "Project",
           },
           derived_roles: [
             { role: "admin", from_global_role: "superadmin" },

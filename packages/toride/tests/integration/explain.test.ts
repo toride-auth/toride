@@ -1,10 +1,12 @@
 // T067: Integration tests for debug scenarios
+// Updated for Resolvers map / AttributeCache (Phase 3)
+// FR-008: roles derived via derived_roles, not getRoles
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  Resolvers,
   Policy,
   TorideOptions,
   ExplainResult,
@@ -46,6 +48,7 @@ describe("explain() integration - debug scenarios", () => {
   });
 
   // Multi-resource policy with derived roles and conditional rules
+  // Relations are now simple strings; relation targets come from resource attributes
   const POLICY_YAML = `
 version: "1"
 actors:
@@ -53,6 +56,10 @@ actors:
     attributes:
       isSuperAdmin: boolean
       department: string
+      is_org_admin: boolean
+      is_org_member: boolean
+      is_project_viewer: boolean
+      is_project_editor: boolean
 resources:
   Organization:
     roles: [admin, member]
@@ -60,13 +67,18 @@ resources:
     grants:
       admin: [all]
       member: [read]
+    derived_roles:
+      - role: admin
+        when:
+          "$actor.is_org_admin": true
+      - role: member
+        when:
+          "$actor.is_org_member": true
   Project:
     roles: [owner, editor, viewer]
     permissions: [read, write, delete, archive]
     relations:
-      org:
-        resource: Organization
-        cardinality: one
+      org: Organization
     grants:
       owner: [all]
       editor: [read, write]
@@ -77,6 +89,12 @@ resources:
       - role: editor
         from_role: admin
         on_relation: org
+      - role: viewer
+        when:
+          "$actor.is_project_viewer": true
+      - role: editor
+        when:
+          "$actor.is_project_editor": true
     rules:
       - effect: forbid
         permissions: [archive]
@@ -94,35 +112,30 @@ global_roles:
       "$actor.isSuperAdmin": true
 `;
 
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-    related?: Record<string, ResourceRef | ResourceRef[]>;
-    attributes?: Record<string, Record<string, unknown>>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async (resource: ResourceRef, relationName: string) => {
-        const key = `${resource.type}:${resource.id}:${relationName}`;
-        return config.related?.[key] ?? [];
-      },
-      getAttributes: async (ref: ResourceRef) => {
+  function makeResolvers(attrs: Record<string, Record<string, unknown>>): Resolvers {
+    const typeSet = new Set<string>();
+    for (const key of Object.keys(attrs)) {
+      const ci = key.indexOf(":");
+      if (ci > 0) typeSet.add(key.substring(0, ci));
+    }
+    const resolvers: Resolvers = {};
+    for (const type of typeSet) {
+      resolvers[type] = async (ref) => {
         const key = `${ref.type}:${ref.id}`;
-        return config.attributes?.[key] ?? {};
-      },
-    };
+        return attrs[key] ?? {};
+      };
+    }
+    return resolvers;
   }
 
   // ─── Scenario 1: Explain derived role via global role ──────────────
 
   it("explains derivation path through global role", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy, resolvers });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -151,12 +164,11 @@ global_roles:
 
   it("explains derivation path through relation-based role", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Organization:org1": ["admin"] },
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_org_admin: true } };
     const project: ResourceRef = { type: "Project", id: "p1" };
 
     const result = await engine.explain(actor, "write", project);
@@ -176,13 +188,11 @@ global_roles:
 
   it("explains forbid rule blocking access", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Organization:org1": ["admin"] },
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
-      attributes: { "Project:p1": { archived: true } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" }, archived: true },
     });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_org_admin: true } };
     const project: ResourceRef = { type: "Project", id: "p1" };
 
     const result = await engine.explain(actor, "archive", project);
@@ -203,10 +213,10 @@ global_roles:
 
   it("explains default deny when no roles match", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const project: ResourceRef = { type: "Project", id: "p1" };
 
@@ -223,10 +233,10 @@ global_roles:
 
   it("permittedActions returns all actions for superadmin via derived owner", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy, resolvers });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -244,17 +254,14 @@ global_roles:
 
   // ─── Scenario 6: resolvedRoles with multiple derivation paths ──────
 
-  it("resolvedRoles includes both direct and derived roles", async () => {
+  it("resolvedRoles includes derived roles from multiple paths", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: {
-        "u1:Project:p1": ["viewer"],
-        "u1:Organization:org1": ["admin"],
-      },
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy, resolvers });
+    // Actor gets viewer from is_project_viewer and editor from is_org_admin via relation
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_project_viewer: true, is_org_admin: true } };
     const project: ResourceRef = { type: "Project", id: "p1" };
 
     const roles = await engine.resolvedRoles(actor, project);
@@ -267,15 +274,11 @@ global_roles:
 
   it("canBatch correctly evaluates checks across different resources", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: {
-        "u1:Organization:org1": ["member"],
-        "u1:Project:p1": ["editor"],
-      },
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" } },
     });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_org_member: true, is_project_editor: true } };
 
     const results = await engine.canBatch(actor, [
       { action: "read", resource: { type: "Organization", id: "org1" } },
@@ -298,13 +301,11 @@ global_roles:
 
   it("explains permit rule granting access", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Organization:org1": ["admin"] },
-      related: { "Project:p1:org": { type: "Organization", id: "org1" } },
-      attributes: { "Project:p1": { archived: false } },
+    const resolvers = makeResolvers({
+      "Project:p1": { org: { type: "Organization", id: "org1" }, archived: false },
     });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_org_admin: true } };
     const project: ResourceRef = { type: "Project", id: "p1" };
 
     const result = await engine.explain(actor, "archive", project);

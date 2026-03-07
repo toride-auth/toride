@@ -7,7 +7,7 @@
 
 import type {
   ActorRef,
-  RelationResolver,
+  // RelationResolver removed — replaced by AttributeCache
   Policy,
   ResourceBlock,
   DerivedRoleEntry,
@@ -21,6 +21,7 @@ import type {
   Constraint,
   ConstraintResult,
 } from "./constraint-types.js";
+import type { AttributeCache } from "../evaluation/cache.js";
 
 // ─── Module-level operator key set ────────────────────────────────
 
@@ -44,7 +45,7 @@ export async function buildConstraints(
   actor: ActorRef,
   action: string,
   resourceType: string,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   policy: Policy,
   options?: CheckOptions & {
     maxDerivedRoleDepth?: number;
@@ -83,7 +84,7 @@ export async function buildConstraints(
     for (const entry of derivedEntries) {
       if (entry.role !== role) continue;
       const constraint = await evaluateDerivedRoleConstraint(
-        entry, actor, resourceType, resolver, policy, resourceBlock,
+        entry, actor, resourceType, cache, policy, resourceBlock,
       );
       if (constraint !== null) constraints.push(constraint);
     }
@@ -212,7 +213,7 @@ async function evaluateDerivedRoleConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
   _resourceType: string,
-  _resolver: RelationResolver,
+  _cache: AttributeCache,
   policy: Policy,
   resourceBlock: ResourceBlock,
 ): Promise<Constraint | null> {
@@ -283,7 +284,7 @@ function evaluateRelationRoleConstraint(
   const relationDef = resourceBlock.relations?.[relationName];
   if (!relationDef) return null;
 
-  const targetResourceType = relationDef.resource;
+  const targetResourceType = relationDef;
 
   // Emit a relation constraint wrapping a has_role constraint
   // This tells the adapter: "the related resource must have a role assignment for this actor"
@@ -325,7 +326,7 @@ function evaluateRelationIdentityConstraint(
   return {
     type: "relation",
     field: relationName,
-    resourceType: relationDef.resource,
+    resourceType: relationDef,
     constraint: {
       type: "and",
       children: [

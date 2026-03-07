@@ -1,10 +1,11 @@
 // T066: Unit tests for permittedActions(), resolvedRoles(), canBatch()
+// Updated for Resolvers map / AttributeCache (Phase 3)
 
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  Resolvers,
   Policy,
   TorideOptions,
   ExplainResult,
@@ -47,12 +48,16 @@ describe("permittedActions(), resolvedRoles(), canBatch()", () => {
     loadYaml = parserMod.loadYaml;
   });
 
+  // Policy uses derived_roles to assign roles from actor attributes
   const POLICY_YAML = `
 version: "1"
 actors:
   User:
     attributes:
       isSuperAdmin: boolean
+      is_editor: boolean
+      is_viewer: boolean
+      is_admin: boolean
 resources:
   Task:
     roles: [viewer, editor, admin]
@@ -64,6 +69,15 @@ resources:
     derived_roles:
       - role: admin
         from_global_role: superadmin
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
 global_roles:
   superadmin:
     actor_type: User
@@ -71,27 +85,13 @@ global_roles:
       "$actor.isSuperAdmin": true
 `;
 
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async () => [],
-      getAttributes: async () => ({}),
-    };
-  }
-
   // ─── permittedActions() ─────────────────────────────────────────────
 
   describe("permittedActions()", () => {
     it("returns all permitted actions for a role", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       const actions = await engine.permittedActions(actor, resource);
@@ -103,9 +103,8 @@ global_roles:
 
     it("returns all permissions for admin with [all] grant", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["admin"] } });
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_admin: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       const actions = await engine.permittedActions(actor, resource);
@@ -117,8 +116,7 @@ global_roles:
 
     it("returns empty array when no roles match", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({});
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
@@ -129,8 +127,7 @@ global_roles:
 
     it("returns empty array for unknown resource type", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({});
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
       const resource: ResourceRef = { type: "Unknown", id: "1" };
 
@@ -143,11 +140,10 @@ global_roles:
   // ─── resolvedRoles() ───────────────────────────────────────────────
 
   describe("resolvedRoles()", () => {
-    it("returns flat list of direct roles", async () => {
+    it("returns derived roles in flat list", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       const roles = await engine.resolvedRoles(actor, resource);
@@ -156,10 +152,9 @@ global_roles:
       expect(Array.isArray(roles)).toBe(true);
     });
 
-    it("includes derived roles in flat list", async () => {
+    it("includes derived roles from global role", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({});
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = {
         type: "User",
         id: "u1",
@@ -174,26 +169,24 @@ global_roles:
 
     it("returns deduplicated roles", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["admin"] } });
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = {
         type: "User",
         id: "u1",
-        attributes: { isSuperAdmin: true },
+        attributes: { isSuperAdmin: true, is_admin: true },
       };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       const roles = await engine.resolvedRoles(actor, resource);
 
-      // admin appears as both direct and derived, but should be deduplicated
+      // admin appears from both global_role and when condition, but should be deduplicated
       const adminCount = roles.filter((r: string) => r === "admin").length;
       expect(adminCount).toBe(1);
     });
 
     it("returns empty array for unknown resource type", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({});
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
       const resource: ResourceRef = { type: "Unknown", id: "1" };
 
@@ -208,9 +201,8 @@ global_roles:
   describe("canBatch()", () => {
     it("returns boolean array matching check order", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       const results = await engine.canBatch(actor, [
         { action: "read", resource: { type: "Task", id: "42" } },
@@ -223,8 +215,7 @@ global_roles:
 
     it("returns empty array for empty checks", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({});
-      const engine = new Toride({ policy, resolver });
+      const engine = new Toride({ policy });
       const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
       const results = await engine.canBatch(actor, []);
@@ -233,21 +224,35 @@ global_roles:
     });
 
     it("shares resolver cache across batch checks", async () => {
-      const policy = await loadYaml(POLICY_YAML);
-      const getRolesSpy = vi.fn(
-        async (actor: ActorRef, resource: ResourceRef) => {
-          const key = `${actor.id}:${resource.type}:${resource.id}`;
-          if (key === "u1:Task:42") return ["editor"];
-          return [];
-        },
-      );
-      const resolver: RelationResolver = {
-        getRoles: getRolesSpy,
-        getRelated: async () => [],
-        getAttributes: async () => ({}),
+      // Use a policy with a $resource condition rule so the resolver is actually invoked
+      const policyWithResourceRule = await loadYaml(`
+version: "1"
+actors:
+  User:
+    attributes:
+      is_editor: boolean
+resources:
+  Task:
+    roles: [editor]
+    permissions: [read, update, delete]
+    grants:
+      editor: [read, update]
+    derived_roles:
+      - role: editor
+        when:
+          "$actor.is_editor": true
+    rules:
+      - effect: forbid
+        permissions: [update]
+        when:
+          "$resource.status": "archived"
+`);
+      const taskResolverSpy = vi.fn(async () => ({ status: "active" }));
+      const resolvers: Resolvers = {
+        Task: taskResolverSpy,
       };
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy: policyWithResourceRule, resolvers });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       await engine.canBatch(actor, [
         { action: "read", resource: { type: "Task", id: "42" } },
@@ -255,16 +260,14 @@ global_roles:
         { action: "delete", resource: { type: "Task", id: "42" } },
       ]);
 
-      // With cache sharing, getRoles should only be called once per unique resource
-      // (the cache deduplicates calls to the same resource)
-      expect(getRolesSpy).toHaveBeenCalledTimes(1);
+      // With cache sharing, Task resolver for id=42 should be called at most once
+      expect(taskResolverSpy).toHaveBeenCalledTimes(1);
     });
 
     it("handles mixed resource types in batch", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-      const engine = new Toride({ policy, resolver });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const engine = new Toride({ policy });
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       const results = await engine.canBatch(actor, [
         { action: "read", resource: { type: "Task", id: "42" } },
@@ -280,14 +283,12 @@ global_roles:
   describe("onDecision audit callback", () => {
     it("fires onDecision callback after can() call", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const decisions: DecisionEvent[] = [];
       const engine = new Toride({
         policy,
-        resolver,
         onDecision: (event) => decisions.push(event),
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       await engine.can(actor, "update", resource);
@@ -305,14 +306,12 @@ global_roles:
 
     it("fires onDecision callback after explain() call", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const decisions: DecisionEvent[] = [];
       const engine = new Toride({
         policy,
-        resolver,
         onDecision: (event) => decisions.push(event),
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       await engine.explain(actor, "update", resource);
@@ -324,15 +323,13 @@ global_roles:
 
     it("does not block on callback errors", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const engine = new Toride({
         policy,
-        resolver,
         onDecision: () => {
           throw new Error("audit failure");
         },
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
       const resource: ResourceRef = { type: "Task", id: "42" };
 
       // Should not throw even though callback throws
@@ -342,14 +339,12 @@ global_roles:
 
     it("fires onDecision for each check in canBatch()", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const decisions: DecisionEvent[] = [];
       const engine = new Toride({
         policy,
-        resolver,
         onDecision: (event) => decisions.push(event),
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       await engine.canBatch(actor, [
         { action: "read", resource: { type: "Task", id: "42" } },
@@ -366,14 +361,12 @@ global_roles:
   describe("onQuery audit callback", () => {
     it("fires onQuery callback after buildConstraints() call", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const queries: QueryEvent[] = [];
       const engine = new Toride({
         policy,
-        resolver,
         onQuery: (event) => queries.push(event),
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       await engine.buildConstraints(actor, "read", "Task");
       await new Promise((resolve) => queueMicrotask(resolve));
@@ -387,15 +380,13 @@ global_roles:
 
     it("does not block on callback errors", async () => {
       const policy = await loadYaml(POLICY_YAML);
-      const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
       const engine = new Toride({
         policy,
-        resolver,
         onQuery: () => {
           throw new Error("audit failure");
         },
       });
-      const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
 
       // Should not throw
       const result = await engine.buildConstraints(actor, "read", "Task");

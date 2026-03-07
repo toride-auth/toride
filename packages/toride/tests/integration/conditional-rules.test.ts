@@ -1,12 +1,12 @@
 // T045: Integration tests for conditional rules
-// Full pipeline with YAML policies, permit/forbid rules, custom evaluators,
-// fail-closed semantics, and resolver errors.
+// Updated for Resolvers map / AttributeCache (Phase 3)
+// FR-008: roles derived via derived_roles, not getRoles
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  Resolvers,
   Policy,
   TorideOptions,
   EvaluatorFn,
@@ -25,6 +25,7 @@ describe("conditional rules integration", () => {
     loadYaml = parserMod.loadYaml;
   });
 
+  // Uses derived_roles and resolvers for resource attributes
   const POLICY_YAML = `
 version: "1"
 actors:
@@ -33,18 +34,27 @@ actors:
       department: string
       level: number
       active: boolean
+      is_editor: boolean
+      is_viewer: boolean
+      is_admin: boolean
 resources:
   Document:
     roles: [editor, viewer, admin]
     permissions: [read, write, delete, publish]
-    relations:
-      org:
-        resource: Organization
-        cardinality: one
     grants:
       viewer: [read]
       editor: [read, write]
       admin: [all]
+    derived_roles:
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
     rules:
       - effect: permit
         roles: [editor]
@@ -69,37 +79,29 @@ resources:
       member: []
 `;
 
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-    related?: Record<string, ResourceRef | ResourceRef[]>;
-    attributes?: Record<string, Record<string, unknown>>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async (resource: ResourceRef, relationName: string) => {
-        const key = `${resource.type}:${resource.id}:${relationName}`;
-        return config.related?.[key] ?? [];
-      },
-      getAttributes: async (ref: ResourceRef) => {
+  function makeResolvers(attrs: Record<string, Record<string, unknown>>): Resolvers {
+    const typeSet = new Set<string>();
+    for (const key of Object.keys(attrs)) {
+      const ci = key.indexOf(":");
+      if (ci > 0) typeSet.add(key.substring(0, ci));
+    }
+    const resolvers: Resolvers = {};
+    for (const type of typeSet) {
+      resolvers[type] = async (ref) => {
         const key = `${ref.type}:${ref.id}`;
-        return config.attributes?.[key] ?? {};
-      },
-    };
+        return attrs[key] ?? {};
+      };
+    }
+    return resolvers;
   }
 
   // ─── Permit rule grants conditional access ──────────────────────────
 
   it("editor can publish when document is in review and level >= 3", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["editor"] },
-      attributes: { "Document:d1": { status: "review", locked: false, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "publish", resource)).toBe(true);
@@ -107,12 +109,9 @@ resources:
 
   it("editor cannot publish when level < 3", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["editor"] },
-      attributes: { "Document:d1": { status: "review", locked: false, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 2, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 2, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "publish", resource)).toBe(false);
@@ -120,12 +119,9 @@ resources:
 
   it("editor cannot publish when document is not in review", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["editor"] },
-      attributes: { "Document:d1": { status: "draft", locked: false, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { status: "draft", locked: false, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "publish", resource)).toBe(false);
@@ -135,12 +131,9 @@ resources:
 
   it("admin cannot delete locked document (forbid overrides grant)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["admin"] },
-      attributes: { "Document:d1": { locked: true, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { locked: true, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "delete", resource)).toBe(false);
@@ -150,12 +143,9 @@ resources:
 
   it("admin can delete unlocked document", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["admin"] },
-      attributes: { "Document:d1": { locked: false, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { locked: false, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "delete", resource)).toBe(true);
@@ -165,12 +155,9 @@ resources:
 
   it("archived document forbids write and publish", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["admin"] },
-      attributes: { "Document:d1": { locked: false, archived: true, status: "review" } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { locked: false, archived: true, status: "review" } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "write", resource)).toBe(false);
@@ -183,12 +170,9 @@ resources:
 
   it("viewer cannot publish even when conditions match (roles guard)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["viewer"] },
-      attributes: { "Document:d1": { status: "review", locked: false, archived: false } },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true } };
+    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_viewer: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "publish", resource)).toBe(false);
@@ -201,13 +185,18 @@ resources:
 version: "1"
 actors:
   User:
-    attributes: {}
+    attributes:
+      is_editor: boolean
 resources:
   Document:
     roles: [editor]
     permissions: [write]
     grants:
       editor: [write]
+    derived_roles:
+      - role: editor
+        when:
+          "$actor.is_editor": true
     rules:
       - effect: forbid
         permissions: [write]
@@ -217,16 +206,13 @@ resources:
 `;
     const policy = await loadYaml(CUSTOM_POLICY);
     const isMaintenanceWindow: EvaluatorFn = async () => true;
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["editor"] },
-      attributes: { "Document:d1": { status: "active" } },
-    });
+    const resolvers = makeResolvers({ "Document:d1": { status: "active" } });
     const engine = createToride({
       policy,
-      resolver,
+      resolvers,
       customEvaluators: { isMaintenanceWindow },
     });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     expect(await engine.can(actor, "write", resource)).toBe(false);
@@ -236,20 +222,18 @@ resources:
 
   it("resolver error during condition evaluation denies access (fail-closed)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const failingResolver: RelationResolver = {
-      getRoles: async () => ["editor"],
-      getRelated: async () => [],
-      getAttributes: async () => { throw new Error("DB down"); },
+    const resolvers: Resolvers = {
+      Document: async () => { throw new Error("DB down"); },
     };
-    const engine = createToride({ policy, resolver: failingResolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true } };
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
-    // Even though editor has write via grants, condition evaluation failure -> deny-safe
-    // Actually, for grant-based permissions that don't depend on conditions, they should still work.
-    // But for rules that need getAttributes and it fails -> fail-closed
-    expect(await engine.can(actor, "write", resource)).toBe(true); // grants don't need conditions
-    expect(await engine.can(actor, "publish", resource)).toBe(false); // needs conditions -> fail-closed
+    // Grant-based permissions that don't depend on conditions still work
+    // (editor gets write via grants, no condition needed)
+    expect(await engine.can(actor, "write", resource)).toBe(true);
+    // But publish needs conditions -> resolver throws -> fail-closed
+    expect(await engine.can(actor, "publish", resource)).toBe(false);
   });
 
   // ─── Env passing through engine ─────────────────────────────────────
@@ -259,13 +243,18 @@ resources:
 version: "1"
 actors:
   User:
-    attributes: {}
+    attributes:
+      is_editor: boolean
 resources:
   Document:
     roles: [editor]
     permissions: [write]
     grants:
       editor: []
+    derived_roles:
+      - role: editor
+        when:
+          "$actor.is_editor": true
     rules:
       - effect: permit
         roles: [editor]
@@ -275,12 +264,8 @@ resources:
             includes: "advanced_editing"
 `;
     const policy = await loadYaml(ENV_POLICY);
-    const resolver = makeResolver({
-      roles: { "u1:Document:d1": ["editor"] },
-      attributes: { "Document:d1": {} },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = createToride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
     // Without env containing the flag, should deny
@@ -297,36 +282,26 @@ resources:
     })).toBe(false);
   });
 
-  // ─── ResolverCache integration: deduplicates resolver calls ─────────
+  // ─── AttributeCache integration: deduplicates resolver calls ─────────
 
   it("caches resolver calls within a single can() check", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    let getAttributesCallCount = 0;
-    const cachingResolver: RelationResolver = {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        const roles: Record<string, string[]> = { "u1:Document:d1": ["admin"] };
-        return roles[key] ?? [];
-      },
-      getRelated: async () => [],
-      getAttributes: async (ref: ResourceRef) => {
-        getAttributesCallCount++;
-        const key = `${ref.type}:${ref.id}`;
-        const attrs: Record<string, Record<string, unknown>> = {
-          "Document:d1": { locked: false, archived: false },
-        };
-        return attrs[key] ?? {};
+    let resolverCallCount = 0;
+    const resolvers: Resolvers = {
+      Document: async (ref) => {
+        resolverCallCount++;
+        return { locked: false, archived: false };
       },
     };
-    const engine = createToride({ policy, resolver: cachingResolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true } };
+    const engine = createToride({ policy, resolvers });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
-    // Multiple rules for "delete" will call getAttributes, but cache should deduplicate
-    getAttributesCallCount = 0;
+    // Multiple rules for "delete" will resolve attributes, but cache should deduplicate
+    resolverCallCount = 0;
     await engine.can(actor, "delete", resource);
-    // With cache, getAttributes for Document:d1 should be called at most once
-    expect(getAttributesCallCount).toBeLessThanOrEqual(1);
+    // With cache, resolver for Document:d1 should be called at most once
+    expect(resolverCallCount).toBeLessThanOrEqual(1);
   });
 
   // ─── Backward compatibility: policies without rules ─────────────────
@@ -336,20 +311,22 @@ resources:
 version: "1"
 actors:
   User:
-    attributes: {}
+    attributes:
+      is_editor: boolean
 resources:
   Task:
     roles: [editor]
     permissions: [read, write]
     grants:
       editor: [read, write]
+    derived_roles:
+      - role: editor
+        when:
+          "$actor.is_editor": true
 `;
     const policy = await loadYaml(SIMPLE_POLICY);
-    const resolver = makeResolver({
-      roles: { "u1:Task:t1": ["editor"] },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = createToride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "t1" };
 
     expect(await engine.can(actor, "read", resource)).toBe(true);

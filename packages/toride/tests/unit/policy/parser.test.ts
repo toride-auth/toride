@@ -116,12 +116,8 @@ resources:
     roles: [editor, viewer]
     permissions: [read, update]
     relations:
-      project:
-        resource: Project
-        cardinality: one
-      assignee:
-        resource: User
-        cardinality: one
+      project: Project
+      assignee: User
     grants:
       editor: [read, update]
       viewer: [read]
@@ -133,8 +129,8 @@ resources:
         from_relation: assignee
 `;
       const policy = await loadYaml(yaml);
-      expect(policy.resources.Task.relations!.project.resource).toBe("Project");
-      expect(policy.resources.Task.relations!.project.cardinality).toBe("one");
+      expect(policy.resources.Task.relations!.project).toBe("Project");
+      expect(policy.resources.Task.relations!.assignee).toBe("User");
       expect(policy.resources.Task.derived_roles).toHaveLength(2);
       expect(policy.resources.Task.derived_roles![0]).toEqual({
         role: "editor",

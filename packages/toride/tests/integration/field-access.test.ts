@@ -1,10 +1,11 @@
 // T092: Integration tests for field-level access scenarios
+// Updated for Resolvers map / AttributeCache (Phase 3)
+// FR-008: roles derived via derived_roles, not getRoles
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
   Policy,
   TorideOptions,
 } from "../../src/types.js";
@@ -37,14 +38,16 @@ describe("field-level access integration", () => {
     loadYaml = parserMod.loadYaml;
   });
 
-  // Checkpoint scenario from the plan:
-  // canField(actor, "read", Employee:42, "salary") returns correct results based on role
+  // Uses derived_roles to assign roles from actor attributes
   const POLICY_YAML = `
 version: "1"
 actors:
   User:
     attributes:
       department: string
+      is_viewer: boolean
+      is_manager: boolean
+      is_hr_admin: boolean
 resources:
   Employee:
     roles: [viewer, manager, hr_admin]
@@ -53,6 +56,16 @@ resources:
       viewer:   [read]
       manager:  [read, update]
       hr_admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: manager
+        when:
+          "$actor.is_manager": true
+      - role: hr_admin
+        when:
+          "$actor.is_hr_admin": true
     field_access:
       salary:      { read: [hr_admin, manager], update: [hr_admin] }
       ssn:         { read: [hr_admin] }
@@ -60,39 +73,15 @@ resources:
       name:        { read: [viewer, manager, hr_admin], update: [manager, hr_admin] }
 `;
 
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-    attributes?: Record<string, Record<string, unknown>>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async () => [],
-      getAttributes: async (ref: ResourceRef) => {
-        const key = `${ref.type}:${ref.id}`;
-        return config.attributes?.[key] ?? {};
-      },
-    };
-  }
-
   // Checkpoint: canField(actor, "read", Employee:42, "salary") returns correct results based on role
   it("checkpoint: canField returns correct results based on role for salary field", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: {
-        "alice:Employee:42": ["hr_admin"],
-        "bob:Employee:42": ["manager"],
-        "charlie:Employee:42": ["viewer"],
-      },
-    });
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const employee: ResourceRef = { type: "Employee", id: "42" };
 
-    const alice: ActorRef = { type: "User", id: "alice", attributes: {} };
-    const bob: ActorRef = { type: "User", id: "bob", attributes: {} };
-    const charlie: ActorRef = { type: "User", id: "charlie", attributes: {} };
+    const alice: ActorRef = { type: "User", id: "alice", attributes: { is_hr_admin: true } };
+    const bob: ActorRef = { type: "User", id: "bob", attributes: { is_manager: true } };
+    const charlie: ActorRef = { type: "User", id: "charlie", attributes: { is_viewer: true } };
     const nobody: ActorRef = { type: "User", id: "nobody", attributes: {} };
 
     // hr_admin can read salary
@@ -108,11 +97,8 @@ resources:
   // Checkpoint: Unlisted fields are unrestricted
   it("checkpoint: unlisted fields are unrestricted for actors with resource-level permission", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Employee:42": ["viewer"] },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = createToride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_viewer: true } };
     const resource: ResourceRef = { type: "Employee", id: "42" };
 
     // "email" not in field_access; viewer has "read" perm -> unrestricted
@@ -123,19 +109,12 @@ resources:
 
   it("permittedFields returns correct fields for each role", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: {
-        "alice:Employee:42": ["hr_admin"],
-        "bob:Employee:42": ["manager"],
-        "charlie:Employee:42": ["viewer"],
-      },
-    });
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const employee: ResourceRef = { type: "Employee", id: "42" };
 
-    const alice: ActorRef = { type: "User", id: "alice", attributes: {} };
-    const bob: ActorRef = { type: "User", id: "bob", attributes: {} };
-    const charlie: ActorRef = { type: "User", id: "charlie", attributes: {} };
+    const alice: ActorRef = { type: "User", id: "alice", attributes: { is_hr_admin: true } };
+    const bob: ActorRef = { type: "User", id: "bob", attributes: { is_manager: true } };
+    const charlie: ActorRef = { type: "User", id: "charlie", attributes: { is_viewer: true } };
 
     // hr_admin can read all declared fields
     const aliceFields = await engine.permittedFields(alice, "read", employee);
@@ -169,8 +148,7 @@ resources:
       - role: manager
         actor_type: User
         when:
-          actor.department:
-            eq: "engineering"
+          "$actor.department": "engineering"
     field_access:
       salary:      { read: [hr_admin, manager], update: [hr_admin] }
       ssn:         { read: [hr_admin] }
@@ -179,8 +157,7 @@ resources:
 `;
     const policy = await loadYaml(derivedRoleYaml);
     // Actor with department=engineering gets derived "manager" role (no direct roles)
-    const resolver = makeResolver({ roles: {} });
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -199,8 +176,7 @@ resources:
 
   it("canField and can are consistent: no field access without resource permission", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const resource: ResourceRef = { type: "Employee", id: "42" };
 
@@ -213,11 +189,8 @@ resources:
 
   it("handles multiple roles on the same actor", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Employee:42": ["viewer", "manager"] },
-    });
-    const engine = createToride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = createToride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_viewer: true, is_manager: true } };
     const resource: ResourceRef = { type: "Employee", id: "42" };
 
     // Combined viewer + manager: can read salary (via manager)

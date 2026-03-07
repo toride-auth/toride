@@ -140,7 +140,7 @@ describe("buildConstraints", () => {
             roles: ["viewer", "editor"],
             permissions: ["read", "update"],
             relations: {
-              project: { resource: "Project", cardinality: "one" as const },
+              project: "Project",
             },
             grants: { editor: ["read", "update"] },
             derived_roles: [

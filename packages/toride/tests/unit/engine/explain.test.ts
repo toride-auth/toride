@@ -1,10 +1,10 @@
 // T065: Unit tests for explain() output structure
+// Updated for Resolvers map / AttributeCache (Phase 3)
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
   Policy,
   TorideOptions,
   ExplainResult,
@@ -32,12 +32,15 @@ describe("explain() output structure", () => {
     loadYaml = parserMod.loadYaml;
   });
 
+  // Uses derived_roles to assign roles from actor attributes
   const POLICY_YAML = `
 version: "1"
 actors:
   User:
     attributes:
       isSuperAdmin: boolean
+      is_editor: boolean
+      is_viewer: boolean
 resources:
   Task:
     roles: [viewer, editor, admin]
@@ -49,6 +52,12 @@ resources:
     derived_roles:
       - role: admin
         from_global_role: superadmin
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
 global_roles:
   superadmin:
     actor_type: User
@@ -56,24 +65,10 @@ global_roles:
       "$actor.isSuperAdmin": true
 `;
 
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async () => [],
-      getAttributes: async () => ({}),
-    };
-  }
-
   it("returns ExplainResult with correct shape", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const result = await engine.explain(actor, "update", resource);
@@ -85,23 +80,23 @@ global_roles:
     expect(result).toHaveProperty("finalDecision");
   });
 
-  it("shows direct roles in resolvedRoles", async () => {
+  it("shows derived roles in resolvedRoles (FR-008: direct always empty)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const result = await engine.explain(actor, "update", resource);
 
-    expect(result.resolvedRoles.direct).toContain("editor");
-    expect(result.resolvedRoles.derived).toEqual([]);
+    // FR-008: direct roles always empty, roles come from derived
+    expect(result.resolvedRoles.direct).toEqual([]);
+    expect(result.resolvedRoles.derived.length).toBeGreaterThan(0);
+    expect(result.resolvedRoles.derived.some(d => d.role === "editor")).toBe(true);
   });
 
   it("shows derived roles with derivation paths", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -124,9 +119,8 @@ global_roles:
 
   it("shows grantedPermissions from role grants", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const result = await engine.explain(actor, "update", resource);
@@ -138,9 +132,8 @@ global_roles:
 
   it("provides human-readable finalDecision for allowed action", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const result = await engine.explain(actor, "update", resource);
@@ -151,9 +144,8 @@ global_roles:
 
   it("provides human-readable finalDecision for denied action", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["viewer"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_viewer: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const result = await engine.explain(actor, "delete", resource);
@@ -164,8 +156,7 @@ global_roles:
 
   it("shows unknown resource type in finalDecision", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const resource: ResourceRef = { type: "Unknown", id: "1" };
 
@@ -177,9 +168,8 @@ global_roles:
 
   it("explain() and can() agree on the decision", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Task:42": ["editor"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true } };
     const resource: ResourceRef = { type: "Task", id: "42" };
 
     const explainResult = await engine.explain(actor, "update", resource);

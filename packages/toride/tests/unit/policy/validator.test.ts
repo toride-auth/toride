@@ -117,7 +117,7 @@ describe("cross-reference validator", () => {
           permissions: ["read"],
           grants: { admin: ["read"] },
           relations: {
-            project: { resource: "Project", cardinality: "one" as const },
+            project: "Project",
           },
           derived_roles: [
             { role: "admin", from_role: "admin", on_relation: "org" },
@@ -147,7 +147,7 @@ describe("cross-reference validator", () => {
           permissions: ["read"],
           grants: { viewer: ["read"] },
           relations: {
-            project: { resource: "Project", cardinality: "one" as const },
+            project: "Project",
           },
           derived_roles: [
             { role: "admin", from_role: "admin", on_relation: "project" },
@@ -311,7 +311,7 @@ describe("cross-reference validator", () => {
           permissions: ["read"],
           grants: { viewer: ["read"] },
           relations: {
-            project: { resource: "Project", cardinality: "one" as const },
+            project: "Project",
           },
         },
       },
@@ -353,8 +353,8 @@ describe("cross-reference validator", () => {
           permissions: ["read"],
           grants: { editor: ["read"] },
           relations: {
-            project: { resource: "Project", cardinality: "one" as const },
-            assignee: { resource: "User", cardinality: "one" as const },
+            project: "Project",
+            assignee: "User",
           },
           derived_roles: [
             {
@@ -405,8 +405,8 @@ describe("cross-reference validator", () => {
           roles: ["editor", "viewer"],
           permissions: ["read", "update", "delete"],
           relations: {
-            project: { resource: "Project", cardinality: "one" },
-            assignee: { resource: "User", cardinality: "one" },
+            project: "Project",
+            assignee: "User",
           },
           grants: {
             editor: ["read", "update", "delete"],

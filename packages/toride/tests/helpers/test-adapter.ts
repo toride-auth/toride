@@ -2,13 +2,14 @@
 
 import type {
   ActorRef,
-  RelationResolver,
+  Resolvers,
   ResourceRef,
 } from "../../src/types.js";
 import type {
   ConstraintAdapter,
   LeafConstraint,
 } from "../../src/partial/constraint-types.js";
+import { AttributeCache } from "../../src/evaluation/cache.js";
 
 /**
  * Create a string-based constraint adapter for testing translation output.
@@ -53,25 +54,25 @@ export function makeStringAdapter(): ConstraintAdapter<string> {
 }
 
 /**
- * Create a mock relation resolver for tests.
+ * Create a mock AttributeCache for tests.
+ * Builds a Resolvers map from the provided attributes and wraps it in an AttributeCache.
  */
 export function makeResolver(opts: {
-  roles?: Record<string, string[]>;
-  related?: Record<string, Record<string, ResourceRef | ResourceRef[]>>;
   attributes?: Record<string, Record<string, unknown>>;
-} = {}): RelationResolver {
-  return {
-    getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-      const key = `${actor.id}:${resource.type}:${resource.id}`;
-      return opts.roles?.[key] ?? [];
-    },
-    getRelated: async (resource: ResourceRef, relation: string) => {
-      const key = `${resource.type}:${resource.id}`;
-      return opts.related?.[key]?.[relation] ?? [];
-    },
-    getAttributes: async (ref: ResourceRef) => {
+} = {}): AttributeCache {
+  const typeSet = new Set<string>();
+  if (opts.attributes) {
+    for (const key of Object.keys(opts.attributes)) {
+      const ci = key.indexOf(":");
+      if (ci > 0) typeSet.add(key.substring(0, ci));
+    }
+  }
+  const resolvers: Resolvers = {};
+  for (const type of typeSet) {
+    resolvers[type] = async (ref: ResourceRef) => {
       const key = `${ref.type}:${ref.id}`;
       return opts.attributes?.[key] ?? {};
-    },
-  };
+    };
+  }
+  return new AttributeCache(resolvers);
 }

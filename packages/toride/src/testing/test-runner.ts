@@ -24,8 +24,8 @@ export async function runTestCases(
   const results: TestResult[] = [];
 
   for (const tc of tests) {
-    const resolver = createMockResolver(tc);
-    const engine = new Toride({ policy, resolver });
+    const resolvers = createMockResolver(tc);
+    const engine = new Toride({ policy, resolvers });
 
     const allowed = await engine.can(tc.actor, tc.action, tc.resource);
     const actual: "allow" | "deny" = allowed ? "allow" : "deny";

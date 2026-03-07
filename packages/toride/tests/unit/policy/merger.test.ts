@@ -316,7 +316,7 @@ describe("mergePolicies", () => {
           roles: ["viewer"],
           permissions: ["read"],
           relations: {
-            project: { resource: "Project", cardinality: "one" },
+            project: "Project",
           },
         },
       },
@@ -327,7 +327,7 @@ describe("mergePolicies", () => {
           roles: ["editor"],
           permissions: ["update"],
           relations: {
-            assignee: { resource: "User", cardinality: "one" },
+            assignee: "User",
           },
         },
       },
@@ -411,37 +411,39 @@ describe("mergePolicies", () => {
 
 describe("setPolicy", () => {
   it("swaps the policy atomically", async () => {
+    // Policy1: Task with viewer role derived from actor attribute
     const policy1 = makePolicy({
-      actors: { User: { attributes: {} } },
+      actors: { User: { attributes: { is_viewer: "boolean", is_admin: "boolean" } } },
       resources: {
         Task: {
           roles: ["viewer"],
           permissions: ["read"],
           grants: { viewer: ["read"] },
+          derived_roles: [
+            { role: "viewer", when: { "$actor.is_viewer": true } },
+          ],
         },
       },
     });
+    // Policy2: Project with admin role derived from actor attribute
     const policy2 = makePolicy({
-      actors: { User: { attributes: {} } },
+      actors: { User: { attributes: { is_viewer: "boolean", is_admin: "boolean" } } },
       resources: {
         Project: {
           roles: ["admin"],
           permissions: ["delete"],
           grants: { admin: ["all"] },
+          derived_roles: [
+            { role: "admin", when: { "$actor.is_admin": true } },
+          ],
         },
       },
     });
 
-    const resolver = {
-      getRoles: async () => ["viewer"],
-      getRelated: async () => ({ type: "X", id: "1" }),
-      getAttributes: async () => ({}),
-    };
-
-    const engine = new Toride({ policy: policy1, resolver });
-    // Should find Task
+    const engine = new Toride({ policy: policy1 });
+    // Should find Task with viewer role
     expect(await engine.can(
-      { type: "User", id: "1", attributes: {} },
+      { type: "User", id: "1", attributes: { is_viewer: true } },
       "read",
       { type: "Task", id: "1" },
     )).toBe(true);
@@ -450,19 +452,15 @@ describe("setPolicy", () => {
     engine.setPolicy(policy2);
 
     expect(await engine.can(
-      { type: "User", id: "1", attributes: {} },
+      { type: "User", id: "1", attributes: { is_viewer: true } },
       "read",
       { type: "Task", id: "1" },
     )).toBe(false);
 
-    // Now resolver returns "admin" for Project
-    const engine2 = new Toride({ policy: policy2, resolver: {
-      ...resolver,
-      getRoles: async () => ["admin"],
-    }});
-    engine2.setPolicy(policy2);
+    // Now actor with is_admin gets admin on Project
+    const engine2 = new Toride({ policy: policy2 });
     expect(await engine2.can(
-      { type: "User", id: "1", attributes: {} },
+      { type: "User", id: "1", attributes: { is_admin: true } },
       "delete",
       { type: "Project", id: "1" },
     )).toBe(true);

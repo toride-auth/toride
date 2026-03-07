@@ -1,10 +1,10 @@
 // T079: Unit tests for snapshot()
+// Updated for Resolvers map / AttributeCache (Phase 3)
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
   Policy,
   TorideOptions,
 } from "../../../src/types.js";
@@ -30,12 +30,18 @@ describe("snapshot()", () => {
     loadYaml = parserMod.loadYaml;
   });
 
+  // Uses derived_roles to assign roles from actor attributes
   const POLICY_YAML = `
 version: "1"
 actors:
   User:
     attributes:
       department: string
+      is_viewer: boolean
+      is_editor: boolean
+      is_admin: boolean
+      is_member: boolean
+      is_owner: boolean
 resources:
   Document:
     roles: [viewer, editor, admin]
@@ -44,32 +50,35 @@ resources:
       viewer: [read]
       editor: [read, update]
       admin: [all]
+    derived_roles:
+      - role: viewer
+        when:
+          "$actor.is_viewer": true
+      - role: editor
+        when:
+          "$actor.is_editor": true
+      - role: admin
+        when:
+          "$actor.is_admin": true
   Project:
     roles: [member, owner]
     permissions: [view, edit, archive]
     grants:
       member: [view]
       owner: [all]
+    derived_roles:
+      - role: member
+        when:
+          "$actor.is_member": true
+      - role: owner
+        when:
+          "$actor.is_owner": true
 `;
-
-  function makeResolver(config: {
-    roles?: Record<string, string[]>;
-  }): RelationResolver {
-    return {
-      getRoles: async (actor: ActorRef, resource: ResourceRef) => {
-        const key = `${actor.id}:${resource.type}:${resource.id}`;
-        return config.roles?.[key] ?? [];
-      },
-      getRelated: async () => [],
-      getAttributes: async () => ({}),
-    };
-  }
 
   it("returns PermissionSnapshot with correct keys (Type:id format)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({ roles: { "u1:Document:doc1": ["viewer"] } });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_viewer: true } };
 
     const snap = await engine.snapshot(actor, [
       { type: "Document", id: "doc1" },
@@ -81,14 +90,8 @@ resources:
 
   it("returns correct actions for multiple resources", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: {
-        "u1:Document:doc1": ["editor"],
-        "u1:Project:p1": ["owner"],
-      },
-    });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_editor: true, is_owner: true } };
 
     const snap = await engine.snapshot(actor, [
       { type: "Document", id: "doc1" },
@@ -105,8 +108,7 @@ resources:
 
   it("returns empty array for resources with no permissions", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
     const snap = await engine.snapshot(actor, [
@@ -118,8 +120,7 @@ resources:
 
   it("returns empty snapshot for empty resource list", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
     const snap = await engine.snapshot(actor, []);
@@ -129,8 +130,7 @@ resources:
 
   it("returns empty array for unknown resource types", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({});
-    const engine = new Toride({ policy, resolver });
+    const engine = new Toride({ policy });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
     const snap = await engine.snapshot(actor, [
@@ -142,11 +142,8 @@ resources:
 
   it("handles mixed known and unknown resource types", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolver = makeResolver({
-      roles: { "u1:Document:doc1": ["viewer"] },
-    });
-    const engine = new Toride({ policy, resolver });
-    const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
+    const engine = new Toride({ policy });
+    const actor: ActorRef = { type: "User", id: "u1", attributes: { is_viewer: true } };
 
     const snap = await engine.snapshot(actor, [
       { type: "Document", id: "doc1" },

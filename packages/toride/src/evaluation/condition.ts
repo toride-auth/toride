@@ -6,7 +6,7 @@
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  // RelationResolver removed — replaced by AttributeCache
   ConditionExpression,
   ConditionOperator,
   ConditionValue,
@@ -14,6 +14,7 @@ import type {
   Policy,
   EvaluatorFn,
 } from "../types.js";
+import type { AttributeCache } from "./cache.js";
 
 /** Default maximum depth for nested property resolution. */
 const DEFAULT_MAX_CONDITION_DEPTH = 3;
@@ -48,7 +49,7 @@ export async function evaluateCondition(
   condition: ConditionExpression,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
@@ -66,7 +67,7 @@ export async function evaluateCondition(
     }
     const items = (condition as { any: ConditionExpression[] }).any;
     for (const item of items) {
-      if (await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options, combinatorDepth + 1)) {
+      if (await evaluateCondition(item, actor, resource, cache, env, resourceBlock, policy, options, combinatorDepth + 1)) {
         return true;
       }
     }
@@ -80,7 +81,7 @@ export async function evaluateCondition(
     }
     const items = (condition as { all: ConditionExpression[] }).all;
     for (const item of items) {
-      if (!(await evaluateCondition(item, actor, resource, resolver, env, resourceBlock, policy, options, combinatorDepth + 1))) {
+      if (!(await evaluateCondition(item, actor, resource, cache, env, resourceBlock, policy, options, combinatorDepth + 1))) {
         return false;
       }
     }
@@ -95,7 +96,7 @@ export async function evaluateCondition(
       conditionValue,
       actor,
       resource,
-      resolver,
+      cache,
       env,
       resourceBlock,
       policy,
@@ -116,7 +117,7 @@ async function evaluatePair(
   conditionValue: ConditionValue,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
@@ -128,7 +129,7 @@ async function evaluatePair(
     key,
     actor,
     resource,
-    resolver,
+    cache,
     env,
     resourceBlock,
     policy,
@@ -142,7 +143,7 @@ async function evaluatePair(
       conditionValue,
       actor,
       resource,
-      resolver,
+      cache,
       env,
       resourceBlock,
       policy,
@@ -156,7 +157,7 @@ async function evaluatePair(
     conditionValue,
     actor,
     resource,
-    resolver,
+    cache,
     env,
     resourceBlock,
     policy,
@@ -182,7 +183,7 @@ async function resolveValue(
   path: string,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
@@ -198,7 +199,7 @@ async function resolveValue(
     return resolveResourcePath(
       attrPath,
       resource,
-      resolver,
+      cache,
       resourceBlock,
       policy,
       maxDepth,
@@ -222,7 +223,7 @@ async function resolveValue(
 async function resolveResourcePath(
   path: string,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   resourceBlock: ResourceBlock,
   policy: Policy,
   depthRemaining: number,
@@ -230,9 +231,9 @@ async function resolveResourcePath(
   const parts = path.split(".");
 
   if (parts.length === 1) {
-    // Simple attribute lookup
+    // Simple attribute lookup via cache (merges inline + resolver)
     try {
-      const attrs = await resolver.getAttributes(resource);
+      const attrs = await cache.resolve(resource);
       const val = attrs[parts[0]];
       return val === undefined ? UNDEFINED_SENTINEL : val;
     } catch {
@@ -253,7 +254,7 @@ async function resolveResourcePath(
   if (!relationDef) {
     // Not a relation - might be a nested attribute object
     try {
-      const attrs = await resolver.getAttributes(resource);
+      const attrs = await cache.resolve(resource);
       const val = getNestedAttribute(attrs, path);
       return val;
     } catch {
@@ -261,55 +262,37 @@ async function resolveResourcePath(
     }
   }
 
-  // Resolve the related resource(s)
-  let relatedRefs: ResourceRef[];
+  // Resolve the relation target from resource attributes (via cache)
+  // Relation traversal via attributes — deferred full implementation to US3
   try {
-    const result = await resolver.getRelated(resource, relationName);
-    relatedRefs = Array.isArray(result) ? result : result ? [result] : [];
-  } catch {
-    return UNDEFINED_SENTINEL;
-  }
+    const attrs = await cache.resolve(resource);
+    const relValue = attrs[relationName];
+    if (!relValue || typeof relValue !== "object" || relValue === null) {
+      return UNDEFINED_SENTINEL;
+    }
 
-  if (relatedRefs.length === 0) {
-    return UNDEFINED_SENTINEL;
-  }
-
-  // Get the resource block for the related type
-  const relatedType = relatedRefs[0].type;
-  const relatedBlock = policy.resources[relatedType] ?? {
-    roles: [],
-    permissions: [],
-  };
-
-  if (relationDef.cardinality === "many") {
-    // T053: Cardinality:many -> collect all values (ANY semantics applied at operator level)
-    const values: unknown[] = [];
-    for (const ref of relatedRefs) {
-      const refBlock = policy.resources[ref.type] ?? { roles: [], permissions: [] };
-      const val = await resolveResourcePath(
+    // Check if it's a ResourceRef-shaped value
+    if ("type" in relValue && "id" in relValue) {
+      const relatedRef = relValue as ResourceRef;
+      const relatedBlock = policy.resources[relatedRef.type] ?? {
+        roles: [],
+        permissions: [],
+      };
+      return resolveResourcePath(
         remainingPath,
-        ref,
-        resolver,
-        refBlock,
+        relatedRef,
+        cache,
+        relatedBlock,
         policy,
         depthRemaining - 1,
       );
-      if (val !== UNDEFINED_SENTINEL) {
-        values.push(val);
-      }
     }
-    return values.length > 0 ? values : UNDEFINED_SENTINEL;
-  }
 
-  // Cardinality:one -> resolve on first ref
-  return resolveResourcePath(
-    remainingPath,
-    relatedRefs[0],
-    resolver,
-    relatedBlock,
-    policy,
-    depthRemaining - 1,
-  );
+    // Array of ResourceRefs (many relations) — deferred to US3
+    return UNDEFINED_SENTINEL;
+  } catch {
+    return UNDEFINED_SENTINEL;
+  }
 }
 
 /**
@@ -336,14 +319,14 @@ async function resolveRightValue(
   value: ConditionValue,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
   maxDepth: number,
 ): Promise<unknown> {
   if (typeof value === "string" && isCrossReference(value)) {
-    return resolveValue(value, actor, resource, resolver, env, resourceBlock, policy, maxDepth);
+    return resolveValue(value, actor, resource, cache, env, resourceBlock, policy, maxDepth);
   }
   return value;
 }
@@ -376,7 +359,7 @@ async function evaluateOperator(
   operator: ConditionOperator,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
@@ -409,7 +392,7 @@ async function evaluateOperator(
     opValue as ConditionValue,
     actor,
     resource,
-    resolver,
+    cache,
     env,
     resourceBlock,
     policy,

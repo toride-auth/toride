@@ -1,10 +1,10 @@
 // T056: Integration tests for end-to-end partial evaluation
+// Updated for Resolvers map / AttributeCache (Phase 3)
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
   Policy,
   TorideOptions,
 } from "../../src/types.js";
@@ -54,9 +54,7 @@ resources:
     roles: [viewer, editor, admin]
     permissions: [read, update, delete, create_task]
     relations:
-      org:
-        resource: Organization
-        cardinality: one
+      org: Organization
     grants:
       viewer: [read]
       editor: [read, update, create_task]
@@ -71,12 +69,8 @@ resources:
     roles: [viewer, editor]
     permissions: [read, update, delete]
     relations:
-      project:
-        resource: Project
-        cardinality: one
-      assignee:
-        resource: User
-        cardinality: one
+      project: Project
+      assignee: User
     grants:
       viewer: [read]
       editor: [read, update]
@@ -101,8 +95,8 @@ resources:
 
   it("returns unrestricted for superadmin", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const cache = makeResolver();
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "admin1",
@@ -118,8 +112,7 @@ resources:
 
   it("returns forbidden for actor with no access paths", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "nobody",
@@ -135,8 +128,7 @@ resources:
 
   it("produces relation -> has_role structure for relation-derived roles", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -181,8 +173,7 @@ resources:
           $resource.department: $actor.department
 `;
     const policy = await loadYaml(policyYaml);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -230,8 +221,7 @@ resources:
           $resource.deleted: true
 `;
     const policy = await loadYaml(policyYaml);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const actor: ActorRef = {
       type: "User",
       id: "u1",
@@ -277,8 +267,7 @@ resources:
           $resource.archived: true
 `;
     const policy = await loadYaml(policyYaml);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const adapter = makeStringAdapter();
     const actor: ActorRef = {
       type: "User",
@@ -333,8 +322,7 @@ resources:
             custom: businessHours
 `;
     const policy = await loadYaml(policyYaml);
-    const resolver = makeResolver();
-    const engine = createToride({ policy, resolver });
+    const engine = createToride({ policy });
     const adapter = makeStringAdapter();
     const actor: ActorRef = {
       type: "User",

@@ -1,21 +1,23 @@
 // T034: Unit tests for cycle detection and depth limit enforcement
+// Updated for AttributeCache (Phase 3)
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  Resolvers,
   Policy,
   ResourceBlock,
   ResolvedRolesDetail,
 } from "../../../src/types.js";
 import { CycleError, DepthLimitError } from "../../../src/types.js";
+import { AttributeCache } from "../../../src/evaluation/cache.js";
 
 describe("cycle detection and depth limits", () => {
   let resolveRoles: (
     actor: ActorRef,
     resource: ResourceRef,
-    resolver: RelationResolver,
+    cache: AttributeCache,
     resourceBlock: ResourceBlock,
     policy: Policy,
     options?: { maxDerivedRoleDepth?: number },
@@ -28,21 +30,20 @@ describe("cycle detection and depth limits", () => {
 
   const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
 
-  function makeResolver(overrides: {
-    roles?: Record<string, string[]>;
-    related?: Record<string, ResourceRef | ResourceRef[]>;
-  }): RelationResolver {
-    return {
-      getRoles: async (a: ActorRef, r: ResourceRef) => {
-        const key = `${a.type}:${a.id}:${r.type}:${r.id}`;
-        return overrides.roles?.[key] ?? [];
-      },
-      getRelated: async (r: ResourceRef, rel: string) => {
-        const key = `${r.type}:${r.id}:${rel}`;
-        return overrides.related?.[key] ?? [];
-      },
-      getAttributes: async () => ({}),
-    };
+  function makeCache(attrs: Record<string, Record<string, unknown>> = {}): AttributeCache {
+    const typeSet = new Set<string>();
+    for (const key of Object.keys(attrs)) {
+      const ci = key.indexOf(":");
+      if (ci > 0) typeSet.add(key.substring(0, ci));
+    }
+    const resolvers: Resolvers = {};
+    for (const type of typeSet) {
+      resolvers[type] = async (ref) => {
+        const key = `${ref.type}:${ref.id}`;
+        return attrs[key] ?? {};
+      };
+    }
+    return new AttributeCache(resolvers);
   }
 
   // ─── Cycle Detection ──────────────────────────────────────────────
@@ -59,7 +60,7 @@ describe("cycle detection and depth limits", () => {
             roles: ["admin"],
             permissions: ["read"],
             relations: {
-              parent: { resource: "ResourceB", cardinality: "one" },
+              parent: "ResourceB",
             },
             derived_roles: [
               { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -69,7 +70,7 @@ describe("cycle detection and depth limits", () => {
             roles: ["admin"],
             permissions: ["read"],
             relations: {
-              parent: { resource: "ResourceA", cardinality: "one" },
+              parent: "ResourceA",
             },
             derived_roles: [
               { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -78,18 +79,16 @@ describe("cycle detection and depth limits", () => {
         },
       };
 
-      const resolver = makeResolver({
-        related: {
-          "ResourceA:a1:parent": { type: "ResourceB", id: "b1" },
-          "ResourceB:b1:parent": { type: "ResourceA", id: "a1" },
-        },
+      const cache = makeCache({
+        "ResourceA:a1": { parent: { type: "ResourceB", id: "b1" } },
+        "ResourceB:b1": { parent: { type: "ResourceA", id: "a1" } },
       });
 
       const resourceA: ResourceRef = { type: "ResourceA", id: "a1" };
       const blockA = policy.resources["ResourceA"]!;
 
       await expect(
-        resolveRoles(actor, resourceA, resolver, blockA, policy),
+        resolveRoles(actor, resourceA, cache, blockA, policy),
       ).rejects.toThrow(CycleError);
     });
 
@@ -102,7 +101,7 @@ describe("cycle detection and depth limits", () => {
             roles: ["admin"],
             permissions: ["read"],
             relations: {
-              parent: { resource: "ResourceB", cardinality: "one" },
+              parent: "ResourceB",
             },
             derived_roles: [
               { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -112,7 +111,7 @@ describe("cycle detection and depth limits", () => {
             roles: ["admin"],
             permissions: ["read"],
             relations: {
-              parent: { resource: "ResourceA", cardinality: "one" },
+              parent: "ResourceA",
             },
             derived_roles: [
               { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -121,18 +120,16 @@ describe("cycle detection and depth limits", () => {
         },
       };
 
-      const resolver = makeResolver({
-        related: {
-          "ResourceA:a1:parent": { type: "ResourceB", id: "b1" },
-          "ResourceB:b1:parent": { type: "ResourceA", id: "a1" },
-        },
+      const cache = makeCache({
+        "ResourceA:a1": { parent: { type: "ResourceB", id: "b1" } },
+        "ResourceB:b1": { parent: { type: "ResourceA", id: "a1" } },
       });
 
       const resourceA: ResourceRef = { type: "ResourceA", id: "a1" };
       const blockA = policy.resources["ResourceA"]!;
 
       try {
-        await resolveRoles(actor, resourceA, resolver, blockA, policy);
+        await resolveRoles(actor, resourceA, cache, blockA, policy);
         expect.fail("Should have thrown CycleError");
       } catch (e) {
         expect(e).toBeInstanceOf(CycleError);
@@ -150,7 +147,7 @@ describe("cycle detection and depth limits", () => {
             roles: ["admin"],
             permissions: ["read"],
             relations: {
-              parent: { resource: "Folder", cardinality: "one" },
+              parent: "Folder",
             },
             derived_roles: [
               { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -160,17 +157,15 @@ describe("cycle detection and depth limits", () => {
       };
 
       // Folder f1 points to itself
-      const resolver = makeResolver({
-        related: {
-          "Folder:f1:parent": { type: "Folder", id: "f1" },
-        },
+      const cache = makeCache({
+        "Folder:f1": { parent: { type: "Folder", id: "f1" } },
       });
 
       const folderRef: ResourceRef = { type: "Folder", id: "f1" };
       const folderBlock = policy.resources["Folder"]!;
 
       await expect(
-        resolveRoles(actor, folderRef, resolver, folderBlock, policy),
+        resolveRoles(actor, folderRef, cache, folderBlock, policy),
       ).rejects.toThrow(CycleError);
     });
   });
@@ -180,9 +175,8 @@ describe("cycle detection and depth limits", () => {
   describe("depth limit", () => {
     it("throws DepthLimitError when chain exceeds default depth of 5", async () => {
       // Create a chain: Res0 -> Res1 -> Res2 -> Res3 -> Res4 -> Res5 -> Res6
-      // This requires 6 hops which exceeds the default depth of 5
       const resources: Record<string, ResourceBlock> = {};
-      const related: Record<string, ResourceRef> = {};
+      const attrs: Record<string, Record<string, unknown>> = {};
 
       for (let i = 0; i <= 6; i++) {
         const resName = `Res${i}`;
@@ -192,7 +186,7 @@ describe("cycle detection and depth limits", () => {
           ...(i < 6
             ? {
                 relations: {
-                  parent: { resource: `Res${i + 1}`, cardinality: "one" as const },
+                  parent: `Res${i + 1}`,
                 },
                 derived_roles: [
                   { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -201,7 +195,7 @@ describe("cycle detection and depth limits", () => {
             : {}),
         };
         if (i < 6) {
-          related[`Res${i}:r${i}:parent`] = { type: `Res${i + 1}`, id: `r${i + 1}` };
+          attrs[`Res${i}:r${i}`] = { parent: { type: `Res${i + 1}`, id: `r${i + 1}` } };
         }
       }
 
@@ -211,20 +205,20 @@ describe("cycle detection and depth limits", () => {
         resources,
       };
 
-      const resolver = makeResolver({ related });
+      const cache = makeCache(attrs);
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
       await expect(
-        resolveRoles(actor, startRef, resolver, startBlock, policy),
+        resolveRoles(actor, startRef, cache, startBlock, policy),
       ).rejects.toThrow(DepthLimitError);
     });
 
     it("succeeds when chain is within depth limit", async () => {
       // Create a chain of 3 hops: Res0 -> Res1 -> Res2 -> Res3
-      // Res3 has admin directly
+      // Res3 has admin derived from actor attribute
       const resources: Record<string, ResourceBlock> = {};
-      const related: Record<string, ResourceRef> = {};
+      const attrs: Record<string, Record<string, unknown>> = {};
 
       for (let i = 0; i <= 3; i++) {
         const resName = `Res${i}`;
@@ -234,41 +228,42 @@ describe("cycle detection and depth limits", () => {
           ...(i < 3
             ? {
                 relations: {
-                  parent: { resource: `Res${i + 1}`, cardinality: "one" as const },
+                  parent: `Res${i + 1}`,
                 },
                 derived_roles: [
                   { role: "admin", from_role: "admin", on_relation: "parent" },
                 ],
               }
-            : {}),
+            : {
+                derived_roles: [
+                  { role: "admin", when: { "$actor.is_admin": true } },
+                ],
+              }),
         };
         if (i < 3) {
-          related[`Res${i}:r${i}:parent`] = { type: `Res${i + 1}`, id: `r${i + 1}` };
+          attrs[`Res${i}:r${i}`] = { parent: { type: `Res${i + 1}`, id: `r${i + 1}` } };
         }
       }
 
       const policy: Policy = {
         version: "1",
-        actors: { User: { attributes: {} } },
+        actors: { User: { attributes: { is_admin: "boolean" } } },
         resources,
       };
 
-      // Actor has admin role on the leaf resource Res3
-      const resolver = makeResolver({
-        related,
-        roles: { "User:u1:Res3:r3": ["admin"] },
-      });
+      const actorWithFlag: ActorRef = { type: "User", id: "u1", attributes: { is_admin: true } };
+      const cache = makeCache(attrs);
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
-      const result = await resolveRoles(actor, startRef, resolver, startBlock, policy);
+      const result = await resolveRoles(actorWithFlag, startRef, cache, startBlock, policy);
       expect(result.derived.some(d => d.role === "admin")).toBe(true);
     });
 
     it("respects custom maxDerivedRoleDepth", async () => {
       // Chain of 3 hops, but with maxDerivedRoleDepth=2 should fail
       const resources: Record<string, ResourceBlock> = {};
-      const related: Record<string, ResourceRef> = {};
+      const attrs: Record<string, Record<string, unknown>> = {};
 
       for (let i = 0; i <= 3; i++) {
         const resName = `Res${i}`;
@@ -278,7 +273,7 @@ describe("cycle detection and depth limits", () => {
           ...(i < 3
             ? {
                 relations: {
-                  parent: { resource: `Res${i + 1}`, cardinality: "one" as const },
+                  parent: `Res${i + 1}`,
                 },
                 derived_roles: [
                   { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -287,7 +282,7 @@ describe("cycle detection and depth limits", () => {
             : {}),
         };
         if (i < 3) {
-          related[`Res${i}:r${i}:parent`] = { type: `Res${i + 1}`, id: `r${i + 1}` };
+          attrs[`Res${i}:r${i}`] = { parent: { type: `Res${i + 1}`, id: `r${i + 1}` } };
         }
       }
 
@@ -297,18 +292,18 @@ describe("cycle detection and depth limits", () => {
         resources,
       };
 
-      const resolver = makeResolver({ related });
+      const cache = makeCache(attrs);
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
       await expect(
-        resolveRoles(actor, startRef, resolver, startBlock, policy, { maxDerivedRoleDepth: 2 }),
+        resolveRoles(actor, startRef, cache, startBlock, policy, { maxDerivedRoleDepth: 2 }),
       ).rejects.toThrow(DepthLimitError);
     });
 
     it("DepthLimitError has correct limit and limitType", async () => {
       const resources: Record<string, ResourceBlock> = {};
-      const related: Record<string, ResourceRef> = {};
+      const attrs: Record<string, Record<string, unknown>> = {};
 
       for (let i = 0; i <= 6; i++) {
         const resName = `Res${i}`;
@@ -318,7 +313,7 @@ describe("cycle detection and depth limits", () => {
           ...(i < 6
             ? {
                 relations: {
-                  parent: { resource: `Res${i + 1}`, cardinality: "one" as const },
+                  parent: `Res${i + 1}`,
                 },
                 derived_roles: [
                   { role: "admin", from_role: "admin", on_relation: "parent" },
@@ -327,7 +322,7 @@ describe("cycle detection and depth limits", () => {
             : {}),
         };
         if (i < 6) {
-          related[`Res${i}:r${i}:parent`] = { type: `Res${i + 1}`, id: `r${i + 1}` };
+          attrs[`Res${i}:r${i}`] = { parent: { type: `Res${i + 1}`, id: `r${i + 1}` } };
         }
       }
 
@@ -337,12 +332,12 @@ describe("cycle detection and depth limits", () => {
         resources,
       };
 
-      const resolver = makeResolver({ related });
+      const cache = makeCache(attrs);
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
       try {
-        await resolveRoles(actor, startRef, resolver, startBlock, policy);
+        await resolveRoles(actor, startRef, cache, startBlock, policy);
         expect.fail("Should have thrown DepthLimitError");
       } catch (e) {
         expect(e).toBeInstanceOf(DepthLimitError);

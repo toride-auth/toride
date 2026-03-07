@@ -4,7 +4,7 @@
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  // RelationResolver removed — replaced by AttributeCache
   ResolvedRolesDetail,
   DerivedRoleTrace,
   Policy,
@@ -13,27 +13,24 @@ import type {
   ConditionExpression,
 } from "../types.js";
 import { CycleError, DepthLimitError } from "../types.js";
+import type { AttributeCache } from "./cache.js";
 
 /** Default maximum depth for derived role chain traversal. */
 const DEFAULT_MAX_DERIVED_ROLE_DEPTH = 5;
 
 /**
  * Resolve direct roles for an actor on a resource.
- * Only calls `resolver.getRoles()` — no derived role evaluation.
- * Fail-closed: if the resolver throws, returns empty roles (denial).
+ * FR-008: getRoles has been removed. Direct roles are always empty.
+ * All roles are now derived through derived_roles policy entries.
  */
 export async function resolveDirectRoles(
-  actor: ActorRef,
-  resource: ResourceRef,
-  resolver: RelationResolver,
+  _actor: ActorRef,
+  _resource: ResourceRef,
+  _cache: AttributeCache,
 ): Promise<ResolvedRolesDetail> {
-  try {
-    const direct = await resolver.getRoles(actor, resource);
-    return { direct, derived: [] };
-  } catch {
-    // Fail-closed: resolver error -> empty roles -> denial
-    return { direct: [], derived: [] };
-  }
+  // FR-008: No more getRoles — direct roles always empty.
+  // All role assignment happens through derived_roles.
+  return { direct: [], derived: [] };
 }
 
 /**
@@ -51,7 +48,7 @@ export async function resolveDirectRoles(
 export async function resolveRoles(
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   resourceBlock: ResourceBlock,
   policy: Policy,
   options?: { maxDerivedRoleDepth?: number },
@@ -59,13 +56,8 @@ export async function resolveRoles(
   const maxDepth =
     options?.maxDerivedRoleDepth ?? DEFAULT_MAX_DERIVED_ROLE_DEPTH;
 
-  // Step 1: Resolve direct roles (fail-closed)
-  let direct: string[];
-  try {
-    direct = await resolver.getRoles(actor, resource);
-  } catch {
-    direct = [];
-  }
+  // FR-008: No more getRoles — direct roles always empty.
+  const direct: string[] = [];
 
   // Step 2: Evaluate derived roles exhaustively
   const derived: DerivedRoleTrace[] = [];
@@ -81,7 +73,7 @@ export async function resolveRoles(
         entry,
         actor,
         resource,
-        resolver,
+        cache,
         resourceBlock,
         policy,
         maxDepth,
@@ -109,7 +101,7 @@ async function evaluateDerivedRole(
   entry: DerivedRoleEntry,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   resourceBlock: ResourceBlock,
   policy: Policy,
   depthRemaining: number,
@@ -127,7 +119,7 @@ async function evaluateDerivedRole(
       entry,
       actor,
       resource,
-      resolver,
+      cache,
       policy,
       depthRemaining,
       maxDepth,
@@ -137,7 +129,7 @@ async function evaluateDerivedRole(
 
   // Pattern 3: from_relation (identity check)
   if (entry.from_relation !== undefined) {
-    return evaluateRelationIdentity(entry, actor, resource, resolver);
+    return evaluateRelationIdentity(entry, actor, resource, cache);
   }
 
   // Pattern 4: actor_type + when
@@ -193,7 +185,7 @@ async function evaluateRelationRole(
   entry: DerivedRoleEntry,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   policy: Policy,
   depthRemaining: number,
   maxDepth: number,
@@ -211,19 +203,32 @@ async function evaluateRelationRole(
   const relationName = entry.on_relation!;
   const requiredRole = entry.from_role!;
 
-  // Resolve the relation target(s)
+  // Resolve the relation target from resource attributes (via cache)
+  // Full relation traversal via attributes is deferred to US3/US4.
+  // For now, we look up the relation field in attributes and check if it's a ResourceRef.
   let relatedRefs: ResourceRef[];
   try {
-    const result = await resolver.getRelated(resource, relationName);
-    relatedRefs = Array.isArray(result) ? result : result ? [result] : [];
+    const attrs = await cache.resolve(resource);
+    const relValue = attrs[relationName];
+    if (!relValue) return [];
+    if (Array.isArray(relValue)) {
+      relatedRefs = relValue.filter(
+        (r): r is ResourceRef =>
+          r != null && typeof r === "object" && "type" in r && "id" in r,
+      );
+    } else if (
+      typeof relValue === "object" &&
+      relValue !== null &&
+      "type" in relValue &&
+      "id" in relValue
+    ) {
+      relatedRefs = [relValue as ResourceRef];
+    } else {
+      return [];
+    }
   } catch {
     return []; // Fail-closed
   }
-
-  // Filter out empty refs
-  relatedRefs = relatedRefs.filter(
-    (r) => r && r.type !== undefined && r.id !== undefined,
-  );
 
   const traces: DerivedRoleTrace[] = [];
 
@@ -242,35 +247,22 @@ async function evaluateRelationRole(
     const branchVisited = new Set(visited);
     branchVisited.add(refKey);
 
-    // Check if the actor has the required role on the related resource
-    // First check direct roles
+    // FR-008: No direct roles. Check derived roles on the related resource.
     let hasRole = false;
-    try {
-      const roles = await resolver.getRoles(actor, relatedRef);
-      if (roles.includes(requiredRole)) {
+    const relatedBlock = policy.resources[relatedRef.type];
+    if (relatedBlock?.derived_roles?.length) {
+      const relatedResult = await resolveRolesRecursive(
+        actor,
+        relatedRef,
+        cache,
+        relatedBlock,
+        policy,
+        depthRemaining - 1,
+        maxDepth,
+        branchVisited,
+      );
+      if (relatedResult.derived.some((d) => d.role === requiredRole)) {
         hasRole = true;
-      }
-    } catch {
-      // Fail-closed: resolver error -> treat as no roles
-    }
-
-    // If not found directly, check derived roles on the related resource
-    if (!hasRole) {
-      const relatedBlock = policy.resources[relatedRef.type];
-      if (relatedBlock?.derived_roles?.length) {
-        const relatedResult = await resolveRolesRecursive(
-          actor,
-          relatedRef,
-          resolver,
-          relatedBlock,
-          policy,
-          depthRemaining - 1,
-          maxDepth,
-          branchVisited,
-        );
-        if (relatedResult.derived.some((d) => d.role === requiredRole)) {
-          hasRole = true;
-        }
       }
     }
 
@@ -292,7 +284,7 @@ async function evaluateRelationRole(
 async function resolveRolesRecursive(
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   resourceBlock: ResourceBlock,
   policy: Policy,
   depthRemaining: number,
@@ -307,12 +299,8 @@ async function resolveRolesRecursive(
     );
   }
 
-  let direct: string[];
-  try {
-    direct = await resolver.getRoles(actor, resource);
-  } catch {
-    direct = [];
-  }
+  // FR-008: No more getRoles — direct roles always empty.
+  const direct: string[] = [];
 
   const derived: DerivedRoleTrace[] = [];
   const derivedEntries = resourceBlock.derived_roles ?? [];
@@ -323,7 +311,7 @@ async function resolveRolesRecursive(
         entry,
         actor,
         resource,
-        resolver,
+        cache,
         resourceBlock,
         policy,
         depthRemaining,
@@ -352,14 +340,31 @@ async function evaluateRelationIdentity(
   entry: DerivedRoleEntry,
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
 ): Promise<DerivedRoleTrace[]> {
   const relationName = entry.from_relation!;
 
+  // Resolve the relation target from resource attributes (via cache)
   let relatedRefs: ResourceRef[];
   try {
-    const result = await resolver.getRelated(resource, relationName);
-    relatedRefs = Array.isArray(result) ? result : result ? [result] : [];
+    const attrs = await cache.resolve(resource);
+    const relValue = attrs[relationName];
+    if (!relValue) return [];
+    if (Array.isArray(relValue)) {
+      relatedRefs = relValue.filter(
+        (r): r is ResourceRef =>
+          r != null && typeof r === "object" && "type" in r && "id" in r,
+      );
+    } else if (
+      typeof relValue === "object" &&
+      relValue !== null &&
+      "type" in relValue &&
+      "id" in relValue
+    ) {
+      relatedRefs = [relValue as ResourceRef];
+    } else {
+      return [];
+    }
   } catch {
     return []; // Fail-closed
   }

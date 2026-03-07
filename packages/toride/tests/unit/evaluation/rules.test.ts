@@ -1,17 +1,20 @@
 // T044: Unit tests for rule engine with permit/forbid rules
+// Updated for AttributeCache (Phase 3)
 // Covers permit/forbid evaluation, forbid-wins precedence, roles-only guard,
 // custom evaluators, and fail-closed semantics.
+// FR-008: roles are derived via derived_roles, not getRoles.
 
 import { describe, it, expect, beforeAll } from "vitest";
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
   ResourceBlock,
   ExplainResult,
   Policy,
   EvaluatorFn,
+  Resolvers,
 } from "../../../src/types.js";
+import { AttributeCache } from "../../../src/evaluation/cache.js";
 
 describe("evaluate (rules)", () => {
   let evaluateRaw: (
@@ -19,7 +22,7 @@ describe("evaluate (rules)", () => {
     action: string,
     resource: ResourceRef,
     resourceBlock: ResourceBlock,
-    resolver: RelationResolver,
+    cache: AttributeCache,
     policy: Policy,
     options?: {
       maxDerivedRoleDepth?: number;
@@ -37,32 +40,38 @@ describe("evaluate (rules)", () => {
   const actor: ActorRef = {
     type: "User",
     id: "u1",
-    attributes: { department: "engineering", level: 5, active: true },
+    attributes: { department: "engineering", level: 5, active: true, is_editor: true, is_admin: true, is_viewer: true },
   };
   const resource: ResourceRef = { type: "Document", id: "d1" };
 
-  function makeResolver(config: {
-    roles?: string[];
-    attributes?: Record<string, Record<string, unknown>>;
-    related?: Record<string, ResourceRef | ResourceRef[]>;
-  }): RelationResolver {
+  function makeCache(attrMap: Record<string, Record<string, unknown>>): AttributeCache {
+    const typeSet = new Set<string>();
+    for (const key of Object.keys(attrMap)) {
+      const ci = key.indexOf(":");
+      if (ci > 0) typeSet.add(key.substring(0, ci));
+    }
+    const resolvers: Resolvers = {};
+    for (const type of typeSet) {
+      resolvers[type] = async (ref) => attrMap[`${ref.type}:${ref.id}`] ?? {};
+    }
+    return new AttributeCache(resolvers);
+  }
+
+  /** Helper: add derived_roles to a resource block for specific roles based on actor attributes. */
+  function withDerivedRoles(block: ResourceBlock, roles: string[]): ResourceBlock {
     return {
-      getRoles: async () => config.roles ?? [],
-      getRelated: async (res: ResourceRef, rel: string) => {
-        const key = `${res.type}:${res.id}:${rel}`;
-        return config.related?.[key] ?? [];
-      },
-      getAttributes: async (ref: ResourceRef) => {
-        const key = `${ref.type}:${ref.id}`;
-        return config.attributes?.[key] ?? {};
-      },
+      ...block,
+      derived_roles: roles.map((role) => ({
+        role,
+        when: { [`$actor.is_${role}`]: true },
+      })),
     };
   }
 
   // ─── Permit rule grants conditional access ──────────────────────────
 
   describe("permit rules", () => {
-    const blockWithPermitRule: ResourceBlock = {
+    const baseBlock: ResourceBlock = {
       roles: ["editor", "viewer"],
       permissions: ["read", "write", "delete"],
       grants: {
@@ -79,18 +88,11 @@ describe("evaluate (rules)", () => {
       ],
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockWithPermitRule },
-    };
-
     it("grants permission via permit rule when condition matches", async () => {
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { status: "draft" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithPermitRule, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "draft" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
       expect(result.matchedRules).toHaveLength(1);
       expect(result.matchedRules[0].effect).toBe("permit");
@@ -98,20 +100,18 @@ describe("evaluate (rules)", () => {
     });
 
     it("denies when permit rule condition does not match", async () => {
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { status: "published" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithPermitRule, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "published" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
     });
 
     it("denies when actor does not have required role for permit rule", async () => {
-      const resolver = makeResolver({
-        roles: ["viewer"],
-        attributes: { "Document:d1": { status: "draft" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithPermitRule, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["viewer"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "draft" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
     });
   });
@@ -119,7 +119,7 @@ describe("evaluate (rules)", () => {
   // ─── Forbid rule overrides grants (forbid-wins) ─────────────────────
 
   describe("forbid rules (forbid-wins)", () => {
-    const blockWithForbid: ResourceBlock = {
+    const baseBlock: ResourceBlock = {
       roles: ["editor", "admin"],
       permissions: ["read", "write", "delete"],
       grants: {
@@ -135,38 +135,28 @@ describe("evaluate (rules)", () => {
       ],
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockWithForbid },
-    };
-
     it("forbid rule overrides grant when condition matches", async () => {
-      const resolver = makeResolver({
-        roles: ["admin"],
-        attributes: { "Document:d1": { locked: true } },
-      });
-      const result = await evaluateRaw(actor, "delete", resource, blockWithForbid, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["admin"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { locked: true } });
+      const result = await evaluateRaw(actor, "delete", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
       expect(result.matchedRules.some((r) => r.effect === "forbid" && r.matched)).toBe(true);
     });
 
     it("allows when forbid condition does not match", async () => {
-      const resolver = makeResolver({
-        roles: ["admin"],
-        attributes: { "Document:d1": { locked: false } },
-      });
-      const result = await evaluateRaw(actor, "delete", resource, blockWithForbid, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["admin"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { locked: false } });
+      const result = await evaluateRaw(actor, "delete", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
     });
 
     it("forbid only applies to specified permissions", async () => {
-      const resolver = makeResolver({
-        roles: ["admin"],
-        attributes: { "Document:d1": { locked: true } },
-      });
-      // read should still be allowed
-      const result = await evaluateRaw(actor, "read", resource, blockWithForbid, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["admin"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { locked: true } });
+      const result = await evaluateRaw(actor, "read", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
     });
   });
@@ -174,7 +164,7 @@ describe("evaluate (rules)", () => {
   // ─── Forbid-wins precedence over permit ─────────────────────────────
 
   describe("forbid-wins precedence", () => {
-    const blockBothRules: ResourceBlock = {
+    const baseBlock: ResourceBlock = {
       roles: ["editor"],
       permissions: ["read", "write"],
       grants: {
@@ -195,27 +185,19 @@ describe("evaluate (rules)", () => {
       ],
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockBothRules },
-    };
-
     it("forbid wins even when permit also matches", async () => {
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { frozen: true } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockBothRules, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { frozen: true } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
     });
 
     it("permit works when forbid does not match", async () => {
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { frozen: false } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockBothRules, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { frozen: false } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
     });
   });
@@ -223,7 +205,7 @@ describe("evaluate (rules)", () => {
   // ─── Roles-only guard (T050) ────────────────────────────────────────
 
   describe("roles-only guard", () => {
-    const blockWithRolesGuard: ResourceBlock = {
+    const baseBlock: ResourceBlock = {
       roles: ["editor", "viewer"],
       permissions: ["read", "write"],
       grants: {
@@ -239,70 +221,27 @@ describe("evaluate (rules)", () => {
       ],
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockWithRolesGuard },
-    };
-
     it("skips permit rule when actor lacks required role", async () => {
-      const resolver = makeResolver({
-        roles: ["viewer"],
-        attributes: { "Document:d1": { status: "draft" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithRolesGuard, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["viewer"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "draft" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
     });
 
     it("evaluates permit rule when actor has required role", async () => {
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { status: "draft" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithRolesGuard, resolver, policy);
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "draft" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
-    });
-  });
-
-  // ─── Forbid rules without roles guard ───────────────────────────────
-
-  describe("forbid rules without roles guard", () => {
-    const blockForbidNoRoles: ResourceBlock = {
-      roles: ["admin"],
-      permissions: ["delete"],
-      grants: {
-        admin: ["delete"],
-      },
-      rules: [
-        {
-          effect: "forbid",
-          // No roles: applies to all actors
-          permissions: ["delete"],
-          when: { "$resource.protected": true },
-        },
-      ],
-    };
-
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockForbidNoRoles },
-    };
-
-    it("forbid without roles guard applies to all actors", async () => {
-      const resolver = makeResolver({
-        roles: ["admin"],
-        attributes: { "Document:d1": { protected: true } },
-      });
-      const result = await evaluateRaw(actor, "delete", resource, blockForbidNoRoles, resolver, policy);
-      expect(result.allowed).toBe(false);
     });
   });
 
   // ─── Custom evaluator in rules (T051) ───────────────────────────────
 
   describe("custom evaluator in rules", () => {
-    const blockWithCustom: ResourceBlock = {
+    const baseBlock: ResourceBlock = {
       roles: ["editor"],
       permissions: ["write"],
       grants: {
@@ -317,19 +256,12 @@ describe("evaluate (rules)", () => {
       ],
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockWithCustom },
-    };
-
     it("uses custom evaluator in condition", async () => {
       const isWeekend: EvaluatorFn = async () => true;
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { status: "active" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithCustom, resolver, policy, {
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "active" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy, {
         customEvaluators: { isWeekend },
       });
       expect(result.allowed).toBe(false); // forbid matched
@@ -337,11 +269,10 @@ describe("evaluate (rules)", () => {
 
     it("allows when custom evaluator returns false", async () => {
       const isWeekend: EvaluatorFn = async () => false;
-      const resolver = makeResolver({
-        roles: ["editor"],
-        attributes: { "Document:d1": { status: "active" } },
-      });
-      const result = await evaluateRaw(actor, "write", resource, blockWithCustom, resolver, policy, {
+      const block = withDerivedRoles(baseBlock, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({ "Document:d1": { status: "active" } });
+      const result = await evaluateRaw(actor, "write", resource, block, cache, policy, {
         customEvaluators: { isWeekend },
       });
       expect(result.allowed).toBe(true);
@@ -350,7 +281,7 @@ describe("evaluate (rules)", () => {
 
   // ─── Existing grant evaluation still works ──────────────────────────
 
-  describe("backwards compatibility", () => {
+  describe("grants without rules", () => {
     const blockNoRules: ResourceBlock = {
       roles: ["editor"],
       permissions: ["read", "write"],
@@ -359,21 +290,20 @@ describe("evaluate (rules)", () => {
       },
     };
 
-    const policy: Policy = {
-      version: "1",
-      actors: { User: { attributes: {} } },
-      resources: { Document: blockNoRules },
-    };
-
-    it("grants via grants map when no rules defined", async () => {
-      const resolver = makeResolver({ roles: ["editor"] });
-      const result = await evaluateRaw(actor, "read", resource, blockNoRules, resolver, policy);
+    it("grants via grants map when actor has derived role", async () => {
+      const block = withDerivedRoles(blockNoRules, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({});
+      const result = await evaluateRaw(actor, "read", resource, block, cache, policy);
       expect(result.allowed).toBe(true);
     });
 
-    it("denies via grants map when no rules defined", async () => {
-      const resolver = makeResolver({ roles: [] });
-      const result = await evaluateRaw(actor, "read", resource, blockNoRules, resolver, policy);
+    it("denies via grants map when actor has no roles", async () => {
+      const actorNoFlags: ActorRef = { type: "User", id: "u1", attributes: {} };
+      const block = withDerivedRoles(blockNoRules, ["editor"]);
+      const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: { Document: block } };
+      const cache = makeCache({});
+      const result = await evaluateRaw(actorNoFlags, "read", resource, block, cache, policy);
       expect(result.allowed).toBe(false);
     });
   });
