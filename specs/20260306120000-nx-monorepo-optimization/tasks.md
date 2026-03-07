@@ -71,9 +71,9 @@
 
 ### Verification for User Story 2
 
-- [ ] T013 [US2] Run `pnpm exec nx run-many -t build` and verify all 4 packages build successfully with correct dependency order
-- [ ] T014 [US2] Run `pnpm exec nx run-many -t build` again with no changes and verify all tasks are cache hits (complete in <2s)
-- [ ] T015 [US2] Modify a file in `packages/drizzle/src/`, run `pnpm exec nx affected -t build`, and verify only `@toride/drizzle` rebuilds
+- [X] T013 [US2] Run `pnpm exec nx run-many -t build` and verify all 4 packages build successfully with correct dependency order
+- [X] T014 [US2] Run `pnpm exec nx run-many -t build` again with no changes and verify all tasks are cache hits (complete in <2s)
+- [X] T015 [US2] Modify a file in `packages/drizzle/src/`, run `pnpm exec nx affected -t build`, and verify only `@toride/drizzle` rebuilds
 
 **Checkpoint**: Cached builds work; affected builds skip unchanged packages
 
