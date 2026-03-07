@@ -133,9 +133,9 @@
 
 **Purpose**: Final validation and cleanup
 
-- [ ] T024 Run quickstart.md validation: execute all commands from `specs/20260306120000-nx-monorepo-optimization/quickstart.md` and verify they work
-- [ ] T025 Verify `.gitignore` excludes `.nx/cache` and `.nx/workspace-data`
-- [ ] T026 Run full `pnpm exec nx affected -t lint test build` from clean state and verify all tasks pass
+- [X] T024 Run quickstart.md validation: execute all commands from `specs/20260306120000-nx-monorepo-optimization/quickstart.md` and verify they work
+- [X] T025 Verify `.gitignore` excludes `.nx/cache` and `.nx/workspace-data`
+- [X] T026 Run full `pnpm exec nx affected -t lint test build` from clean state and verify all tasks pass
 
 ---
 
