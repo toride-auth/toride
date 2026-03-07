@@ -50,8 +50,8 @@
 
 ### Implementation
 
-- [ ] T008 [US2] Create `packages/toride/bench/operations.bench.ts` with all 27 benchmark cases (9 operations x 3 tiers). Use `describe()` blocks per tier and `bench()` calls per operation. Naming convention: `"{operation} - {tier}"` (e.g., `"can - small"`). Operations: `can`, `canBatch`, `permittedActions`, `buildConstraints`, `explain`, `snapshot`, `canField`, `permittedFields`, `resolvedRoles`. Import setup helper for engine creation and mock resolvers.
-- [ ] T009 [US2] Run `pnpm exec nx run toride:bench` and verify: all 27 cases execute, output shows ops/sec and median times, total runtime < 60 seconds. Tune iteration counts if needed.
+- [X] T008 [US2] Create `packages/toride/bench/operations.bench.ts` with all 27 benchmark cases (9 operations x 3 tiers). Use `describe()` blocks per tier and `bench()` calls per operation. Naming convention: `"{operation} - {tier}"` (e.g., `"can - small"`). Operations: `can`, `canBatch`, `permittedActions`, `buildConstraints`, `explain`, `snapshot`, `canField`, `permittedFields`, `resolvedRoles`. Import setup helper for engine creation and mock resolvers.
+- [X] T009 [US2] Run `pnpm exec nx run toride:bench` and verify: all 27 cases execute, output shows ops/sec and median times, total runtime < 60 seconds. Tune iteration counts if needed.
 
 **Checkpoint**: `pnpm exec nx run toride:bench` produces a complete table of all 27 benchmark cases with stable timing data.
 
