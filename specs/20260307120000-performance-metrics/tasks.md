@@ -65,12 +65,12 @@
 
 ### Tests
 
-- [ ] T010 [US1] Write unit tests for the comparison script in `packages/toride/bench/compare.test.ts`. Cover: normal comparison with no regressions (exit 0), comparison with >= 20% regression (exit 1), first run without baseline (exit 0), new operation in PR but not baseline (status "new", no failure), missing operation in PR (status "missing", no failure), markdown output format validation, threshold override via `--threshold` flag, invalid/missing input file handling (exit 2).
+- [X] T010 [US1] Write unit tests for the comparison script in `packages/toride/bench/compare.test.ts`. Cover: normal comparison with no regressions (exit 0), comparison with >= 20% regression (exit 1), first run without baseline (exit 0), new operation in PR but not baseline (status "new", no failure), missing operation in PR (status "missing", no failure), markdown output format validation, threshold override via `--threshold` flag, invalid/missing input file handling (exit 2).
 
 ### Implementation
 
-- [ ] T011 [US1] Implement the comparison script in `packages/toride/bench/compare.ts`. Parse vitest bench JSON output (extract operation and tier from bench names via `"{operation} - {tier}"` convention). Accept CLI args: `--baseline`, `--current`, `--threshold` (default 0.20), `--output`, `--markdown`. Produce `ComparisonReport` JSON per data-model.md. Generate markdown summary table per contracts/compare-cli.md. Exit 0 (no regressions / first run), 1 (regressions), 2 (script error).
-- [ ] T012 [US1] Verify compare.test.ts passes with `pnpm exec nx run toride:test`
+- [X] T011 [US1] Implement the comparison script in `packages/toride/bench/compare.ts`. Parse vitest bench JSON output (extract operation and tier from bench names via `"{operation} - {tier}"` convention). Accept CLI args: `--baseline`, `--current`, `--threshold` (default 0.20), `--output`, `--markdown`. Produce `ComparisonReport` JSON per data-model.md. Generate markdown summary table per contracts/compare-cli.md. Exit 0 (no regressions / first run), 1 (regressions), 2 (script error).
+- [X] T012 [US1] Verify compare.test.ts passes with `pnpm exec nx run toride:test`
 - [ ] T013 [US1] [US3] [US4] Create `.github/workflows/benchmark.yml` — GitHub Actions workflow triggered on `pull_request` targeting `main`. Steps: (1) checkout main, install deps, build toride, run `vitest bench --reporter=json --outputFile=baseline.json`, (2) checkout PR branch, install deps, build toride, run `vitest bench --reporter=json --outputFile=current.json`, (3) run `npx tsx packages/toride/bench/compare.ts --baseline baseline.json --current current.json --threshold 0.20 --output report.json --markdown summary.md`, (4) post/update PR comment using `github-script` with `<!-- toride-benchmark -->` marker, (5) upload `report.json` as CI artifact, (6) fail job if compare.ts exits 1. Set `permissions: pull-requests: write`.
 - [ ] T014 [US1] Add error handling in `benchmark.yml` to distinguish benchmark infrastructure failures from performance regressions (check compare.ts exit code 2 vs 1, report accordingly).
 
