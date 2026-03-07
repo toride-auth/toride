@@ -131,7 +131,7 @@ export class AttributeCache {
       if (!isResourceRef(value)) continue;
 
       // Extract extra fields beyond type/id as inline attributes for the target
-      const { type, id, ...extra } = value as Record<string, unknown>;
+      const { type, id, ...extra } = value as unknown as Record<string, unknown>;
       if (Object.keys(extra).length > 0) {
         this.seedInline(targetType, id as string, extra);
       }
