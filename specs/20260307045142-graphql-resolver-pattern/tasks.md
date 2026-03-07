@@ -122,12 +122,12 @@
 
 **Purpose**: Update codegen, drizzle, and prisma packages to align with the new core API.
 
-- [ ] T031 [P] Update codegen: remove `TypedRelationResolver` and `RelationMap` cardinality, generate `ResolverMap` type for per-type resolvers, update `RelationMap` to use simplified syntax in `packages/codegen/src/generator.ts`
-- [ ] T032 [P] Update drizzle adapter: add `createDrizzleResolver` thin adapter function that wraps a Drizzle select into the `ResourceResolver` signature in `packages/drizzle/src/index.ts`
-- [ ] T033 [P] Update prisma adapter: add `createPrismaResolver` thin adapter function that wraps a Prisma findUnique into the `ResourceResolver` signature in `packages/prisma/src/index.ts`
-- [ ] T034 Update codegen tests to verify new generated output format in `packages/codegen/src/__tests__/`
-- [ ] T035 [P] Update drizzle tests for new resolver adapter in `packages/drizzle/src/__tests__/`
-- [ ] T036 [P] Update prisma tests for new resolver adapter in `packages/prisma/src/__tests__/`
+- [X] T031 [P] Update codegen: remove `TypedRelationResolver` and `RelationMap` cardinality, generate `ResolverMap` type for per-type resolvers, update `RelationMap` to use simplified syntax in `packages/codegen/src/generator.ts`
+- [X] T032 [P] Update drizzle adapter: add `createDrizzleResolver` thin adapter function that wraps a Drizzle select into the `ResourceResolver` signature in `packages/drizzle/src/index.ts`
+- [X] T033 [P] Update prisma adapter: add `createPrismaResolver` thin adapter function that wraps a Prisma findUnique into the `ResourceResolver` signature in `packages/prisma/src/index.ts`
+- [X] T034 Update codegen tests to verify new generated output format in `packages/codegen/src/__tests__/`
+- [X] T035 [P] Update drizzle tests for new resolver adapter in `packages/drizzle/src/__tests__/`
+- [X] T036 [P] Update prisma tests for new resolver adapter in `packages/prisma/src/__tests__/`
 
 **Checkpoint**: All 4 packages build and test green. `pnpm run build && pnpm run test` passes.
 

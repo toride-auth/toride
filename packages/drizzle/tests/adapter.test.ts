@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { createDrizzleAdapter } from "../src/index.js";
+import { describe, it, expect, vi } from "vitest";
+import { createDrizzleAdapter, createDrizzleResolver } from "../src/index.js";
 
 /**
  * Mock table object that simulates a Drizzle table with columns.
@@ -125,6 +125,60 @@ describe("DrizzleConstraintAdapter", () => {
   it("translates not", () => {
     const a = { _op: "eq", field: "a", value: 1 };
     expect(adapter.not(a)).toEqual({ _op: "not", child: a });
+  });
+
+  describe("createDrizzleResolver", () => {
+    it("returns attributes from a Drizzle select query", async () => {
+      const mockRow = { id: "doc-1", title: "Hello", owner_id: "u1" };
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([mockRow]),
+          }),
+        }),
+      };
+      const mockTable = { id: { name: "id" } };
+
+      const resolver = createDrizzleResolver(mockDb, mockTable);
+      const result = await resolver({ type: "Document", id: "doc-1" });
+
+      expect(result).toEqual(mockRow);
+      expect(mockDb.select).toHaveBeenCalled();
+    });
+
+    it("returns empty object when row is not found", async () => {
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      };
+      const mockTable = { id: { name: "id" } };
+
+      const resolver = createDrizzleResolver(mockDb, mockTable);
+      const result = await resolver({ type: "Document", id: "nonexistent" });
+
+      expect(result).toEqual({});
+    });
+
+    it("uses custom idColumn when specified", async () => {
+      const mockRow = { uuid: "doc-1", title: "Hello" };
+      const whereFn = vi.fn().mockResolvedValue([mockRow]);
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: whereFn,
+          }),
+        }),
+      };
+      const mockTable = { uuid: { name: "uuid" } };
+
+      const resolver = createDrizzleResolver(mockDb, mockTable, { idColumn: "uuid" });
+      const result = await resolver({ type: "Document", id: "doc-1" });
+
+      expect(result).toEqual(mockRow);
+    });
   });
 
   describe("with custom options", () => {

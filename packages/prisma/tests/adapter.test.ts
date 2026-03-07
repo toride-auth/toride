@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { createPrismaAdapter } from "../src/index.js";
+import { describe, it, expect, vi } from "vitest";
+import { createPrismaAdapter, createPrismaResolver } from "../src/index.js";
 
 describe("PrismaConstraintAdapter", () => {
   describe("createPrismaAdapter with defaults", () => {
@@ -93,6 +93,58 @@ describe("PrismaConstraintAdapter", () => {
     it("translates not", () => {
       expect(adapter.not({ a: 1 }))
         .toEqual({ NOT: { a: 1 } });
+    });
+  });
+
+  describe("createPrismaResolver", () => {
+    it("returns attributes from a Prisma findUnique query", async () => {
+      const mockRow = { id: "doc-1", title: "Hello", owner_id: "u1" };
+      const mockClient = {
+        document: {
+          findUnique: vi.fn().mockResolvedValue(mockRow),
+        },
+      };
+
+      const resolver = createPrismaResolver(mockClient, "document");
+      const result = await resolver({ type: "Document", id: "doc-1" });
+
+      expect(result).toEqual(mockRow);
+      expect(mockClient.document.findUnique).toHaveBeenCalledWith({
+        where: { id: "doc-1" },
+      });
+    });
+
+    it("returns empty object when record is not found", async () => {
+      const mockClient = {
+        document: {
+          findUnique: vi.fn().mockResolvedValue(null),
+        },
+      };
+
+      const resolver = createPrismaResolver(mockClient, "document");
+      const result = await resolver({ type: "Document", id: "nonexistent" });
+
+      expect(result).toEqual({});
+    });
+
+    it("passes select option to Prisma findUnique", async () => {
+      const mockRow = { id: "doc-1", title: "Hello" };
+      const mockClient = {
+        document: {
+          findUnique: vi.fn().mockResolvedValue(mockRow),
+        },
+      };
+
+      const resolver = createPrismaResolver(mockClient, "document", {
+        select: { id: true, title: true },
+      });
+      const result = await resolver({ type: "Document", id: "doc-1" });
+
+      expect(result).toEqual(mockRow);
+      expect(mockClient.document.findUnique).toHaveBeenCalledWith({
+        where: { id: "doc-1" },
+        select: { id: true, title: true },
+      });
     });
   });
 

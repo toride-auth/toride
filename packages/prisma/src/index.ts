@@ -3,7 +3,7 @@
 
 export const VERSION = "0.0.1";
 
-import type { ConstraintAdapter, LeafConstraint } from "toride";
+import type { ConstraintAdapter, LeafConstraint, ResourceRef } from "toride";
 
 /** Prisma WHERE clause type (plain object). */
 export type PrismaWhere = Record<string, unknown>;
@@ -101,5 +101,42 @@ export function createPrismaAdapter(
     not(query: PrismaWhere): PrismaWhere {
       return { NOT: query };
     },
+  };
+}
+
+/** Options for createPrismaResolver. */
+export interface PrismaResolverOptions {
+  /** Fields to select. Defaults to all scalar fields. */
+  select?: Record<string, boolean>;
+}
+
+/**
+ * Creates a resolver function for a Prisma model.
+ * Wraps a Prisma findUnique query into the ResourceResolver signature.
+ *
+ * The client parameter is duck-typed — no direct @prisma/client dependency
+ * is required. The client must support `client[modelName].findUnique({ where: { id } })`.
+ *
+ * @param client - A Prisma client instance (duck-typed).
+ * @param modelName - The Prisma model name (lowercase, e.g. "document").
+ * @param options - Optional configuration.
+ * @returns A ResourceResolver function.
+ */
+export function createPrismaResolver(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: any,
+  modelName: string,
+  options?: PrismaResolverOptions,
+): (ref: ResourceRef) => Promise<Record<string, unknown>> {
+  return async (ref: ResourceRef): Promise<Record<string, unknown>> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model = (client as Record<string, any>)[modelName];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const query: Record<string, any> = { where: { id: ref.id } };
+    if (options?.select) {
+      query.select = options.select;
+    }
+    const result = await model.findUnique(query);
+    return (result as Record<string, unknown>) ?? {};
   };
 }

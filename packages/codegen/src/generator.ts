@@ -12,7 +12,7 @@ import type { Policy, ResourceBlock } from "toride";
  * - RoleMap: per-resource role union types
  * - PermissionMap: per-resource permission union types
  * - RelationMap: per-resource relation target types
- * - TypedResolvers: typed per-type resolver map
+ * - ResolverMap: typed per-type resolver map
  */
 /** Safe identifier pattern: alphanumeric + underscore, starting with a letter or underscore */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -133,11 +133,11 @@ export function generateTypes(policy: Policy): string {
   lines.push(`}`);
   lines.push("");
 
-  // TypedResolvers
-  lines.push(`/** Typed per-type resolvers — TypeScript errors if you miss a resource type */`);
-  lines.push(`export type TypedResolvers = {`);
-  lines.push(`  [R in keyof RelationMap]?: (`);
-  lines.push(`    ref: { type: R; id: string; attributes?: Record<string, unknown> }`);
+  // ResolverMap
+  lines.push(`/** Per-type resolver map — TypeScript ensures all resource types have resolvers */`);
+  lines.push(`export type ResolverMap = {`);
+  lines.push(`  [R in Resources]?: (`);
+  lines.push(`    ref: { type: R; id: string; attributes?: Record<string, unknown> },`);
   lines.push(`  ) => Promise<Record<string, unknown>>;`);
   lines.push(`};`);
   lines.push("");

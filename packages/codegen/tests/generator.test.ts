@@ -108,9 +108,11 @@ describe("generateTypes", () => {
     expect(output).toContain("export type Resources = never");
   });
 
-  it("generates TypedResolvers type", () => {
+  it("generates ResolverMap type keyed by Resources", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export type TypedResolvers");
+    expect(output).toContain("export type ResolverMap");
+    expect(output).not.toContain("TypedResolvers");
+    expect(output).toContain("[R in Resources]?");
     expect(output).toContain("Promise<Record<string, unknown>>");
   });
 
