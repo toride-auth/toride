@@ -299,7 +299,7 @@ interface TierTestData {
   env: Record<string, unknown>;
 }
 
-function buildTestData(tier: Tier, policy: Policy): TierTestData {
+function buildTestData(tier: Tier): TierTestData {
   switch (tier) {
     case "small":
       return {
@@ -426,7 +426,7 @@ export async function createBenchEngine(tier: Tier): Promise<BenchEngine> {
   const policy = await loadFixture(tier);
   const resolvers = buildResolvers(tier);
   const engine = createToride({ policy, resolvers });
-  const testData = buildTestData(tier, policy);
+  const testData = buildTestData(tier);
 
   return { engine, testData, policy };
 }

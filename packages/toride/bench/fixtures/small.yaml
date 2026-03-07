@@ -1,6 +1,6 @@
 # Small tier benchmark fixture
-# ~5 resources, 3 roles, simple grants only
-# No derived roles, no conditions, no relations
+# ~5 resources, 3 roles, simple grants with attribute-based derived roles
+# No conditions on resources, no relations
 # Minimal field_access on 1 resource for canField/permittedFields benchmarks
 
 version: "1"
