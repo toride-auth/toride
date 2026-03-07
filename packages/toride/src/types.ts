@@ -15,6 +15,8 @@ export interface ActorRef {
 export interface ResourceRef {
   readonly type: string;
   readonly id: string;
+  /** Pre-fetched attributes. Inline values take precedence over resolver results. */
+  readonly attributes?: Record<string, unknown>;
 }
 
 /** Optional per-check configuration. */
@@ -28,15 +30,21 @@ export interface BatchCheckItem {
   readonly resource: ResourceRef;
 }
 
-/** User-provided data bridge for resolving roles, relations, and attributes. */
-export interface RelationResolver {
-  getRoles(actor: ActorRef, resource: ResourceRef): Promise<string[]>;
-  getRelated(
-    resource: ResourceRef,
-    relationName: string,
-  ): Promise<ResourceRef | ResourceRef[]>;
-  getAttributes(ref: ResourceRef): Promise<Record<string, unknown>>;
-}
+/**
+ * Per-type resolver function.
+ * Called when the engine needs attributes not available inline.
+ * Called at most once per unique resource per evaluation (cached).
+ */
+export type ResourceResolver = (
+  ref: ResourceRef,
+) => Promise<Record<string, unknown>>;
+
+/**
+ * Map of resource type names to their resolver functions.
+ * Not all types need resolvers — types without resolvers use trivial resolution
+ * (fields are undefined unless provided inline).
+ */
+export type Resolvers = Record<string, ResourceResolver>;
 
 /** Custom evaluator function signature. */
 export type EvaluatorFn = (
@@ -48,7 +56,8 @@ export type EvaluatorFn = (
 /** Engine construction options. */
 export interface TorideOptions {
   readonly policy: Policy;
-  readonly resolver: RelationResolver;
+  /** Per-type resolver map. Optional — engine works without resolvers if all data is inline. */
+  readonly resolvers?: Resolvers;
   readonly maxConditionDepth?: number;
   readonly maxDerivedRoleDepth?: number;
   readonly customEvaluators?: Record<string, EvaluatorFn>;
@@ -70,12 +79,6 @@ export interface ActorDeclaration {
 export interface GlobalRole {
   readonly actor_type: string;
   readonly when: ConditionExpression;
-}
-
-/** Relation definition between resources. */
-export interface RelationDef {
-  readonly resource: string;
-  readonly cardinality: "one" | "many";
 }
 
 /**
@@ -115,7 +118,8 @@ export interface FieldAccessDef {
 export interface ResourceBlock {
   readonly roles: string[];
   readonly permissions: string[];
-  readonly relations?: Record<string, RelationDef>;
+  /** Relations map field names to target resource type names (simplified). */
+  readonly relations?: Record<string, string>;
   readonly grants?: Record<string, string[]>;
   readonly derived_roles?: DerivedRoleEntry[];
   readonly rules?: Rule[];
@@ -166,9 +170,8 @@ export type ConditionExpression =
 export interface TestCase {
   readonly name: string;
   readonly actor: ActorRef;
-  readonly roles?: Record<string, string[]>;
-  readonly relations?: Record<string, Record<string, ResourceRef | ResourceRef[]>>;
-  readonly attributes?: Record<string, Record<string, unknown>>;
+  /** Mock resolver data: keyed by "Type:id", values are attribute objects. */
+  readonly resolvers?: Record<string, Record<string, unknown>>;
   readonly action: string;
   readonly resource: ResourceRef;
   readonly expected: "allow" | "deny";

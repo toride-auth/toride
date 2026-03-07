@@ -29,13 +29,13 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T002 Redefine `ResourceRef` to add optional `attributes` field, create `ResourceResolver` and `Resolvers` types, remove `RelationResolver` interface, update `TorideOptions` to accept `resolvers?: Resolvers` instead of `resolver: RelationResolver` in `packages/toride/src/types.ts`
-- [ ] T003 Change `RelationDef` from `{ resource: string; cardinality: "one" | "many" }` to a plain string (target type name), update `ResourceBlock.relations` type to `Record<string, string>` in `packages/toride/src/types.ts`
-- [ ] T004 Update `TestCase` type: remove `roles` and `relations` fields, add `resolvers?: Record<string, Record<string, unknown>>` field in `packages/toride/src/types.ts`
-- [ ] T005 Update valibot schemas: `RelationDefSchema` → string, `ResourceBlockSchema.relations` → `Record<string, string>`, `TestCaseSchema` to match new `TestCase` type in `packages/toride/src/policy/schema.ts`
-- [ ] T006 Update policy validator for new relation syntax (string values instead of objects) in `packages/toride/src/policy/validator.ts`
-- [ ] T007 Rewrite `ResolverCache` as `AttributeCache`: accept `Resolvers` map, implement `resolve(ref, policy)` that merges inline attributes with resolver results (inline wins), cache by `${type}:${id}` in `packages/toride/src/evaluation/cache.ts`
-- [ ] T008 Update public exports: remove `RelationResolver` and `RelationDef` type exports, add `ResourceResolver`, `Resolvers` exports in `packages/toride/src/index.ts`
+- [X] T002 Redefine `ResourceRef` to add optional `attributes` field, create `ResourceResolver` and `Resolvers` types, remove `RelationResolver` interface, update `TorideOptions` to accept `resolvers?: Resolvers` instead of `resolver: RelationResolver` in `packages/toride/src/types.ts`
+- [X] T003 Change `RelationDef` from `{ resource: string; cardinality: "one" | "many" }` to a plain string (target type name), update `ResourceBlock.relations` type to `Record<string, string>` in `packages/toride/src/types.ts`
+- [X] T004 Update `TestCase` type: remove `roles` and `relations` fields, add `resolvers?: Record<string, Record<string, unknown>>` field in `packages/toride/src/types.ts`
+- [X] T005 Update valibot schemas: `RelationDefSchema` → string, `ResourceBlockSchema.relations` → `Record<string, string>`, `TestCaseSchema` to match new `TestCase` type in `packages/toride/src/policy/schema.ts`
+- [X] T006 Update policy validator for new relation syntax (string values instead of objects) in `packages/toride/src/policy/validator.ts`
+- [X] T007 Rewrite `ResolverCache` as `AttributeCache`: accept `Resolvers` map, implement `resolve(ref, policy)` that merges inline attributes with resolver results (inline wins), cache by `${type}:${id}` in `packages/toride/src/evaluation/cache.ts`
+- [X] T008 Update public exports: remove `RelationResolver` and `RelationDef` type exports, add `ResourceResolver`, `Resolvers` exports in `packages/toride/src/index.ts`
 
 **Checkpoint**: Types compile (`pnpm exec nx run toride:lint`). Tests will be broken — that's expected. The new type surface is in place for user story implementation.
 
