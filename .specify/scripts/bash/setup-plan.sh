@@ -8,17 +8,18 @@ ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-        --json) 
-            JSON_MODE=true 
+        --json)
+            JSON_MODE=true
             ;;
-        --help|-h) 
-            echo "Usage: $0 [--json]"
-            echo "  --json    Output results in JSON format"
-            echo "  --help    Show this help message"
-            exit 0 
+        --help|-h)
+            echo "Usage: $0 [--json] [SPECS_DIR]"
+            echo "  --json      Output results in JSON format"
+            echo "  SPECS_DIR   Explicit specs directory (e.g., specs/20260306120000-nx-monorepo-optimization)"
+            echo "  --help      Show this help message"
+            exit 0
             ;;
-        *) 
-            ARGS+=("$arg") 
+        *)
+            ARGS+=("$arg")
             ;;
     esac
 done
@@ -28,10 +29,13 @@ SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
 # Get all paths and variables from common functions
-eval $(get_feature_paths)
+# Pass explicit specs dir if provided as positional argument
+eval $(get_feature_paths "${ARGS[0]:-}")
 
-# Check if we're on a proper feature branch (only for git repos)
-check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+# If no explicit dir was provided, check for feature branch naming
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+    check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+fi
 
 # Ensure the feature directory exists
 mkdir -p "$FEATURE_DIR"

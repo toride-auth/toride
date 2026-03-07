@@ -24,12 +24,43 @@ You are updating the project constitution at `.specify/memory/constitution.md`. 
 
 Follow this execution flow:
 
-1. Load the existing constitution at `.specify/memory/constitution.md`.
+1. **Deep-dive interview the user about project principles and governance BEFORE making changes**:
+
+   Before touching the constitution, conduct a thorough interview using the **AskUserQuestion** tool to understand the user's values, principles, and governance expectations. Do NOT modify the constitution until you have clear understanding.
+
+   **Interview process**:
+   - Ask ONE question at a time via AskUserQuestion
+   - If the user provided principles in $ARGUMENTS, use them as a starting point and ask deeper follow-ups
+   - If no principles were provided, interview from scratch about the project's core values
+   - When you believe you have sufficient understanding, ask: "I think I have a clear picture of your project principles and governance needs. Do you have any other values, constraints, or preferences to add?"
+   - Continue if the user raises new points
+   - Stop only when you have clear understanding AND the user confirms nothing more to add
+
+   **What to ask about** (adapt to the project — skip irrelevant areas):
+   - What are the non-negotiable principles for this project? What must NEVER be compromised?
+   - What quality attributes matter most? (e.g., correctness > performance > developer experience)
+   - Testing philosophy: What level of test coverage and what testing strategies are required?
+   - Code style and architecture principles: Any strong opinions on patterns, conventions?
+   - Security posture: How strict should security requirements be?
+   - Observability and operational excellence: What's required for production readiness?
+   - Documentation standards: What level of documentation is expected?
+   - Dependency management: Philosophy on third-party dependencies?
+   - Governance: Who can amend the constitution? What process should changes follow?
+   - Versioning: How should the project handle breaking changes?
+   - Are there anti-patterns or past mistakes the user wants to explicitly prohibit?
+   - Any compliance, regulatory, or organizational constraints?
+
+   **Key rules**:
+   - Do NOT start editing the constitution during the interview
+   - If updating an existing constitution, ask about what specifically needs to change and why
+   - Probe for the reasoning behind principles — this helps write better rationale sections
+
+2. Load the existing constitution at `.specify/memory/constitution.md`.
    - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`.
    **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
 
-2. Collect/derive values for placeholders:
-   - If user input (conversation) supplies a value, use it.
+3. Collect/derive values for placeholders:
+   - If user input (conversation or interview answers) supplies a value, use it.
    - Otherwise infer from existing repo context (README, docs, prior constitution versions if embedded).
    - For governance dates: `RATIFICATION_DATE` is the original adoption date (if unknown, use the **AskUserQuestion** tool to ask the user, or mark TODO if they don't know), `LAST_AMENDED_DATE` is today if changes are made, otherwise keep previous.
    - `CONSTITUTION_VERSION` must increment according to semantic versioning rules:
@@ -38,20 +69,20 @@ Follow this execution flow:
      - PATCH: Clarifications, wording, typo fixes, non-semantic refinements.
    - If version bump type ambiguous, propose reasoning before finalizing.
 
-3. Draft the updated constitution content:
+4. Draft the updated constitution content:
    - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the project has chosen not to define yet—explicitly justify any left).
    - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
    - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
 
-4. Consistency propagation checklist (convert prior checklist into active validations):
+5. Consistency propagation checklist (convert prior checklist into active validations):
    - Read `.specify/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
    - Read `.specify/templates/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
    - Read `.specify/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
    - Read each command file in `.specify/templates/commands/*.md` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
 
-5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
+6. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
    - Version change: old → new
    - List of modified principles (old title → new title if renamed)
    - Added sections
@@ -59,15 +90,15 @@ Follow this execution flow:
    - Templates requiring updates (✅ updated / ⚠ pending) with file paths
    - Follow-up TODOs if any placeholders intentionally deferred.
 
-6. Validation before final output:
+7. Validation before final output:
    - No remaining unexplained bracket tokens.
    - Version line matches report.
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
 
-7. Write the completed constitution back to `.specify/memory/constitution.md` (overwrite).
+8. Write the completed constitution back to `.specify/memory/constitution.md` (overwrite).
 
-8. Output a final summary to the user with:
+9. Output a final summary to the user with:
    - New version and bump rationale.
    - Any files flagged for manual follow-up.
    - Suggested commit message (e.g., `docs: amend constitution to vX.Y.Z (principle additions + governance update)`).

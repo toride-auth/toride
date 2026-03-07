@@ -11,3 +11,7 @@ dist/
 
 # Test coverage
 coverage/
+
+# Nx
+.nx/cache
+.nx/workspace-data

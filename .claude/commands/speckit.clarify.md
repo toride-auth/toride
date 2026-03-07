@@ -24,7 +24,7 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Run `.specify/scripts/bash/check-prerequisites.sh --json --paths-only` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
+1. Run `.specify/scripts/bash/check-prerequisites.sh --json --paths-only [SPECS_DIR]` from repo root **once** (combined `--json --paths-only` mode). If `$ARGUMENTS` starts with a path to a specs directory (e.g., `specs/20260306120000-...`), pass it as the SPECS_DIR positional argument to the script. Parse minimal JSON payload fields:
    - `FEATURE_DIR`
    - `FEATURE_SPEC`
    - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)

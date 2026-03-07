@@ -23,14 +23,42 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json [SPECS_DIR]` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. If `$ARGUMENTS` starts with a path to a specs directory (e.g., `specs/20260306120000-...`), pass it as the SPECS_DIR positional argument to the script. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. **Load design documents**: Read from FEATURE_DIR:
+2. **Interview the user about task generation preferences BEFORE generating tasks**:
+
+   After loading the spec and plan context, conduct a focused interview using the **AskUserQuestion** tool to understand how the user wants tasks structured, scoped, and prioritized. Do NOT generate tasks until you have clear understanding.
+
+   **Interview process**:
+   - Ask ONE question at a time via AskUserQuestion
+   - Analyze the plan and spec to identify decision points about task breakdown, then probe the user
+   - When you believe you have sufficient understanding, ask: "I think I understand how you want the tasks structured. Do you have any other preferences or constraints before I generate them?"
+   - Continue if the user raises new points
+   - Stop only when you have clear understanding AND the user confirms nothing more to add
+
+   **What to ask about** (adapt based on the feature — skip irrelevant areas):
+   - Task granularity: Should tasks be fine-grained (one file per task) or coarser (one feature slice per task)?
+   - Testing strategy: Should test tasks be included? TDD style (tests first) or tests alongside implementation?
+   - MVP scope: Which user stories constitute the minimum viable increment? Should later stories be deferred?
+   - Parallel execution: Are multiple developers working on this? Should tasks be optimized for parallelism?
+   - Priority overrides: Does the user want to reorder any user stories from what the spec suggests?
+   - Implementation preferences: Any specific patterns, approaches, or constraints for task execution?
+   - Dependencies: Are there external blockers or prerequisites the user knows about?
+   - Task format: Any preferences on how detailed task descriptions should be?
+   - Phasing: Should all phases be generated, or only up to a certain point?
+   - Any tasks the user explicitly wants included or excluded?
+
+   **Key rules**:
+   - Do NOT generate tasks during the interview
+   - Use the plan and spec content to ask targeted questions (e.g., "The plan has 5 user stories — do you want tasks for all of them or just the P1/P2 stories for now?")
+   - If the user provided context in $ARGUMENTS, acknowledge it and ask deeper follow-ups
+
+3. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
    - **Optional**: data-model.md (entities), contracts/ (interface contracts), research.md (decisions), quickstart.md (test scenarios)
    - Note: Not all projects have all documents. Generate tasks based on what's available.
 
-3. **Execute task generation workflow**:
+4. **Execute task generation workflow**:
    - Load plan.md and extract tech stack, libraries, project structure
    - Load spec.md and extract user stories with their priorities (P1, P2, P3, etc.)
    - If data-model.md exists: Extract entities and map to user stories
@@ -41,7 +69,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-4. **Generate tasks.md**: Use `.specify/templates/tasks-template.md` as structure, fill with:
+5. **Generate tasks.md**: Use `.specify/templates/tasks-template.md` as structure, fill with:
    - Correct feature name from plan.md
    - Phase 1: Setup tasks (project initialization)
    - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
@@ -54,7 +82,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Parallel execution examples per story
    - Implementation strategy section (MVP first, incremental delivery)
 
-5. **Generate jdi task files**: After writing tasks.md, create `.jdi/tasks/` files grouped by phase:
+6. **Generate jdi task files**: After writing tasks.md, create `.jdi/tasks/` files grouped by phase:
 
    **Grouping rule**: Each phase heading (`## Phase N: ...`) becomes one jdi task file. This keeps tasks substantial enough to justify the full jdi workflow (plan → implement → review → finalize).
 
@@ -88,7 +116,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Reference the spec directory path so jdi agents can read full context
    - Ensure `.jdi/tasks/` directory exists before writing (create if needed)
 
-6. **Report**: Output path to generated tasks.md, jdi task files, and summary:
+7. **Report**: Output path to generated tasks.md, jdi task files, and summary:
    - Total task count (fine-grained from tasks.md)
    - jdi task count (grouped by phase)
    - Task count per user story

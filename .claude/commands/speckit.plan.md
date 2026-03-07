@@ -22,11 +22,45 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/bash/setup-plan.sh --json` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Run `.specify/scripts/bash/setup-plan.sh --json [SPECS_DIR]` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. If `$ARGUMENTS` starts with a path to a specs directory (e.g., `specs/20260306120000-...`), pass it as the SPECS_DIR positional argument to the script. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Load context**: Read FEATURE_SPEC and `.specify/memory/constitution.md`. Load IMPL_PLAN template (already copied).
 
-3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
+3. **Deep-dive interview the user about technical decisions and architecture BEFORE generating the plan**:
+
+   After loading the spec and context, conduct a thorough interview using the **AskUserQuestion** tool to understand the user's technical preferences, constraints, and concerns. Do NOT start filling out the plan until you have clear understanding.
+
+   **Interview process**:
+   - Ask ONE question at a time via AskUserQuestion
+   - Analyze the spec to identify every technical decision point, then probe the user on each
+   - Questions must be specific and non-obvious — informed by the actual feature requirements
+   - Dig deeper when answers reveal complexity or when the user mentions constraints
+   - When you believe you have sufficient understanding, ask: "I think I have a clear picture of the technical direction. Do you have any other preferences, constraints, or concerns before I generate the plan?"
+   - Continue if the user raises new points
+   - Stop only when you have clear understanding AND the user confirms nothing more to add
+
+   **What to ask about** (adapt to the specific feature — skip irrelevant areas):
+   - Tech stack preferences and constraints (languages, frameworks, databases, infrastructure)
+   - Architecture style preferences (monolith vs microservices, layered vs hexagonal, etc.)
+   - Existing codebase patterns that must be followed or intentionally broken
+   - Data storage and modeling preferences
+   - Integration patterns with existing systems
+   - Testing strategy preferences (TDD, integration-first, contract testing, etc.)
+   - Deployment and infrastructure constraints
+   - Performance and scalability requirements that affect architecture
+   - Security architecture concerns (auth strategy, data encryption, etc.)
+   - Observability needs (logging, metrics, tracing)
+   - Known technical debt or areas to avoid
+   - Build/CI pipeline constraints
+   - Any libraries or tools the user specifically wants to use or avoid
+   - Tradeoffs the user has opinions on (e.g., build vs buy, speed vs correctness)
+
+   **Key rules**:
+   - Do NOT start generating plan content during the interview
+   - Use the spec content to ask targeted questions (e.g., "The spec mentions real-time updates — are you thinking WebSockets, SSE, or polling?")
+   - If the user provided tech stack info in $ARGUMENTS, acknowledge it and ask deeper follow-ups rather than re-asking
+
+4. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
    - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
    - Fill Constitution Check section from constitution
    - Evaluate gates (ERROR if violations unjustified)
@@ -35,7 +69,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
+5. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
 ## Phases
 

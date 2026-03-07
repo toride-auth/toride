@@ -21,7 +21,11 @@
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "tsc --noEmit"
+  },
+  "nx": {
+    "tags": ["type:core"]
   },
   "dependencies": {
     "yaml": "^2.3.0",

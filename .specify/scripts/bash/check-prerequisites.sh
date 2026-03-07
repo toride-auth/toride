@@ -26,6 +26,7 @@ JSON_MODE=false
 REQUIRE_TASKS=false
 INCLUDE_TASKS=false
 PATHS_ONLY=false
+ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
@@ -43,7 +44,7 @@ for arg in "$@"; do
             ;;
         --help|-h)
             cat << 'EOF'
-Usage: check-prerequisites.sh [OPTIONS]
+Usage: check-prerequisites.sh [OPTIONS] [SPECS_DIR]
 
 Consolidated prerequisite checking for Spec-Driven Development workflow.
 
@@ -54,22 +55,28 @@ OPTIONS:
   --paths-only        Only output path variables (no prerequisite validation)
   --help, -h          Show this help message
 
+SPECS_DIR:
+  Explicit specs directory (e.g., specs/20260306120000-nx-monorepo-optimization).
+  When provided, bypasses branch name validation.
+
 EXAMPLES:
   # Check task prerequisites (plan.md required)
   ./check-prerequisites.sh --json
-  
+
+  # Check with explicit specs dir
+  ./check-prerequisites.sh --json specs/20260306120000-my-feature
+
   # Check implementation prerequisites (plan.md + tasks.md required)
   ./check-prerequisites.sh --json --require-tasks --include-tasks
-  
+
   # Get feature paths only (no validation)
   ./check-prerequisites.sh --paths-only
-  
+
 EOF
             exit 0
             ;;
         *)
-            echo "ERROR: Unknown option '$arg'. Use --help for usage information." >&2
-            exit 1
+            ARGS+=("$arg")
             ;;
     esac
 done
@@ -78,9 +85,13 @@ done
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
 
-# Get feature paths and validate branch
-eval $(get_feature_paths)
-check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+# Get feature paths, passing explicit dir if provided
+eval $(get_feature_paths "${ARGS[0]:-}")
+
+# If no explicit dir was provided, check for feature branch naming
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+    check_feature_branch "$CURRENT_BRANCH" "$HAS_GIT" || exit 1
+fi
 
 # If paths-only mode, output paths and exit (support JSON + paths-only combined)
 if $PATHS_ONLY; then
