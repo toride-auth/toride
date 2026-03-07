@@ -560,6 +560,88 @@ describe("compare", () => {
     expect(reportStrict.comparisons[0].status).toBe("regression");
   });
 
+  it("should handle first-ever run (no baseline entries) without regression", () => {
+    // Simulates the case where baseline has no benchmark data (first run)
+    const baseline: BenchmarkResult = {
+      commit: "unknown",
+      timestamp: "2026-03-07T12:00:00Z",
+      entries: [],
+    };
+
+    const pr: BenchmarkResult = {
+      commit: "pr456",
+      timestamp: "2026-03-07T13:00:00Z",
+      entries: [
+        {
+          operation: "can",
+          tier: "small",
+          median: 0.002,
+          mean: 0.0022,
+          hz: 500000,
+          samples: 10000,
+          min: 0.001,
+          max: 0.005,
+          p75: 0.0025,
+          p99: 0.004,
+        },
+        {
+          operation: "canBatch",
+          tier: "small",
+          median: 0.01,
+          mean: 0.011,
+          hz: 100000,
+          samples: 10000,
+          min: 0.008,
+          max: 0.02,
+          p75: 0.012,
+          p99: 0.018,
+        },
+      ],
+    };
+
+    const report = compare(baseline, pr, 0.2);
+
+    // First run should never flag regressions
+    expect(report.hasRegression).toBe(false);
+    // All PR entries should be reported as "new"
+    expect(report.comparisons).toHaveLength(2);
+    expect(report.comparisons.every((c) => c.status === "new")).toBe(true);
+  });
+
+  it("should handle new operation end-to-end via parseBenchmarkJson + compare", () => {
+    // Baseline has one operation; PR adds a second
+    const baselineJson = makeVitestJson([makeBenchEntry("can - small", 0.002)]);
+    const prJson = makeVitestJson([
+      makeBenchEntry("can - small", 0.0021),
+      makeBenchEntry("newOp - small", 0.005),
+    ]);
+
+    const baselineResult = parseBenchmarkJson(
+      baselineJson,
+      "base123",
+      "2026-03-07T12:00:00Z",
+    );
+    const prResult = parseBenchmarkJson(
+      prJson,
+      "pr456",
+      "2026-03-07T13:00:00Z",
+    );
+
+    const report = compare(baselineResult, prResult, 0.2);
+
+    expect(report.hasRegression).toBe(false);
+
+    const canEntry = report.comparisons.find((c) => c.operation === "can");
+    expect(canEntry).toBeDefined();
+    expect(canEntry!.status).toBe("stable");
+
+    const newEntry = report.comparisons.find((c) => c.operation === "newOp");
+    expect(newEntry).toBeDefined();
+    expect(newEntry!.status).toBe("new");
+    expect(newEntry!.baselineMedian).toBe(0);
+    expect(newEntry!.prMedian).toBe(0.005);
+  });
+
   it("should handle empty entries gracefully", () => {
     const baseline: BenchmarkResult = {
       commit: "base123",
@@ -686,6 +768,49 @@ describe("formatMarkdown", () => {
     const md = formatMarkdown(report);
     expect(md).toContain("new");
     expect(md).toContain("missing");
+  });
+
+  it("should render first-run informational message when no comparisons exist", () => {
+    const report: ComparisonReport = {
+      baselineCommit: "unknown",
+      prCommit: "def5678",
+      timestamp: "2026-03-07T12:00:00Z",
+      threshold: 0.2,
+      hasRegression: false,
+      comparisons: [],
+    };
+
+    const md = formatMarkdown(report);
+    expect(md).toContain("No significant regressions detected.");
+    expect(md).not.toContain("regressed beyond");
+  });
+
+  it("should render 'new' entries with dash for baseline column", () => {
+    const report: ComparisonReport = {
+      baselineCommit: "abc1234",
+      prCommit: "def5678",
+      timestamp: "2026-03-07T12:00:00Z",
+      threshold: 0.2,
+      hasRegression: false,
+      comparisons: [
+        {
+          operation: "newOp",
+          tier: "small",
+          baselineMedian: 0,
+          prMedian: 0.005,
+          deltaPercent: 0,
+          status: "new",
+        },
+      ],
+    };
+
+    const md = formatMarkdown(report);
+    // The baseline column for "new" operations should show a dash
+    const lines = md.split("\n");
+    const newOpLine = lines.find((l) => l.includes("newOp"));
+    expect(newOpLine).toBeDefined();
+    // Baseline column should contain a dash (em dash)
+    expect(newOpLine).toMatch(/\|\s*—\s*\|/);
   });
 
   it("should format timing values in human-readable units", () => {

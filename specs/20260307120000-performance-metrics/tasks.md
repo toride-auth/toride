@@ -82,9 +82,9 @@
 
 **Purpose**: Final validation and edge case handling.
 
-- [ ] T015 Validate quickstart.md scenarios end-to-end: local benchmark run, local comparison of two runs, verify documented commands work as written
-- [ ] T016 Handle edge case: first-ever run on a new repo (no main branch baseline exists). Verify compare.ts exits 0 and benchmark.yml posts an informational comment
-- [ ] T017 Handle edge case: new operation added to engine. Verify comparison reports it as "new" without failing
+- [X] T015 Validate quickstart.md scenarios end-to-end: local benchmark run, local comparison of two runs, verify documented commands work as written
+- [X] T016 Handle edge case: first-ever run on a new repo (no main branch baseline exists). Verify compare.ts exits 0 and benchmark.yml posts an informational comment
+- [X] T017 Handle edge case: new operation added to engine. Verify comparison reports it as "new" without failing
 
 ---
 

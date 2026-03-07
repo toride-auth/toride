@@ -37,6 +37,7 @@ jobs:
 
       - name: Run benchmarks (baseline)
         id: baseline
+        continue-on-error: true
         run: |
           cd packages/toride
           pnpm exec vitest bench --outputJson /tmp/baseline.json
@@ -77,9 +78,14 @@ jobs:
       - name: Check comparison result
         id: check_result
         run: |
+          baseline_outcome="${{ steps.baseline.outcome }}"
           exit_code=${{ steps.compare.outcome == 'success' && '0' || '1' }}
 
-          if [ ! -f /tmp/report.json ]; then
+          # First-ever run: baseline benchmarks failed (no bench files on main)
+          if [ "$baseline_outcome" = "failure" ] && [ ! -f /tmp/baseline.json ]; then
+            echo "status=first_run" >> "$GITHUB_OUTPUT"
+            echo "message=First benchmark run — no baseline on main branch yet. Results recorded for future comparisons." >> "$GITHUB_OUTPUT"
+          elif [ ! -f /tmp/report.json ]; then
             echo "status=error" >> "$GITHUB_OUTPUT"
             echo "message=Benchmark comparison script failed (infrastructure error). Check logs for details." >> "$GITHUB_OUTPUT"
           elif [ "$exit_code" = "1" ]; then

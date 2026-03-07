@@ -6,8 +6,8 @@
 # From repo root — runs all 27 benchmark cases
 pnpm exec nx run toride:bench
 
-# Or directly with vitest
-cd packages/toride && npx vitest bench
+# Or directly with vitest (--run disables watch mode)
+cd packages/toride && npx vitest bench --run
 ```
 
 Expected output: A table showing operations per second, median time, and iterations for all 9 operations across 3 tiers. Should complete in < 60 seconds.
@@ -17,9 +17,9 @@ Expected output: A table showing operations per second, median time, and iterati
 ```bash
 # Run benchmarks and save JSON output
 cd packages/toride
-npx vitest bench --reporter=json --outputFile=baseline.json
+npx vitest bench --run --outputJson baseline.json
 # ... make changes ...
-npx vitest bench --reporter=json --outputFile=current.json
+npx vitest bench --run --outputJson current.json
 
 # Compare
 npx tsx bench/compare.ts --baseline baseline.json --current current.json --markdown report.md
