@@ -109,10 +109,10 @@
 
 **Independent Test**: Write policy with simplified syntax, verify it loads and evaluates correctly. Write policy with old syntax, verify it's rejected with clear error.
 
-- [ ] T027 [US5] Update policy parser to handle string-only relation values (already changed in schema, ensure YAML parsing works end-to-end) in `packages/toride/src/policy/parser.ts`
-- [ ] T028 [US5] Add validation error for old relation syntax (`{ resource: ..., cardinality: ... }`) with clear migration message in `packages/toride/src/policy/validator.ts`
-- [ ] T029 [US5] Update all references to `relationDef.resource` and `relationDef.cardinality` across the codebase to use the string value directly — search and fix any remaining usages in `packages/toride/src/evaluation/condition.ts`, `packages/toride/src/partial/constraint-builder.ts`
-- [ ] T030 [US5] Write integration tests for US5 acceptance scenarios: simplified syntax loads and works, old syntax rejected with error in `packages/toride/src/__tests__/` (extend or new test file)
+- [X] T027 [US5] Update policy parser to handle string-only relation values (already changed in schema, ensure YAML parsing works end-to-end) in `packages/toride/src/policy/parser.ts`
+- [X] T028 [US5] Add validation error for old relation syntax (`{ resource: ..., cardinality: ... }`) with clear migration message in `packages/toride/src/policy/validator.ts`
+- [X] T029 [US5] Update all references to `relationDef.resource` and `relationDef.cardinality` across the codebase to use the string value directly — search and fix any remaining usages in `packages/toride/src/evaluation/condition.ts`, `packages/toride/src/partial/constraint-builder.ts`
+- [X] T030 [US5] Write integration tests for US5 acceptance scenarios: simplified syntax loads and works, old syntax rejected with error in `packages/toride/src/__tests__/` (extend or new test file)
 
 **Checkpoint**: Simplified relation syntax works. Old syntax rejected. `pnpm exec nx run toride:test` passes for US5 scenarios.
 

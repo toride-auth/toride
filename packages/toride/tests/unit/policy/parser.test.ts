@@ -356,7 +356,7 @@ resources:
       await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
     });
 
-    it("throws ValidationError for invalid cardinality", async () => {
+    it("throws ValidationError with migration message for old relation syntax", async () => {
       const yaml = `
 version: "1"
 actors:
@@ -373,6 +373,8 @@ resources:
         cardinality: multiple
 `;
       await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
+      await expect(loadYaml(yaml)).rejects.toThrow(/old object syntax/);
+      await expect(loadYaml(yaml)).rejects.toThrow(/project:\s*Project/);
     });
   });
 
