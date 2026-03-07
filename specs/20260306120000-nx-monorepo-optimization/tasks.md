@@ -103,12 +103,12 @@
 
 ### Implementation for User Story 4
 
-- [ ] T019 [US4] Create `.github/workflows/` directory structure
-- [ ] T020 [US4] Create `.github/workflows/ci.yml` per contracts/ci-workflow.md (checkout with fetch-depth:0, pnpm setup, node 20, nx-set-shas, `nx affected -t lint test build`)
+- [X] T019 [US4] Create `.github/workflows/` directory structure
+- [X] T020 [US4] Create `.github/workflows/ci.yml` per contracts/ci-workflow.md (checkout with fetch-depth:0, pnpm setup, node 20, nx-set-shas, `nx affected -t lint test build`)
 
 ### Verification for User Story 4
 
-- [ ] T021 [US4] Validate `.github/workflows/ci.yml` syntax with `pnpm exec nx show projects` (smoke test that Nx is operational for CI)
+- [X] T021 [US4] Validate `.github/workflows/ci.yml` syntax with `pnpm exec nx show projects` (smoke test that Nx is operational for CI)
 
 **Checkpoint**: CI workflow file is ready for use on pull requests
 
