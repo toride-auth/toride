@@ -39,7 +39,7 @@ jobs:
         id: baseline
         run: |
           cd packages/toride
-          npx vitest bench --outputJson /tmp/baseline.json
+          pnpm exec vitest bench --outputJson /tmp/baseline.json
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # ── PR: benchmark current branch ───────────────────────────
@@ -56,7 +56,7 @@ jobs:
         id: pr_bench
         run: |
           cd packages/toride
-          npx vitest bench --outputJson /tmp/current.json
+          pnpm exec vitest bench --outputJson /tmp/current.json
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       # ── Compare results ────────────────────────────────────────
@@ -65,7 +65,7 @@ jobs:
         run: |
           export BASELINE_SHA="${{ steps.baseline.outputs.sha }}"
           export GITHUB_SHA="${{ steps.pr_bench.outputs.sha }}"
-          npx tsx packages/toride/bench/compare.ts \
+          pnpm exec tsx packages/toride/bench/compare.ts \
             --baseline /tmp/baseline.json \
             --current /tmp/current.json \
             --threshold 0.20 \
@@ -101,6 +101,9 @@ jobs:
       - name: Post benchmark comment
         if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea  # v7
+        env:
+          CHECK_STATUS: ${{ steps.check_result.outputs.status }}
+          CHECK_MESSAGE: ${{ steps.check_result.outputs.message }}
         with:
           script: |
             const fs = require('fs');
@@ -111,8 +114,8 @@ jobs:
               const summary = fs.readFileSync('/tmp/summary.md', 'utf-8');
               body = `${marker}\n${summary}`;
             } else {
-              const status = '${{ steps.check_result.outputs.status }}';
-              const message = '${{ steps.check_result.outputs.message }}';
+              const status = process.env.CHECK_STATUS;
+              const message = process.env.CHECK_MESSAGE;
               body = `${marker}\n## Benchmark Comparison\n\n${
                 status === 'error'
                   ? `**Error**: ${message}`
