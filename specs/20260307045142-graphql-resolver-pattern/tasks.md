@@ -47,10 +47,10 @@
 
 **Independent Test**: Create engine with per-type resolvers, verify correct resolver called per resource type, verify no error when resolver missing for a type.
 
-- [ ] T009 [US1] Update `Toride` class constructor and `evaluateInternal` to use `Resolvers` map and `AttributeCache` instead of `RelationResolver` and `ResolverCache` in `packages/toride/src/engine.ts`
-- [ ] T010 [US1] Update `evaluate()` function signature to accept `AttributeCache` instead of `RelationResolver`, pass through to role resolution and condition evaluation in `packages/toride/src/evaluation/rule-engine.ts`
-- [ ] T011 [US1] Rewrite `createMockResolver` to construct mock resolver data from new `TestCase.resolvers` field (keyed by `Type:id`) in `packages/toride/src/testing/mock-resolver.ts`
-- [ ] T012 [US1] Write integration tests for US1 acceptance scenarios: correct resolver called per type, trivial resolver for unregistered types, engine works with no resolvers + inline attributes in `packages/toride/src/__tests__/` (new test file)
+- [X] T009 [US1] Update `Toride` class constructor and `evaluateInternal` to use `Resolvers` map and `AttributeCache` instead of `RelationResolver` and `ResolverCache` in `packages/toride/src/engine.ts`
+- [X] T010 [US1] Update `evaluate()` function signature to accept `AttributeCache` instead of `RelationResolver`, pass through to role resolution and condition evaluation in `packages/toride/src/evaluation/rule-engine.ts`
+- [X] T011 [US1] Rewrite `createMockResolver` to construct mock resolver data from new `TestCase.resolvers` field (keyed by `Type:id`) in `packages/toride/src/testing/mock-resolver.ts`
+- [X] T012 [US1] Write integration tests for US1 acceptance scenarios: correct resolver called per type, trivial resolver for unregistered types, engine works with no resolvers + inline attributes in `packages/toride/src/__tests__/` (new test file)
 
 **Checkpoint**: Engine accepts `resolvers` map. Per-type dispatch works. `pnpm exec nx run toride:test` passes for US1 scenarios.
 
@@ -137,11 +137,11 @@
 
 **Purpose**: Final validation, cleanup, and cross-cutting fixes.
 
-- [ ] T037 Update existing test fixtures and YAML policy files to use new relation syntax and resolver mock format across all test directories
-- [ ] T038 Run full test suite across all packages, fix any remaining failures: `pnpm run test`
-- [ ] T039 Run lint across all packages, fix type errors: `pnpm run lint`
-- [ ] T040 Validate quickstart.md examples compile and work end-to-end
-- [ ] T041 Update inline YAML test sections in any policy files to use new `resolvers` mock format instead of `roles`/`relations`
+- [X] T037 Update existing test fixtures and YAML policy files to use new relation syntax and resolver mock format across all test directories
+- [X] T038 Run full test suite across all packages, fix any remaining failures: `pnpm run test`
+- [X] T039 Run lint across all packages, fix type errors: `pnpm run lint`
+- [X] T040 Validate quickstart.md examples compile and work end-to-end
+- [X] T041 Update inline YAML test sections in any policy files to use new `resolvers` mock format instead of `roles`/`relations`
 
 **Checkpoint**: All packages build, lint, and test green. Quickstart examples work. Branch is ready for review.
 
