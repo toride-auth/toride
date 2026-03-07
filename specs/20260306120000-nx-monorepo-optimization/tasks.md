@@ -33,11 +33,11 @@
 
 **CRITICAL**: No user story verification can begin until this phase is complete.
 
-- [ ] T004 Add `"nx": { "tags": ["type:core"] }` to `packages/toride/package.json`
-- [ ] T005 Add `"nx": { "tags": ["type:codegen"] }` to `packages/codegen/package.json`
-- [ ] T006 Add `"nx": { "tags": ["type:integration"] }` to `packages/drizzle/package.json`
-- [ ] T007 Add `"nx": { "tags": ["type:integration"] }` to `packages/prisma/package.json`
-- [ ] T008 Update root `package.json` scripts: `build` -> `nx run-many -t build`, `test` -> `nx run-many -t test`, `lint` -> `nx run-many -t lint`
+- [X] T004 Add `"nx": { "tags": ["type:core"] }` to `packages/toride/package.json`
+- [X] T005 Add `"nx": { "tags": ["type:codegen"] }` to `packages/codegen/package.json`
+- [X] T006 Add `"nx": { "tags": ["type:integration"] }` to `packages/drizzle/package.json`
+- [X] T007 Add `"nx": { "tags": ["type:integration"] }` to `packages/prisma/package.json`
+- [X] T008 Update root `package.json` scripts: `build` -> `nx run-many -t build`, `test` -> `nx run-many -t test`, `lint` -> `nx run-many -t lint`
 
 **Checkpoint**: `pnpm exec nx run-many -t build` succeeds and respects dependency order (toride builds before satellites)
 
