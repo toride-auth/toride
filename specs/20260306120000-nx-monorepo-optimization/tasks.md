@@ -122,8 +122,8 @@
 
 ### Verification for User Story 5
 
-- [ ] T022 [US5] Run `pnpm exec nx graph --file=output.json` and verify the dependency graph shows toride as core with codegen, drizzle, prisma depending on it
-- [ ] T023 [US5] Run `pnpm exec nx show project @toride/drizzle` and verify output includes targets (build, test, lint), tags (type:integration), and dependencies (toride)
+- [X] T022 [US5] Run `pnpm exec nx graph --file=output.json` and verify the dependency graph shows toride as core with codegen, drizzle, prisma depending on it
+- [X] T023 [US5] Run `pnpm exec nx show project @toride/drizzle` and verify output includes targets (build, test, lint), tags (type:integration), and dependencies (toride)
 
 **Checkpoint**: Project graph correctly represents the monorepo dependency structure
 
