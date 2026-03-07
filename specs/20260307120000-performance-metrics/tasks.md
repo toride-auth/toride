@@ -19,9 +19,9 @@
 
 **Purpose**: Add bench target to the Nx monorepo and create the directory structure for benchmarks.
 
-- [ ] T001 Add `"bench": "vitest bench"` script to `packages/toride/package.json`
-- [ ] T002 Add `bench` target defaults to `nx.json` with `cache: false`
-- [ ] T003 Create benchmark directory structure: `packages/toride/bench/`, `packages/toride/bench/fixtures/`, `packages/toride/bench/helpers/`
+- [X] T001 Add `"bench": "vitest bench"` script to `packages/toride/package.json`
+- [X] T002 Add `bench` target defaults to `nx.json` with `cache: false`
+- [X] T003 Create benchmark directory structure: `packages/toride/bench/`, `packages/toride/bench/fixtures/`, `packages/toride/bench/helpers/`
 
 **Checkpoint**: `pnpm exec nx run toride:bench` is recognized as a target (will fail since no bench files exist yet)
 
