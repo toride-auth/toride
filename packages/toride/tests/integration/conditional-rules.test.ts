@@ -79,27 +79,13 @@ resources:
       member: []
 `;
 
-  function makeResolvers(attrs: Record<string, Record<string, unknown>>): Resolvers {
-    const typeSet = new Set<string>();
-    for (const key of Object.keys(attrs)) {
-      const ci = key.indexOf(":");
-      if (ci > 0) typeSet.add(key.substring(0, ci));
-    }
-    const resolvers: Resolvers = {};
-    for (const type of typeSet) {
-      resolvers[type] = async (ref) => {
-        const key = `${ref.type}:${ref.id}`;
-        return attrs[key] ?? {};
-      };
-    }
-    return resolvers;
-  }
-
   // ─── Permit rule grants conditional access ──────────────────────────
 
   it("editor can publish when document is in review and level >= 3", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ status: "review", locked: false, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -109,7 +95,9 @@ resources:
 
   it("editor cannot publish when level < 3", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ status: "review", locked: false, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 2, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -119,7 +107,9 @@ resources:
 
   it("editor cannot publish when document is not in review", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { status: "draft", locked: false, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ status: "draft", locked: false, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -131,7 +121,9 @@ resources:
 
   it("admin cannot delete locked document (forbid overrides grant)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { locked: true, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ locked: true, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -143,7 +135,9 @@ resources:
 
   it("admin can delete unlocked document", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { locked: false, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ locked: false, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 10, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -155,7 +149,9 @@ resources:
 
   it("archived document forbids write and publish", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { locked: false, archived: true, status: "review" } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ locked: false, archived: true, status: "review" }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_admin: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -170,7 +166,9 @@ resources:
 
   it("viewer cannot publish even when conditions match (roles guard)", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({ "Document:d1": { status: "review", locked: false, archived: false } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ status: "review", locked: false, archived: false }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_viewer: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
@@ -206,7 +204,9 @@ resources:
 `;
     const policy = await loadYaml(CUSTOM_POLICY);
     const isMaintenanceWindow: EvaluatorFn = async () => true;
-    const resolvers = makeResolvers({ "Document:d1": { status: "active" } });
+    const resolvers: Resolvers = {
+      Document: async () => ({ status: "active" }),
+    };
     const engine = createToride({
       policy,
       resolvers,

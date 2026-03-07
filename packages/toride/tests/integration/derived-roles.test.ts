@@ -86,22 +86,6 @@ resources:
     permissions: []
 `;
 
-  function makeResolvers(attrs: Record<string, Record<string, unknown>>): Resolvers {
-    const typeSet = new Set<string>();
-    for (const key of Object.keys(attrs)) {
-      const ci = key.indexOf(":");
-      if (ci > 0) typeSet.add(key.substring(0, ci));
-    }
-    const resolvers: Resolvers = {};
-    for (const type of typeSet) {
-      resolvers[type] = async (ref) => {
-        const key = `${ref.type}:${ref.id}`;
-        return attrs[key] ?? {};
-      };
-    }
-    return resolvers;
-  }
-
   // ─── Acceptance Scenario 1: Org admin -> Project admin via relation ──
   // Relation target is expressed as a ResourceRef attribute on the resource
 
@@ -174,9 +158,9 @@ resources:
     permissions: []
 `;
     const policy2 = await loadYaml(orgAdminPolicy);
-    const resolvers = makeResolvers({
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+    const resolvers: Resolvers = {
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy: policy2, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { is_org_admin: true } };
     const project: ResourceRef = { type: "Project", id: "p1" };
@@ -190,9 +174,9 @@ resources:
 
   it("derives Project owner from superadmin global role", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+    const resolvers: Resolvers = {
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = {
       type: "User",
@@ -209,9 +193,9 @@ resources:
 
   it("does not derive superadmin role for non-matching actor", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+    const resolvers: Resolvers = {
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = {
       type: "User",
@@ -228,13 +212,13 @@ resources:
 
   it("derives Task editor from assignee identity relation", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Task:t1": {
+    const resolvers: Resolvers = {
+      Task: async () => ({
         assignee: { type: "User", id: "u1" },
         project: { type: "Project", id: "p1" },
-      },
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+      }),
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const task: ResourceRef = { type: "Task", id: "t1" };
@@ -246,13 +230,13 @@ resources:
 
   it("does not derive Task editor when assignee is different user", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Task:t1": {
+    const resolvers: Resolvers = {
+      Task: async () => ({
         assignee: { type: "User", id: "u999" },
         project: { type: "Project", id: "p1" },
-      },
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+      }),
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const task: ResourceRef = { type: "Task", id: "t1" };
@@ -264,11 +248,11 @@ resources:
 
   it("skips derived roles when actor type does not match", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Task:t1": {
+    const resolvers: Resolvers = {
+      Task: async () => ({
         assignee: { type: "User", id: "sa1" },
-      },
-    });
+      }),
+    };
     const engine = createToride({ policy, resolvers });
     // ServiceAccount has same ID as assignee target ID, but type differs
     const actor: ActorRef = { type: "ServiceAccount", id: "sa1", attributes: {} };
@@ -340,13 +324,13 @@ resources:
     permissions: []
 `;
     const policy = await loadYaml(viewerPolicy);
-    const resolvers = makeResolvers({
-      "Task:t1": {
+    const resolvers: Resolvers = {
+      Task: async () => ({
         project: { type: "Project", id: "p1" },
         assignee: { type: "User", id: "other" },
-      },
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+      }),
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: { is_project_viewer: true } };
     const task: ResourceRef = { type: "Task", id: "t1" };
@@ -359,9 +343,9 @@ resources:
 
   it("denies access when no direct or derived roles match", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+    const resolvers: Resolvers = {
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
     const project: ResourceRef = { type: "Project", id: "p1" };
@@ -373,9 +357,9 @@ resources:
 
   it("still supports derived roles alongside global roles", async () => {
     const policy = await loadYaml(POLICY_YAML);
-    const resolvers = makeResolvers({
-      "Project:p1": { org: { type: "Organization", id: "org1" } },
-    });
+    const resolvers: Resolvers = {
+      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+    };
     const engine = createToride({ policy, resolvers });
     // Superadmin gets owner via global role
     const actor: ActorRef = { type: "User", id: "u1", attributes: { isSuperAdmin: true } };
