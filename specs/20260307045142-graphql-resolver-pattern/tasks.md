@@ -62,9 +62,9 @@
 
 **Independent Test**: Provide inline attributes, verify resolver never called. Provide partial inline, verify resolver fills gaps without overwriting inline.
 
-- [ ] T013 [US2] Implement inline-first resolution in `AttributeCache.resolve()`: check `ref.attributes` before calling resolver, merge results with inline precedence in `packages/toride/src/evaluation/cache.ts`
-- [ ] T014 [US2] Update `resolveResourcePath` in condition evaluator to use `AttributeCache` for attribute lookups instead of direct `resolver.getAttributes()` calls in `packages/toride/src/evaluation/condition.ts`
-- [ ] T015 [US2] Write integration tests for US2 acceptance scenarios: inline-only (zero resolver calls), partial inline + resolver merge, trivial resolver (no resolver + no inline = undefined) in `packages/toride/src/__tests__/` (extend or new test file)
+- [X] T013 [US2] Implement inline-first resolution in `AttributeCache.resolve()`: check `ref.attributes` before calling resolver, merge results with inline precedence in `packages/toride/src/evaluation/cache.ts`
+- [X] T014 [US2] Update `resolveResourcePath` in condition evaluator to use `AttributeCache` for attribute lookups instead of direct `resolver.getAttributes()` calls in `packages/toride/src/evaluation/condition.ts`
+- [X] T015 [US2] Write integration tests for US2 acceptance scenarios: inline-only (zero resolver calls), partial inline + resolver merge, trivial resolver (no resolver + no inline = undefined) in `packages/toride/src/__tests__/` (extend or new test file)
 
 **Checkpoint**: Inline attributes work. Zero resolver calls when all data provided inline. `pnpm exec nx run toride:test` passes for US2 scenarios.
 
