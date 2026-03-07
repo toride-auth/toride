@@ -434,19 +434,25 @@ function evaluateWhenOnly(
  * Minimal implementation for US2 — handles $actor.x attribute matching.
  * Full condition evaluation deferred to US3.
  */
+/** Maximum nesting depth for any/all combinators in actor conditions (fail-closed). */
+const MAX_ACTOR_COMBINATOR_DEPTH = 10;
+
 function evaluateActorCondition(
   condition: ConditionExpression,
   actor: ActorRef,
+  combinatorDepth: number = 0,
 ): boolean {
-  // Handle logical combinators
+  // Handle logical combinators with recursion depth limit
   if ("any" in condition && Array.isArray(condition.any)) {
+    if (combinatorDepth >= MAX_ACTOR_COMBINATOR_DEPTH) return false;
     return (condition.any as ConditionExpression[]).some((c) =>
-      evaluateActorCondition(c, actor),
+      evaluateActorCondition(c, actor, combinatorDepth + 1),
     );
   }
   if ("all" in condition && Array.isArray(condition.all)) {
+    if (combinatorDepth >= MAX_ACTOR_COMBINATOR_DEPTH) return false;
     return (condition.all as ConditionExpression[]).every((c) =>
-      evaluateActorCondition(c, actor),
+      evaluateActorCondition(c, actor, combinatorDepth + 1),
     );
   }
 

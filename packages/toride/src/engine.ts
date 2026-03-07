@@ -344,7 +344,7 @@ export class Toride {
 
   /**
    * Evaluate with full ExplainResult (shared code path for can(), explain(), and helpers).
-   * Accepts an optional pre-existing ResolverCache for shared-cache scenarios (canBatch, permittedActions).
+   * Accepts an optional pre-existing AttributeCache for shared-cache scenarios (canBatch, permittedActions).
    */
   private async evaluateInternal(
     actor: ActorRef,

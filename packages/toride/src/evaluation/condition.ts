@@ -295,6 +295,9 @@ async function resolveResourcePath(
   }
 }
 
+/** Property names that must never be traversed (prototype pollution guard). */
+const FORBIDDEN_PROPS = new Set(["__proto__", "constructor", "prototype"]);
+
 /**
  * Get a nested attribute from an object using dot-separated path.
  */
@@ -303,6 +306,7 @@ function getNestedAttribute(obj: Record<string, unknown>, path: string): unknown
   let current: unknown = obj;
 
   for (const part of parts) {
+    if (FORBIDDEN_PROPS.has(part)) return UNDEFINED_SENTINEL;
     if (current === null || current === undefined || typeof current !== "object") {
       return UNDEFINED_SENTINEL;
     }
