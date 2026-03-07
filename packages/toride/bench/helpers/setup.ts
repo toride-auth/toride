@@ -295,8 +295,6 @@ interface TierTestData {
   field: string;
   /** Field operation for canField/permittedFields */
   fieldOperation: "read" | "update";
-  /** Env context for operations that use it */
-  env: Record<string, unknown>;
 }
 
 function buildTestData(tier: Tier): TierTestData {
@@ -323,7 +321,6 @@ function buildTestData(tier: Tier): TierTestData {
         ],
         field: "title",
         fieldOperation: "read",
-        env: {},
       };
 
     case "medium":
@@ -360,7 +357,6 @@ function buildTestData(tier: Tier): TierTestData {
         ],
         field: "title",
         fieldOperation: "read",
-        env: {},
       };
 
     case "large":
@@ -405,7 +401,6 @@ function buildTestData(tier: Tier): TierTestData {
         ],
         field: "title",
         fieldOperation: "read",
-        env: { release_window: true },
       };
   }
 }

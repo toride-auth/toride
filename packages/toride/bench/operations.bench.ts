@@ -7,7 +7,7 @@
  * Run with: pnpm exec nx run toride:bench
  */
 
-import { describe, bench, beforeAll } from "vitest";
+import { describe, bench } from "vitest";
 import { createBenchEngine, type BenchEngine, type Tier } from "./helpers/setup.js";
 
 const tiers: Tier[] = ["small", "medium", "large"];
