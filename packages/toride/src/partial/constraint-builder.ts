@@ -7,7 +7,7 @@
 
 import type {
   ActorRef,
-  RelationResolver,
+  // RelationResolver removed — replaced by AttributeCache
   Policy,
   ResourceBlock,
   DerivedRoleEntry,
@@ -21,6 +21,7 @@ import type {
   Constraint,
   ConstraintResult,
 } from "./constraint-types.js";
+import type { AttributeCache } from "../evaluation/cache.js";
 
 // ─── Module-level operator key set ────────────────────────────────
 
@@ -44,7 +45,7 @@ export async function buildConstraints(
   actor: ActorRef,
   action: string,
   resourceType: string,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   policy: Policy,
   options?: CheckOptions & {
     maxDerivedRoleDepth?: number;
@@ -83,7 +84,7 @@ export async function buildConstraints(
     for (const entry of derivedEntries) {
       if (entry.role !== role) continue;
       const constraint = await evaluateDerivedRoleConstraint(
-        entry, actor, resourceType, resolver, policy, resourceBlock,
+        entry, actor, resourceType, cache, policy, resourceBlock, env,
       );
       if (constraint !== null) constraints.push(constraint);
     }
@@ -212,9 +213,10 @@ async function evaluateDerivedRoleConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
   _resourceType: string,
-  _resolver: RelationResolver,
+  _cache: AttributeCache,
   policy: Policy,
   resourceBlock: ResourceBlock,
+  env: Record<string, unknown>,
 ): Promise<Constraint | null> {
   // Pattern 1: from_global_role
   if (entry.from_global_role !== undefined) {
@@ -233,12 +235,12 @@ async function evaluateDerivedRoleConstraint(
 
   // Pattern 4: actor_type + when
   if (entry.actor_type !== undefined && entry.when !== undefined) {
-    return evaluateActorTypeConstraint(entry, actor);
+    return evaluateActorTypeConstraint(entry, actor, env);
   }
 
   // Pattern 5: when only
   if (entry.when !== undefined) {
-    return evaluateWhenOnlyConstraint(entry, actor);
+    return evaluateWhenOnlyConstraint(entry, actor, env);
   }
 
   return null;
@@ -283,7 +285,7 @@ function evaluateRelationRoleConstraint(
   const relationDef = resourceBlock.relations?.[relationName];
   if (!relationDef) return null;
 
-  const targetResourceType = relationDef.resource;
+  const targetResourceType = relationDef;
 
   // Emit a relation constraint wrapping a has_role constraint
   // This tells the adapter: "the related resource must have a role assignment for this actor"
@@ -325,7 +327,7 @@ function evaluateRelationIdentityConstraint(
   return {
     type: "relation",
     field: relationName,
-    resourceType: relationDef.resource,
+    resourceType: relationDef,
     constraint: {
       type: "and",
       children: [
@@ -338,31 +340,36 @@ function evaluateRelationIdentityConstraint(
 
 // ─── Pattern 4: Actor Type + When ────────────────────────────────
 
+/**
+ * T025: Evaluate actor-type + when constraint.
+ * If the when clause contains $resource.* references, emit field constraints.
+ * Actor part is evaluated eagerly; if it fails, no constraint emitted.
+ */
 function evaluateActorTypeConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
+  env: Record<string, unknown>,
 ): Constraint | null {
   // Skip if actor type doesn't match
   if (actor.type !== entry.actor_type) return null;
 
-  // Evaluate condition against actor attributes
-  if (!evaluateActorCondition(entry.when!, actor)) return null;
-
-  // Condition matched on actor attributes - unconditional access
-  return { type: "always" };
+  // Convert the when condition to a constraint (handles $resource.*, $actor.*, $env.*)
+  return conditionToConstraint(entry.when!, actor, env);
 }
 
 // ─── Pattern 5: When Only ────────────────────────────────────────
 
+/**
+ * T025: Evaluate when-only constraint.
+ * If the when clause contains $resource.* references, emit field constraints.
+ */
 function evaluateWhenOnlyConstraint(
   entry: DerivedRoleEntry,
   actor: ActorRef,
+  env: Record<string, unknown>,
 ): Constraint | null {
-  // Evaluate condition against actor attributes only
-  if (!evaluateActorCondition(entry.when!, actor)) return null;
-
-  // Condition matched - unconditional access
-  return { type: "always" };
+  // Convert the when condition to a constraint (handles $resource.*, $actor.*, $env.*)
+  return conditionToConstraint(entry.when!, actor, env);
 }
 
 // ─── Condition to Constraint Conversion ───────────────────────────
@@ -465,9 +472,10 @@ function pairToConstraint(
 
   if (key.startsWith("$env.")) {
     // The left side is an env value - known at partial eval time
+    // Fail-closed: if env value is missing, the condition cannot be satisfied
     const envPath = key.slice(5);
     const envValue = env[envPath];
-    if (envValue === undefined || envValue === null) return null;
+    if (envValue === undefined || envValue === null) return { type: "never" };
 
     if (isOperator(conditionValue)) {
       return evaluateActorOperatorConstraint(envValue, conditionValue, actor, env);
@@ -560,6 +568,14 @@ function evaluateActorOperatorConstraint(
     return (opValue === true ? exists : !exists) ? { type: "always" } : { type: "never" };
   }
 
+  // T025: If the right side is a $resource.* reference, emit a field constraint
+  // instead of trying to resolve it statically.
+  if (typeof opValue === "string" && (opValue as string).startsWith("$resource.")) {
+    const field = (opValue as string).slice(10);
+    if (leftValue === undefined || leftValue === null) return { type: "never" };
+    return actorResourceCrossConstraint(leftValue, opKey, field);
+  }
+
   const resolvedRight = resolveStaticValue(opValue as ConditionValue, actor, env);
 
   if (leftValue === undefined || leftValue === null) return { type: "never" };
@@ -583,6 +599,50 @@ function evaluateActorOperatorConstraint(
   }
 
   return result ? { type: "always" } : { type: "never" };
+}
+
+/**
+ * T025: Emit a field constraint when the left side is a known actor/env value
+ * and the right side is a $resource.* reference.
+ * E.g., $actor.id: { in: $resource.editor_ids } -> field_includes(editor_ids, actor.id)
+ */
+function actorResourceCrossConstraint(
+  leftValue: unknown,
+  opKey: string,
+  resourceField: string,
+): Constraint | null {
+  // Flip the operator: actor is left, resource is right
+  // $actor.x eq $resource.y  -> field_eq(y, actor.x)
+  // $actor.x neq $resource.y -> field_neq(y, actor.x)
+  // $actor.x in $resource.y  -> field_includes(y, actor.x) (resource array includes actor value)
+  // $actor.x gt $resource.y  -> field_lt(y, actor.x) (flipped)
+  switch (opKey) {
+    case "eq":
+      return { type: "field_eq", field: resourceField, value: leftValue };
+    case "neq":
+      return { type: "field_neq", field: resourceField, value: leftValue };
+    case "in":
+      // actor.x IN resource.y -> resource.y includes actor.x
+      return { type: "field_includes", field: resourceField, value: leftValue };
+    case "includes":
+      // actor.x includes resource.y -> resource.y in actor.x
+      if (Array.isArray(leftValue)) {
+        return { type: "field_in", field: resourceField, values: leftValue as unknown[] };
+      }
+      return null;
+    case "gt":
+      return { type: "field_lt", field: resourceField, value: leftValue };
+    case "gte":
+      return { type: "field_lte", field: resourceField, value: leftValue };
+    case "lt":
+      return { type: "field_gt", field: resourceField, value: leftValue };
+    case "lte":
+      return { type: "field_gte", field: resourceField, value: leftValue };
+    default:
+      // Fail-closed: unsupported operators (startsWith, endsWith, contains, custom)
+      // must not silently pass — deny access to maintain security invariant
+      return { type: "never" };
+  }
 }
 
 // ─── Static Value Resolution ─────────────────────────────────────

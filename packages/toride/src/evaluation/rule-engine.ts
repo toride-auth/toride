@@ -9,7 +9,7 @@
 import type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  // RelationResolver removed — replaced by AttributeCache
   ResourceBlock,
   ExplainResult,
   MatchedRule,
@@ -17,6 +17,7 @@ import type {
   Rule,
   EvaluatorFn,
 } from "../types.js";
+import type { AttributeCache } from "./cache.js";
 import { resolveRoles } from "./role-resolver.js";
 import { evaluateCondition } from "./condition.js";
 
@@ -67,7 +68,7 @@ export async function evaluate(
   action: string,
   resource: ResourceRef,
   resourceBlock: ResourceBlock,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   policy: Policy,
   options?: {
     maxDerivedRoleDepth?: number;
@@ -80,7 +81,7 @@ export async function evaluate(
   const resolvedRoles = await resolveRoles(
     actor,
     resource,
-    resolver,
+    cache,
     resourceBlock,
     policy,
     options,
@@ -115,7 +116,7 @@ export async function evaluate(
       allRoles,
       actor,
       resource,
-      resolver,
+      cache,
       env,
       resourceBlock,
       policy,
@@ -163,7 +164,7 @@ async function evaluateRules(
   allRoles: string[],
   actor: ActorRef,
   resource: ResourceRef,
-  resolver: RelationResolver,
+  cache: AttributeCache,
   env: Record<string, unknown>,
   resourceBlock: ResourceBlock,
   policy: Policy,
@@ -215,7 +216,7 @@ async function evaluateRules(
         rule.when,
         actor,
         resource,
-        resolver,
+        cache,
         env,
         resourceBlock,
         policy,

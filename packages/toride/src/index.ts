@@ -23,7 +23,8 @@ export type {
 export type {
   ActorRef,
   ResourceRef,
-  RelationResolver,
+  ResourceResolver,
+  Resolvers,
   Policy,
   TorideOptions,
   CheckOptions,
@@ -32,7 +33,6 @@ export type {
   AttributeType,
   ActorDeclaration,
   GlobalRole,
-  RelationDef,
   DerivedRoleEntry,
   Rule,
   FieldAccessDef,

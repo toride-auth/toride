@@ -8,7 +8,6 @@ import type {
   ActorDeclaration,
   DerivedRoleEntry,
   Rule,
-  RelationDef,
 } from "../types.js";
 
 /** Keys that must be rejected to prevent prototype pollution */
@@ -178,9 +177,9 @@ function mergeGrants(
 }
 
 function mergeRelations(
-  base?: Record<string, RelationDef>,
-  overlay?: Record<string, RelationDef>,
-): Record<string, RelationDef> | undefined {
+  base?: Record<string, string>,
+  overlay?: Record<string, string>,
+): Record<string, string> | undefined {
   if (!base && !overlay) return undefined;
   if (base) assertNoDangerousKeys(base, "base relations");
   if (overlay) assertNoDangerousKeys(overlay, "overlay relations");

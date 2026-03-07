@@ -8,10 +8,53 @@ import { ValidationError } from "../types.js";
 import type { Policy } from "../types.js";
 
 /**
+ * Pre-schema check: detect old relation object syntax and throw a
+ * migration-specific error before Valibot gives a cryptic type error.
+ *
+ * Old syntax: `relations: { org: { resource: Organization, cardinality: one } }`
+ * New syntax: `relations: { org: Organization }`
+ */
+function detectOldRelationSyntax(raw: unknown): void {
+  if (typeof raw !== "object" || raw === null) return;
+  const obj = raw as Record<string, unknown>;
+  const resources = obj.resources;
+  if (typeof resources !== "object" || resources === null) return;
+
+  for (const [resName, resDef] of Object.entries(
+    resources as Record<string, unknown>,
+  )) {
+    if (typeof resDef !== "object" || resDef === null) continue;
+    const relations = (resDef as Record<string, unknown>).relations;
+    if (typeof relations !== "object" || relations === null) continue;
+
+    for (const [relName, relDef] of Object.entries(
+      relations as Record<string, unknown>,
+    )) {
+      if (typeof relDef === "object" && relDef !== null) {
+        const relObj = relDef as Record<string, unknown>;
+        if ("resource" in relObj) {
+          const targetType = String(relObj.resource ?? relName);
+          throw new ValidationError(
+            `Relation "${relName}" on resource "${resName}" uses the old object syntax ` +
+              `({ resource: ..., cardinality: ... }). ` +
+              `Relations must now be a plain type name. ` +
+              `Change to: ${relName}: ${targetType}`,
+            `resources.${resName}.relations.${relName}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
  * Internal helper: validate a raw object against the Valibot schema,
  * then run cross-reference semantic validation.
  */
 function parsePolicy(raw: unknown): Policy {
+  // Pre-pass: detect old relation syntax before schema validation
+  detectOldRelationSyntax(raw);
+
   // Pass 1: Structural validation via Valibot
   const result = v.safeParse(PolicySchema, raw);
   if (!result.success) {

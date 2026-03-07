@@ -11,8 +11,8 @@ import type { Policy, ResourceBlock } from "toride";
  * - Resources: union of all resource type names
  * - RoleMap: per-resource role union types
  * - PermissionMap: per-resource permission union types
- * - RelationMap: per-resource relation details
- * - TypedRelationResolver: typed resolver interface
+ * - RelationMap: per-resource relation target types
+ * - ResolverMap: typed per-type resolver map
  */
 /** Safe identifier pattern: alphanumeric + underscore, starting with a letter or underscore */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -53,7 +53,7 @@ export function generateTypes(policy: Policy): string {
     if (block.relations) {
       for (const [relName, relDef] of Object.entries(block.relations)) {
         assertSafeIdentifier(relName, `relation name in resource "${rName}"`);
-        assertSafeIdentifier(relDef.resource, `relation target in resource "${rName}"`);
+        assertSafeIdentifier(relDef, `relation target in resource "${rName}"`);
       }
     }
   }
@@ -115,7 +115,7 @@ export function generateTypes(policy: Policy): string {
   lines.push("");
 
   // RelationMap
-  lines.push(`/** Relation map — resource type -> relation name -> target info */`);
+  lines.push(`/** Relation map — resource type -> relation name -> target resource type */`);
   lines.push(`export interface RelationMap {`);
   for (const [name, block] of Object.entries(policy.resources)) {
     const relations = block.relations ?? {};
@@ -125,7 +125,7 @@ export function generateTypes(policy: Policy): string {
     } else {
       lines.push(`  ${name}: {`);
       for (const [relName, relDef] of relEntries) {
-        lines.push(`    ${relName}: { type: "${relDef.resource}"; cardinality: "${relDef.cardinality}" };`);
+        lines.push(`    ${relName}: "${relDef}";`);
       }
       lines.push(`  };`);
     }
@@ -133,23 +133,13 @@ export function generateTypes(policy: Policy): string {
   lines.push(`}`);
   lines.push("");
 
-  // TypedRelationResolver
-  lines.push(`/** Typed relation resolver — TypeScript errors if you miss a relation */`);
-  lines.push(`export interface TypedRelationResolver {`);
-  lines.push(`  getRelated<R extends keyof RelationMap>(`);
-  lines.push(`    resource: { type: R; id: string },`);
-  lines.push(`    relation: keyof RelationMap[R]`);
-  lines.push(`  ): Promise<{ type: string; id: string } | { type: string; id: string }[]>;`);
-  lines.push(``);
-  lines.push(`  getRoles(`);
-  lines.push(`    actor: { type: string; id: string; attributes: Record<string, unknown> },`);
-  lines.push(`    resource: { type: string; id: string }`);
-  lines.push(`  ): Promise<string[]>;`);
-  lines.push(``);
-  lines.push(`  getAttributes(`);
-  lines.push(`    ref: { type: string; id: string }`);
-  lines.push(`  ): Promise<Record<string, unknown>>;`);
-  lines.push(`}`);
+  // ResolverMap
+  lines.push(`/** Per-type resolver map — TypeScript ensures all resource types have resolvers */`);
+  lines.push(`export type ResolverMap = {`);
+  lines.push(`  [R in Resources]?: (`);
+  lines.push(`    ref: { type: R; id: string; attributes?: Record<string, unknown> },`);
+  lines.push(`  ) => Promise<Record<string, unknown>>;`);
+  lines.push(`};`);
   lines.push("");
 
   return lines.join("\n");

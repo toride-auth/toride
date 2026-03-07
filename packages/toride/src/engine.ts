@@ -11,7 +11,7 @@ import type {
   CheckOptions,
   TorideOptions,
   Policy,
-  RelationResolver,
+  Resolvers,
   ExplainResult,
   BatchCheckItem,
   DecisionEvent,
@@ -23,7 +23,7 @@ import type {
   ConstraintAdapter,
 } from "./partial/constraint-types.js";
 import { evaluate } from "./evaluation/rule-engine.js";
-import { ResolverCache } from "./evaluation/cache.js";
+import { AttributeCache } from "./evaluation/cache.js";
 import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-builder.js";
 import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
 import { snapshot as snapshotImpl } from "./snapshot.js";
@@ -40,12 +40,12 @@ import {
  */
 export class Toride {
   private policy: Policy;
-  private readonly resolver: RelationResolver;
+  private readonly resolvers: Resolvers;
   private readonly options: TorideOptions;
 
   constructor(options: TorideOptions) {
     this.policy = options.policy;
-    this.resolver = options.resolver;
+    this.resolvers = options.resolvers ?? {};
     this.options = options;
   }
 
@@ -102,7 +102,7 @@ export class Toride {
       return [];
     }
 
-    const sharedCache = new ResolverCache(this.resolver);
+    const sharedCache = new AttributeCache(this.resolvers);
     const permitted: string[] = [];
 
     for (const action of resourceBlock.permissions) {
@@ -187,7 +187,7 @@ export class Toride {
     // Use any action just to trigger evaluation for role resolution;
     // pick the first permission or use a dummy
     const action = resourceBlock.permissions[0] ?? "__resolvedRoles__";
-    const result = await this.evaluateInternal(actor, action, { type: resource.type, id: resource.id }, options);
+    const result = await this.evaluateInternal(actor, action, resource, options);
 
     const directRoles = result.resolvedRoles.direct;
     const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
@@ -207,7 +207,7 @@ export class Toride {
       return [];
     }
 
-    const sharedCache = new ResolverCache(this.resolver);
+    const sharedCache = new AttributeCache(this.resolvers);
     const results: boolean[] = [];
 
     for (const check of checks) {
@@ -235,12 +235,12 @@ export class Toride {
     resourceType: string,
     options?: CheckOptions,
   ): Promise<ConstraintResult> {
-    const cachedResolver = new ResolverCache(this.resolver);
+    const cache = new AttributeCache(this.resolvers);
     const constraintResult = await buildConstraintsImpl(
       actor,
       action,
       resourceType,
-      cachedResolver,
+      cache,
       this.policy,
       {
         env: options?.env,
@@ -344,14 +344,14 @@ export class Toride {
 
   /**
    * Evaluate with full ExplainResult (shared code path for can(), explain(), and helpers).
-   * Accepts an optional pre-existing ResolverCache for shared-cache scenarios (canBatch, permittedActions).
+   * Accepts an optional pre-existing AttributeCache for shared-cache scenarios (canBatch, permittedActions).
    */
   private async evaluateInternal(
     actor: ActorRef,
     action: string,
     resource: ResourceRef,
     checkOptions?: CheckOptions,
-    existingCache?: ResolverCache,
+    existingCache?: AttributeCache,
   ): Promise<ExplainResult> {
     // Look up resource block; unknown resource type -> default deny
     const resourceBlock = this.policy.resources[resource.type];
@@ -366,12 +366,12 @@ export class Toride {
     }
 
     // Use existing cache or create a new one
-    const cachedResolver = existingCache ?? new ResolverCache(this.resolver);
+    const cache = existingCache ?? new AttributeCache(this.resolvers);
     const env = checkOptions?.env ?? {};
 
     // T052: Forward all options including customEvaluators and maxConditionDepth
     try {
-      return await evaluate(actor, action, resource, resourceBlock, cachedResolver, this.policy, {
+      return await evaluate(actor, action, resource, resourceBlock, cache, this.policy, {
         maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
         maxConditionDepth: this.options.maxConditionDepth,
         customEvaluators: this.options.customEvaluators,

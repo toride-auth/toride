@@ -3,7 +3,7 @@
 
 export const VERSION = "0.0.1";
 
-import type { ConstraintAdapter, LeafConstraint } from "toride";
+import type { ConstraintAdapter, LeafConstraint, ResourceRef } from "toride";
 
 /**
  * Drizzle query representation.
@@ -134,5 +134,46 @@ export function createDrizzleAdapter(
     not(query: DrizzleQuery): DrizzleQuery {
       return { _op: "not", child: query };
     },
+  };
+}
+
+/** Options for createDrizzleResolver. */
+export interface DrizzleResolverOptions {
+  /** Column used as the resource ID. Defaults to "id". */
+  idColumn?: string;
+}
+
+/**
+ * Creates a resolver function for a Drizzle table.
+ * Wraps a Drizzle select query into the ResourceResolver signature.
+ *
+ * The db and table parameters are duck-typed — no direct drizzle-orm
+ * dependency is required. The db object must support `db.select().from(table).where(condition)`.
+ *
+ * @param db - A Drizzle database instance (duck-typed).
+ * @param table - A Drizzle table reference (duck-typed).
+ * @param options - Optional configuration.
+ * @returns A ResourceResolver function.
+ */
+export function createDrizzleResolver(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  table: any,
+  options?: DrizzleResolverOptions,
+): (ref: ResourceRef) => Promise<Record<string, unknown>> {
+  const idColumn = options?.idColumn ?? "id";
+
+  return async (ref: ResourceRef): Promise<Record<string, unknown>> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: any[] = await db
+      .select()
+      .from(table)
+      .where({ [idColumn]: ref.id });
+
+    if (!rows || rows.length === 0) {
+      return {};
+    }
+    return rows[0] as Record<string, unknown>;
   };
 }

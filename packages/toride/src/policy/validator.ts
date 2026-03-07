@@ -134,16 +134,16 @@ function collectErrors(policy: Policy): ValidationDiagnostic[] {
       resource.relations ? Object.keys(resource.relations) : [],
     );
 
-    // Validate relation targets
+    // Validate relation targets (relDef is now a plain string: the target type name)
     if (resource.relations) {
       for (const [relName, relDef] of Object.entries(resource.relations)) {
         if (
-          !declaredResourceTypes.has(relDef.resource) &&
-          !declaredActorTypes.has(relDef.resource)
+          !declaredResourceTypes.has(relDef) &&
+          !declaredActorTypes.has(relDef)
         ) {
           errors.push({
-            message: `resources.${resName}.relations.${relName}.resource references undeclared resource type "${relDef.resource}"`,
-            path: `resources.${resName}.relations.${relName}.resource`,
+            message: `resources.${resName}.relations.${relName} references undeclared resource type "${relDef}"`,
+            path: `resources.${resName}.relations.${relName}`,
           });
         }
       }

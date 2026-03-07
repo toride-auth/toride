@@ -60,10 +60,8 @@ export const ConditionExpressionSchema: v.GenericSchema<unknown> = v.union([
 
 // ─── Relation Definition ──────────────────────────────────────────
 
-export const RelationDefSchema = v.object({
-  resource: v.string(),
-  cardinality: v.picklist(["one", "many"]),
-});
+/** Simplified: relation value is just the target resource type name. */
+export const RelationDefSchema = v.string();
 
 // ─── Derived Role Entry ───────────────────────────────────────────
 
@@ -102,7 +100,7 @@ export const FieldAccessDefSchema = v.object({
 export const ResourceBlockSchema = v.object({
   roles: v.array(v.string()),
   permissions: v.array(v.string()),
-  relations: v.optional(v.record(v.string(), RelationDefSchema)),
+  relations: v.optional(v.record(v.string(), v.string())),
   grants: v.optional(v.record(v.string(), v.array(v.string()))),
   derived_roles: v.optional(v.array(DerivedRoleEntrySchema)),
   rules: v.optional(v.array(RuleSchema)),
@@ -121,6 +119,7 @@ export const GlobalRoleSchema = v.object({
 export const ResourceRefSchema = v.object({
   type: v.string(),
   id: v.string(),
+  attributes: v.optional(v.record(v.string(), v.unknown())),
 });
 
 // ─── Actor Ref (for test cases) ───────────────────────────────────
@@ -136,14 +135,7 @@ export const ActorRefSchema = v.object({
 export const TestCaseSchema = v.object({
   name: v.string(),
   actor: ActorRefSchema,
-  roles: v.optional(v.record(v.string(), v.array(v.string()))),
-  relations: v.optional(
-    v.record(v.string(), v.record(v.string(), v.union([
-      ResourceRefSchema,
-      v.array(ResourceRefSchema),
-    ]))),
-  ),
-  attributes: v.optional(v.record(v.string(), v.record(v.string(), v.unknown()))),
+  resolvers: v.optional(v.record(v.string(), v.record(v.string(), v.unknown()))),
   action: v.string(),
   resource: ResourceRefSchema,
   expected: v.picklist(["allow", "deny"]),
