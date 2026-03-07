@@ -87,9 +87,9 @@
 
 ### Verification for User Story 3
 
-- [ ] T016 [US3] Run `pnpm exec nx run-many -t test` and verify all package tests pass
-- [ ] T017 [US3] Modify a file in `packages/prisma/src/`, run `pnpm exec nx affected -t test`, and verify only `@toride/prisma` tests run
-- [ ] T018 [US3] Modify a file in `packages/toride/src/`, run `pnpm exec nx affected -t test`, and verify tests run for all 4 packages (all depend on core)
+- [X] T016 [US3] Run `pnpm exec nx run-many -t test` and verify all package tests pass
+- [X] T017 [US3] Modify a file in `packages/prisma/src/`, run `pnpm exec nx affected -t test`, and verify only `@toride/prisma` tests run
+- [X] T018 [US3] Modify a file in `packages/toride/src/`, run `pnpm exec nx affected -t test`, and verify tests run for all 4 packages (all depend on core)
 
 **Checkpoint**: Targeted test runs work correctly based on the dependency graph
 
