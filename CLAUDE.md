@@ -91,3 +91,10 @@ Nx caches `build`, `test`, and `lint` targets locally (`.nx/cache`). Repeated ru
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test) (improve-resolvers)
+- N/A (in-process library, user provides data access) (improve-resolvers)
+
+## Recent Changes
+- improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
