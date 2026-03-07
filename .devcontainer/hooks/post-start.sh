@@ -58,4 +58,11 @@ fi
 #   rails db:migrate
 #   alembic upgrade head
 
+# --- Claude Code config ---
+# Copy host .claude.json if mounted (avoids single-file bind mount corruption).
+if [ -f /tmp/.claude.json.host ]; then
+  cp /tmp/.claude.json.host /home/vscode/.claude.json
+  echo "[devcontainer-wt] Copied .claude.json from host mount."
+fi
+
 echo "=== devcontainer-wt: worktree '${WORKTREE_NAME}' ready ==="
