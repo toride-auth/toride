@@ -51,13 +51,13 @@
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Ensure each package.json has a meaningful `description` field in `packages/toride/package.json`, `packages/codegen/package.json`, `packages/drizzle/package.json`, `packages/prisma/package.json`
-- [ ] T010 [US1] Update root `CLAUDE.md` with Nx-aware monorepo navigation instructions: package overview, Nx commands for discovery (`nx show project`, `nx graph`), per-package build/test/lint commands, dependency graph summary
+- [X] T009 [US1] Ensure each package.json has a meaningful `description` field in `packages/toride/package.json`, `packages/codegen/package.json`, `packages/drizzle/package.json`, `packages/prisma/package.json`
+- [X] T010 [US1] Update root `CLAUDE.md` with Nx-aware monorepo navigation instructions: package overview, Nx commands for discovery (`nx show project`, `nx graph`), per-package build/test/lint commands, dependency graph summary
 
 ### Verification for User Story 1
 
-- [ ] T011 [US1] Verify `pnpm exec nx show project @toride/drizzle` outputs correct tags, targets, and dependencies
-- [ ] T012 [US1] Verify root CLAUDE.md contains package boundary info and Nx commands for AI agent context
+- [X] T011 [US1] Verify `pnpm exec nx show project @toride/drizzle` outputs correct tags, targets, and dependencies
+- [X] T012 [US1] Verify root CLAUDE.md contains package boundary info and Nx commands for AI agent context
 
 **Checkpoint**: An AI agent reading root CLAUDE.md can understand the monorepo structure and use Nx commands for per-package discovery
 
