@@ -160,6 +160,8 @@ chore: update dependencies
 - TypeScript (strict mode), Node.js 20+ LTS; Bash for CI scripts + Lefthook (git hooks), @commitlint/cli + @commitlint/config-conventional (commit validation) (automate-release)
 - N/A (file-based: CHANGELOG.md, package.json versions, git tags) (automate-release)
 - TypeScript (strict mode), Node.js 20 LTS + Nx v22.x (`nx release`), `@nx/js` (new dev dependency), pnpm 10.x, GitHub Actions (automate-publish)
+- TypeScript (VitePress config), Markdown (content), YAML (GitHub Actions) + VitePress 1.6.4 (standalone in `docs/`) (add-readme-and-official-site)
+- N/A (static site generator, Markdown files) (add-readme-and-official-site)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
