@@ -1,0 +1,120 @@
+# Workflow: Simple Implement → Review → PR
+#
+# Flow: implement -> review -> finalize -> end
+#                └────────────┘ (loop on REJECTED)
+
+name: simple
+description: Implement the task, review it, and create a PR if approved
+
+steps:
+  # Step 1: Implement the task
+  - name: implement
+    agent: general-purpose
+    prompt: |
+      Implement the task described below.
+
+      Start by reading the spec directory referenced in the task description
+      to understand requirements, contracts, and data models.
+
+      If review feedback exists in reports/review.md, address ALL findings.
+
+      Requirements:
+      - Follow project coding standards (see CLAUDE.md)
+      - Handle edge cases
+      - Write tests where appropriate
+
+      Progress tracking:
+      - The task description contains sub-tasks (T001, T002, etc.)
+      - After completing each sub-task, mark it as done [X] in the
+        corresponding tasks.md file in the spec directory
+      - Commit after each sub-task or logical group of sub-tasks
+
+      IMPORTANT: End your response with exactly one of:
+      - DONE if implementation is complete
+      - ERROR if you encountered an unrecoverable issue
+    report:
+      name: implementation
+      format: |
+        ## Implementation Summary
+
+        ### Changes Made
+        - Description of changes
+
+        ### Files Modified
+        - path/to/file - What was changed
+
+        ### Sub-tasks Completed
+        - T0XX - Description
+
+        ### Review Feedback Addressed
+        - Feedback item - How it was resolved
+      validation: "DONE|ERROR"
+    next: review
+    conditions:
+      - keyword: ERROR
+        goto: implement
+
+  # Step 2: Review the implementation
+  - name: review
+    agent: general-purpose
+    prompt: |
+      Review the implementation described in reports/implementation.md.
+
+      Read the actual code changes and evaluate:
+      - Correctness: Does it meet the spec requirements?
+      - Code quality: Is it readable, maintainable, and well-structured?
+      - Tests: Are they sufficient and correct?
+      - Security: Any obvious vulnerabilities?
+
+      Be pragmatic. Only reject for real issues, not style preferences.
+
+      IMPORTANT: End your response with exactly one of:
+      - APPROVED if the implementation is acceptable
+      - REJECTED with specific, actionable feedback if changes are needed
+    report:
+      name: review
+      format: |
+        ## Review Results
+
+        **Status:** APPROVED | REJECTED
+
+        ### Findings
+        - Finding 1
+        - Finding 2
+
+        ### Summary
+        Overall assessment...
+      validation: "APPROVED|REJECTED"
+    next: finalize
+    conditions:
+      - keyword: REJECTED
+        goto: implement
+
+  # Step 3: Create PR and finish
+  - name: finalize
+    agent: general-purpose
+    prompt: |
+      The implementation has been reviewed and approved.
+
+      1. Verify all tests pass
+      2. Commit any remaining changes
+      3. Push the branch and create a pull request using `gh pr create`
+         - Use a clear title and summary
+         - Reference reports/implementation.md and reports/review.md
+
+      IMPORTANT: End your response with exactly one of:
+      - FINALIZED if the PR is created
+      - ERROR if something went wrong
+    report:
+      name: finalization
+      format: |
+        ## Finalization
+
+        ### Pull Request
+        - PR URL: <url>
+        - Title: <title>
+
+        ### Summary
+        Brief summary of completed work...
+      validation: "FINALIZED|ERROR"
+    end: true
