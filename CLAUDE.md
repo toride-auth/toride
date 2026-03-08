@@ -159,6 +159,7 @@ chore: update dependencies
 - N/A (JSON artifacts stored as CI artifacts) (performance-metrics)
 - TypeScript (strict mode), Node.js 20+ LTS; Bash for CI scripts + Lefthook (git hooks), @commitlint/cli + @commitlint/config-conventional (commit validation) (automate-release)
 - N/A (file-based: CHANGELOG.md, package.json versions, git tags) (automate-release)
+- TypeScript (strict mode), Node.js 20 LTS + Nx v22.x (`nx release`), `@nx/js` (new dev dependency), pnpm 10.x, GitHub Actions (automate-publish)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

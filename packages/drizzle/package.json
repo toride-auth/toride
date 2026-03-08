@@ -31,6 +31,9 @@
       "optional": true
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": ["authorization", "drizzle", "toride"],
   "license": "MIT",
   "repository": {
