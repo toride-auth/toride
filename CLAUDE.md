@@ -162,6 +162,8 @@ chore: update dependencies
 - TypeScript (strict mode), Node.js 20 LTS + Nx v22.x (`nx release`), `@nx/js` (new dev dependency), pnpm 10.x, GitHub Actions (automate-publish)
 - TypeScript (VitePress config), Markdown (content), YAML (GitHub Actions) + VitePress 1.6.4 (standalone in `docs/`) (add-readme-and-official-site)
 - N/A (static site generator, Markdown files) (add-readme-and-official-site)
+- Markdown + TypeScript code snippets (must match `toride` package exports) + VitePress 1.6.4 (docs site), toride core package (API reference) (sync-docs)
+- N/A (static Markdown files) (sync-docs)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
