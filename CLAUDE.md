@@ -90,6 +90,66 @@ Nx caches `build`, `test`, and `lint` targets locally (`.nx/cache`). Repeated ru
 - Dependencies are declared via `"workspace:*"` in `package.json`
 
 <!-- MANUAL ADDITIONS START -->
+
+## Conventional Commits
+
+All commit messages in this repository MUST follow the [Conventional Commits](https://www.conventionalcommits.org/) format. A commitlint git hook enforces this — non-compliant messages will be rejected.
+
+### Format
+
+```
+<type>[optional scope][optional !]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Allowed Types
+
+| Type | Description | Version Impact |
+|------|-------------|----------------|
+| `feat` | New feature | minor |
+| `fix` | Bug fix | patch |
+| `perf` | Performance improvement | patch |
+| `refactor` | Code refactoring | patch |
+| `docs` | Documentation only | patch |
+| `test` | Adding/updating tests | patch |
+| `chore` | Maintenance tasks | patch |
+| `ci` | CI/CD changes | patch |
+| `build` | Build system changes | patch |
+
+### Allowed Scopes (optional)
+
+`toride`, `codegen`, `drizzle`, `prisma`
+
+When a change targets a specific package, use its scope. Omit the scope for cross-cutting or repo-wide changes.
+
+### Breaking Changes
+
+Two syntaxes (both trigger a **major** version bump):
+
+1. Bang suffix: `feat!: redesign RelationResolver interface`
+2. Footer: add `BREAKING CHANGE: description` in the commit body footer
+
+### Rules
+
+- The `<description>` MUST start with a lowercase letter
+- The `<description>` MUST NOT end with a period
+- Use imperative mood in the description (e.g., "add" not "added" or "adds")
+- Keep the first line (type + scope + description) under 100 characters
+
+### Examples
+
+```
+feat(drizzle): add query constraint builder
+fix: resolve policy parsing edge case with nested relations
+feat!: redesign RelationResolver interface
+refactor(toride): extract evaluation pipeline into separate module
+docs: update README with constraint builder examples
+chore: update dependencies
+```
+
 <!-- MANUAL ADDITIONS END -->
 
 ## Active Technologies
@@ -97,6 +157,8 @@ Nx caches `build`, `test`, and `lint` targets locally (`.nx/cache`). Repeated ru
 - N/A (in-process library, user provides data access) (improve-resolvers)
 - TypeScript (strict mode), Node.js 20+ LTS + vitest ^2.0.0 (bench mode / tinybench), existing toride engine (performance-metrics)
 - N/A (JSON artifacts stored as CI artifacts) (performance-metrics)
+- TypeScript (strict mode), Node.js 20+ LTS; Bash for CI scripts + Lefthook (git hooks), @commitlint/cli + @commitlint/config-conventional (commit validation) (automate-release)
+- N/A (file-based: CHANGELOG.md, package.json versions, git tags) (automate-release)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

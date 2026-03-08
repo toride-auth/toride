@@ -31,7 +31,7 @@
 
 **CRITICAL**: This must be in place before any user story work begins, as it establishes the commit convention that US1 and US2 depend on.
 
-- [ ] T002 Add Conventional Commits instructions section to `CLAUDE.md` — include allowed types (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`, `build`), optional scopes (`toride`, `codegen`, `drizzle`, `prisma`), breaking change syntax (`type!:` or `BREAKING CHANGE:` footer), and commit message format rules per `contracts/conventional-commits-contract.md`
+- [x] T002 Add Conventional Commits instructions section to `CLAUDE.md` — include allowed types (`feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`, `ci`, `build`), optional scopes (`toride`, `codegen`, `drizzle`, `prisma`), breaking change syntax (`type!:` or `BREAKING CHANGE:` footer), and commit message format rules per `contracts/conventional-commits-contract.md`
 
 **Checkpoint**: CLAUDE.md contains complete Conventional Commits instructions. Claude Code will use this format for all future commits in this project.
 
