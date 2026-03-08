@@ -29,5 +29,14 @@
     "bench": {
       "cache": false
     }
+  },
+  "release": {
+    "projects": ["packages/*"],
+    "version": {
+      "conventionalCommits": false
+    },
+    "changelog": {
+      "enabled": false
+    }
   }
 }
