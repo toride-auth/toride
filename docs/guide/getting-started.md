@@ -72,7 +72,7 @@ This generates TypeScript types from your YAML policy, ensuring your resolver im
 A typical Toride project has three parts:
 
 1. **A YAML policy file** that defines your authorization rules (actors, resources, roles, permissions, and conditions)
-2. **A resolver** that tells the engine how to look up roles, relations, and attributes from your database
+2. **Resource resolvers** that tell the engine how to fetch attributes for each resource type from your database
 3. **The engine** that evaluates permission checks against the policy using the resolver
 
 Here is a minimal project structure:
@@ -82,7 +82,7 @@ my-app/
 ├── policy.yaml          # Authorization policy
 ├── src/
 │   ├── auth/
-│   │   ├── resolver.ts  # Relation resolver
+│   │   ├── resolver.ts  # Resource resolvers
 │   │   └── engine.ts    # Engine setup
 │   └── ...
 └── package.json
