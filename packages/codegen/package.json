@@ -26,6 +26,9 @@
   "dependencies": {
     "toride": "workspace:*"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": ["authorization", "codegen", "toride"],
   "license": "MIT",
   "repository": {

@@ -70,7 +70,9 @@ jobs:
 
       # T007: Version bump (CI-only, no git commit)
       - name: Set package versions
-        run: pnpm exec nx release version ${{ steps.tag.outputs.version }}
+        run: pnpm exec nx release version "$RELEASE_VERSION"
+        env:
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
 
       # T008: CI checks
       - name: Lint, test, and build
@@ -78,20 +80,23 @@ jobs:
 
       # T009 + T011: Publish with correct dist-tag and provenance
       - name: Publish to npm
-        run: pnpm exec nx release publish --tag ${{ steps.tag.outputs.dist_tag }}
+        run: pnpm exec nx release publish --tag "$DIST_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+          DIST_TAG: ${{ steps.tag.outputs.dist_tag }}
 
       # T012 + T013: Create GitHub Release (mark as pre-release if applicable)
       - name: Create GitHub Release
         run: |
           PRERELEASE_FLAG=""
-          if [[ "${{ steps.tag.outputs.is_prerelease }}" == "true" ]]; then
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
             PRERELEASE_FLAG="--prerelease"
           fi
-          gh release create "${{ github.ref_name }}" \
+          gh release create "$TAG_NAME" \
             --generate-notes \
             $PRERELEASE_FLAG
         env:
           GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.tag.outputs.is_prerelease }}
+          TAG_NAME: ${{ github.ref_name }}

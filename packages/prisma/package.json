@@ -23,6 +23,9 @@
   "dependencies": {
     "toride": "workspace:*"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": ["authorization", "prisma", "toride"],
   "license": "MIT",
   "repository": {

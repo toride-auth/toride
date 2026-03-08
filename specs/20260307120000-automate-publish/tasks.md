@@ -48,6 +48,11 @@
 
 - [X] T014 Validate workflow end-to-end: dry-run with `act` or review YAML syntax, verify all FR requirements (FR-001 through FR-015) are covered in `.github/workflows/publish.yml`
 
+### Review Fixes
+
+- [X] T015 Add `"publishConfig": { "access": "public" }` to scoped package.json files (`packages/codegen/package.json`, `packages/drizzle/package.json`, `packages/prisma/package.json`)
+- [X] T016 Replace direct `${{ }}` expression interpolation in `run:` blocks of `.github/workflows/publish.yml` with `env:` variables for defense-in-depth against command injection
+
 **Checkpoint**: Complete publish pipeline — push a `v*` tag to trigger automated publish of all 4 packages with provenance, correct dist-tags, and GitHub Release creation.
 
 ---
