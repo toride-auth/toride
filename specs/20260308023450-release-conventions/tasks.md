@@ -84,8 +84,8 @@
 
 **Purpose**: End-to-end validation of the complete release workflow.
 
-- [ ] T007 Run `quickstart.md` validation — verify the documented release flow works: conventional commit → `/release` → review changelog → git commands → tag push → publish workflow triggers
-- [ ] T008 Review all acceptance scenarios from `spec.md` and verify each is addressed by the implementation
+- [x] T007 Run `quickstart.md` validation — verify the documented release flow works: conventional commit → `/release` → review changelog → git commands → tag push → publish workflow triggers
+- [x] T008 Review all acceptance scenarios from `spec.md` and verify each is addressed by the implementation
 
 ---
 

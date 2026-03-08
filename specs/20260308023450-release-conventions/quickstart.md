@@ -40,6 +40,6 @@ Tell Claude during the `/release` flow: "make it a beta" → `v0.2.0-beta.1`
 
 ## Troubleshooting
 
-- **Commit rejected by hook**: Fix the commit message format. Run `pnpm exec commitlint --edit .git/COMMIT_MSG` to see the specific error.
+- **Commit rejected by hook**: Fix the commit message format. Run `pnpm exec commitlint --edit .git/COMMIT_EDITMSG` to see the specific error.
 - **No unreleased changes**: The tool correctly reports nothing to release.
 - **Wrong version suggested**: Override it conversationally during the `/release` flow.
