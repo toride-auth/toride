@@ -89,7 +89,7 @@
 
 **Independent Test**: Push a docs change to `main`, verify workflow triggers, builds, and deploys. Push a non-docs change, verify workflow is skipped.
 
-- [ ] T016 [US5] Create GitHub Actions workflow `.github/workflows/deploy-docs.yml` with push trigger (path filter `docs/**`), `workflow_dispatch`, Node 20 + pnpm setup, VitePress build in `docs/`, artifact upload via `actions/upload-pages-artifact@v3`, and deployment via `actions/deploy-pages@v4`. Set permissions (contents: read, pages: write, id-token: write) and concurrency group.
+- [X] T016 [US5] Create GitHub Actions workflow `.github/workflows/deploy-docs.yml` with push trigger (path filter `docs/**`), `workflow_dispatch`, Node 20 + pnpm setup, VitePress build in `docs/`, artifact upload via `actions/upload-pages-artifact@v3`, and deployment via `actions/deploy-pages@v4`. Set permissions (contents: read, pages: write, id-token: write) and concurrency group.
 
 **Checkpoint**: Workflow file is valid YAML, references correct actions versions, has proper path filters and permissions.
 
