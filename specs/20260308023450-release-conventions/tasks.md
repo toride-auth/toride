@@ -45,7 +45,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T003 [US1] Create the `/release` skill prompt at `.claude/commands/release.md` implementing all behavior from `contracts/release-skill-contract.md`: pre-flight checks (uncommitted changes, branch warning, no unreleased changes), commit analysis with Conventional Commits semantics (fix→patch, feat→minor, feat!/BREAKING CHANGE→major), grouped changelog output (Added, Changed, Fixed, Removed), lockstep version update across all 5 `package.json` files (root + 4 packages), draft CHANGELOG.md entry in Keep a Changelog format, version override support, pre-release support, and exact git commands output (commit → tag → push). The skill MUST NOT execute `git tag` or `git push` itself. It MAY write CHANGELOG.md and update package.json files after maintainer approval.
+- [x] T003 [US1] Create the `/release` skill prompt at `.claude/commands/release.md` implementing all behavior from `contracts/release-skill-contract.md`: pre-flight checks (uncommitted changes, branch warning, no unreleased changes), commit analysis with Conventional Commits semantics (fix→patch, feat→minor, feat!/BREAKING CHANGE→major), grouped changelog output (Added, Changed, Fixed, Removed), lockstep version update across all 5 `package.json` files (root + 4 packages), draft CHANGELOG.md entry in Keep a Changelog format, version override support, pre-release support, and exact git commands output (commit → tag → push). The skill MUST NOT execute `git tag` or `git push` itself. It MAY write CHANGELOG.md and update package.json files after maintainer approval.
 
 **Checkpoint**: `/release` command is available in Claude Code and produces correct output when run against the repository.
 
