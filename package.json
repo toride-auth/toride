@@ -7,10 +7,14 @@
   "scripts": {
     "build": "nx run-many -t build",
     "test": "nx run-many -t test",
-    "lint": "nx run-many -t lint"
+    "lint": "nx run-many -t lint",
+    "postinstall": "lefthook install"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
     "@types/node": "^20.11.0",
+    "lefthook": "^1.11.0",
     "nx": "^22.5.4",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
@@ -19,6 +23,7 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
+      "lefthook",
       "nx"
     ]
   }
