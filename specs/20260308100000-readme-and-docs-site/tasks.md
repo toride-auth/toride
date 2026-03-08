@@ -45,9 +45,9 @@
 
 **Independent Test**: Run `pnpm dev` in `docs/`, navigate landing → getting started → quickstart. All pages render, navigation works, code examples are complete.
 
-- [ ] T005 [US2] Create landing page `docs/index.md` with VitePress hero frontmatter (name: Toride, tagline, description, "Get Started" CTA → `/guide/getting-started`, "View on GitHub" secondary button). No code examples on landing page.
-- [ ] T006 [US2] Create getting started guide `docs/guide/getting-started.md` with installation instructions for all 4 packages, basic project setup, and link to quickstart
-- [ ] T007 [US2] Create quickstart guide `docs/guide/quickstart.md` with step-by-step walkthrough: define YAML policy, implement resolver, create engine, run first `can()` check
+- [X] T005 [US2] Create landing page `docs/index.md` with VitePress hero frontmatter (name: Toride, tagline, description, "Get Started" CTA → `/guide/getting-started`, "View on GitHub" secondary button). No code examples on landing page.
+- [X] T006 [US2] Create getting started guide `docs/guide/getting-started.md` with installation instructions for all 4 packages, basic project setup, and link to quickstart
+- [X] T007 [US2] Create quickstart guide `docs/guide/quickstart.md` with step-by-step walkthrough: define YAML policy, implement resolver, create engine, run first `can()` check
 
 **Checkpoint**: Docs site landing page renders with hero, navigation to Guide section works, getting-started and quickstart pages are complete and render correctly.
 
