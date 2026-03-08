@@ -99,9 +99,9 @@
 
 **Purpose**: Final validation and cross-cutting improvements
 
-- [ ] T017 Verify all cross-links between pages (guide → concepts, concepts → integrations, integrations → concepts) are correct
-- [ ] T018 Run `cd docs && pnpm install && pnpm build` to verify the full site builds without errors
-- [ ] T019 Verify README docs link points to correct GitHub Pages URL (`https://toride-auth.github.io/toride/`)
+- [X] T017 Verify all cross-links between pages (guide → concepts, concepts → integrations, integrations → concepts) are correct
+- [X] T018 Run `cd docs && pnpm install && pnpm build` to verify the full site builds without errors
+- [X] T019 Verify README docs link points to correct GitHub Pages URL (`https://toride-auth.github.io/toride/`)
 
 ---
 
