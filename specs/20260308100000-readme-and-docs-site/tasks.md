@@ -19,9 +19,9 @@
 
 **Purpose**: Initialize VitePress project and docs directory structure
 
-- [ ] T001 Create `docs/package.json` with VitePress 1.6.4 dependency and dev/build/preview scripts
-- [ ] T002 Create VitePress config in `docs/.vitepress/config.ts` with base path `/toride/`, site title, description, search provider, sidebar navigation, nav bar, and social links per contracts/docs-site-structure.md
-- [ ] T003 Create `.gitignore` entries for `docs/.vitepress/dist/` and `docs/.vitepress/cache/` (add to root `.gitignore` or create `docs/.gitignore`)
+- [X] T001 Create `docs/package.json` with VitePress 1.6.4 dependency and dev/build/preview scripts
+- [X] T002 Create VitePress config in `docs/.vitepress/config.ts` with base path `/toride/`, site title, description, search provider, sidebar navigation, nav bar, and social links per contracts/docs-site-structure.md
+- [X] T003 Create `.gitignore` entries for `docs/.vitepress/dist/` and `docs/.vitepress/cache/` (add to root `.gitignore` or create `docs/.gitignore`)
 
 **Checkpoint**: `cd docs && pnpm install && pnpm build` succeeds (may need a placeholder index.md)
 

@@ -17,3 +17,7 @@ coverage/
 .nx/workspace-data
 
 .nx/polygraph
+
+# VitePress
+docs/.vitepress/dist/
+docs/.vitepress/cache/
