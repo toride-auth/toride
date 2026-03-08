@@ -33,7 +33,7 @@
 
 **Independent Test**: View README on GitHub — all sections render, badges resolve, code example is valid TypeScript, docs link works.
 
-- [ ] T004 [US1] Create root `README.md` with badge row (npm version, license, CI status), one-liner description, key features list, install command, minimal usage example (policy YAML + resolver + `can()` check), packages table (all 4 packages), and link to documentation site
+- [X] T004 [US1] Create root `README.md` with badge row (npm version, license, CI status), one-liner description, key features list, install command, minimal usage example (policy YAML + resolver + `can()` check), packages table (all 4 packages), and link to documentation site
 
 **Checkpoint**: README renders correctly on GitHub with all required sections (FR-001 through FR-004b).
 
