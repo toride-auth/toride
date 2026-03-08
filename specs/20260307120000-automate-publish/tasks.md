@@ -26,23 +26,23 @@
 
 ### User Story 1 — Stable Publish (P1)
 
-- [ ] T003 [US1] Create `.github/workflows/publish.yml` with `on: push: tags: ['v*']` trigger, concurrency control (`group: publish`, `cancel-in-progress: true`), and permissions (`contents: write`, `id-token: write`, `actions: read`)
-- [ ] T004 [US1] Add tag validation step: extract version from tag, validate semver format, derive `is_prerelease` and `dist_tag` values as job outputs
-- [ ] T005 [US1] Add branch check step: verify tagged commit is on `main` for stable releases (skip for pre-releases)
-- [ ] T006 [US1] Add setup steps: checkout, pnpm setup, Node.js 20, install dependencies
-- [ ] T007 [US1] Add version bump step: `pnpm exec nx release version $VERSION` to update all package.json files
-- [ ] T008 [US1] Add CI checks step: `pnpm exec nx run-many -t lint test build`
-- [ ] T009 [US1] Add publish step: `pnpm exec nx release publish` with `--tag $DIST_TAG`, npm auth via `NPM_TOKEN` secret, `--provenance`, and `--access public` for scoped packages
+- [X] T003 [US1] Create `.github/workflows/publish.yml` with `on: push: tags: ['v*']` trigger, concurrency control (`group: publish`, `cancel-in-progress: true`), and permissions (`contents: write`, `id-token: write`, `actions: read`)
+- [X] T004 [US1] Add tag validation step: extract version from tag, validate semver format, derive `is_prerelease` and `dist_tag` values as job outputs
+- [X] T005 [US1] Add branch check step: verify tagged commit is on `main` for stable releases (skip for pre-releases)
+- [X] T006 [US1] Add setup steps: checkout, pnpm setup, Node.js 20, install dependencies
+- [X] T007 [US1] Add version bump step: `pnpm exec nx release version $VERSION` to update all package.json files
+- [X] T008 [US1] Add CI checks step: `pnpm exec nx run-many -t lint test build`
+- [X] T009 [US1] Add publish step: `pnpm exec nx release publish` with `--tag $DIST_TAG`, npm auth via `NPM_TOKEN` secret, `--provenance`, and `--access public` for scoped packages
 
 ### User Story 2 — Pre-release Publish (P2)
 
-- [ ] T010 [US2] Add pre-release dist-tag derivation logic: extract first segment before first `.` in prerelease identifier (e.g., `beta.1` → `beta`) in the tag validation step of `.github/workflows/publish.yml`
-- [ ] T011 [US2] Ensure publish step uses derived dist-tag (`beta`, `rc`, `alpha`, etc.) instead of `latest` for pre-release tags in `.github/workflows/publish.yml`
+- [X] T010 [US2] Add pre-release dist-tag derivation logic: extract first segment before first `.` in prerelease identifier (e.g., `beta.1` → `beta`) in the tag validation step of `.github/workflows/publish.yml`
+- [X] T011 [US2] Ensure publish step uses derived dist-tag (`beta`, `rc`, `alpha`, etc.) instead of `latest` for pre-release tags in `.github/workflows/publish.yml`
 
 ### User Story 3 — GitHub Release (P3)
 
-- [ ] T012 [US3] Add GitHub Release creation step after successful publish: use `gh release create` or `actions/create-release` with auto-generated release notes in `.github/workflows/publish.yml`
-- [ ] T013 [US3] Mark GitHub Release as pre-release when tag contains a pre-release identifier in `.github/workflows/publish.yml`
+- [X] T012 [US3] Add GitHub Release creation step after successful publish: use `gh release create` or `actions/create-release` with auto-generated release notes in `.github/workflows/publish.yml`
+- [X] T013 [US3] Mark GitHub Release as pre-release when tag contains a pre-release identifier in `.github/workflows/publish.yml`
 
 ### Polish
 
