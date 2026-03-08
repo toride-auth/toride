@@ -74,7 +74,7 @@
 
 ### Implementation for User Story 3
 
-- [ ] T006 [US3] Create `.github/workflows/publish.yml` per `contracts/publish-workflow-contract.md`: trigger on `push: tags: ['v*']`, checkout → setup pnpm + Node.js 20 → `pnpm install --frozen-lockfile` → `pnpm exec nx run-many -t build` → extract changelog entry for tagged version from CHANGELOG.md → publish each package (`pnpm publish --filter <pkg> --no-git-checks --access public`) → create GitHub Release with `gh release create` using extracted changelog as notes. Permissions: `contents: write`. Secrets: `NPM_TOKEN`.
+- [x] T006 [US3] Create `.github/workflows/publish.yml` per `contracts/publish-workflow-contract.md`: trigger on `push: tags: ['v*']`, checkout → setup pnpm + Node.js 20 → `pnpm install --frozen-lockfile` → `pnpm exec nx run-many -t build` → extract changelog entry for tagged version from CHANGELOG.md → publish each package (`pnpm publish --filter <pkg> --no-git-checks --access public`) → create GitHub Release with `gh release create` using extracted changelog as notes. Permissions: `contents: write`. Secrets: `NPM_TOKEN`.
 
 **Checkpoint**: The workflow file is valid YAML and contains all required steps. Actual publishing is verified on the first real release.
 

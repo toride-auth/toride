@@ -1,0 +1,85 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+        with:
+          fetch-depth: 0
+          filter: tree:0
+
+      - uses: pnpm/action-setup@c5ba7f7862a0f64c1b1a05fbac13e0b8e86ba08c  # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm exec nx run-many -t build
+
+      # Publish packages — core first, then dependents
+      - name: Publish toride
+        run: pnpm publish --filter toride --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @toride/codegen
+        run: pnpm publish --filter @toride/codegen --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @toride/drizzle
+        run: pnpm publish --filter @toride/drizzle --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @toride/prisma
+        run: pnpm publish --filter @toride/prisma --no-git-checks --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Extract changelog entry for the tagged version
+      - name: Extract changelog notes
+        id: changelog
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG#v}"
+          # Extract the section for this version from CHANGELOG.md
+          # Matches from "## [<version>]" until the next "## [" or end of file
+          NOTES=$(awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit
+              if (index($0, "[" ver "]")) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md 2>/dev/null || true)
+          if [ -z "$NOTES" ]; then
+            echo "notes_file=" >> "$GITHUB_OUTPUT"
+          else
+            echo "$NOTES" > /tmp/release-notes.md
+            echo "notes_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Create GitHub Release with changelog notes or auto-generated notes as fallback
+      - name: Create GitHub Release
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          NOTES_FILE="${{ steps.changelog.outputs.notes_file }}"
+          if [ -n "$NOTES_FILE" ] && [ -f "$NOTES_FILE" ]; then
+            gh release create "$TAG" --title "$TAG" --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
