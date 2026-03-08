@@ -75,9 +75,9 @@
 
 **Independent Test**: Navigate to each integration page, verify install instructions, adapter setup, and at least one complete usage example per page.
 
-- [ ] T013 [US4] Create Prisma integration guide `docs/integrations/prisma.md` with install instructions, adapter creation, and complete `buildConstraints()` → Prisma WHERE example
-- [ ] T014 [US4] Create Drizzle integration guide `docs/integrations/drizzle.md` with install instructions, adapter creation, and complete `buildConstraints()` → Drizzle WHERE example
-- [ ] T015 [US4] Create Codegen integration guide `docs/integrations/codegen.md` with install instructions, CLI usage, and TypeScript type generation from policy files
+- [X] T013 [US4] Create Prisma integration guide `docs/integrations/prisma.md` with install instructions, adapter creation, and complete `buildConstraints()` → Prisma WHERE example
+- [X] T014 [US4] Create Drizzle integration guide `docs/integrations/drizzle.md` with install instructions, adapter creation, and complete `buildConstraints()` → Drizzle WHERE example
+- [X] T015 [US4] Create Codegen integration guide `docs/integrations/codegen.md` with install instructions, CLI usage, and TypeScript type generation from policy files
 
 **Checkpoint**: All 3 integration pages render with complete install + usage examples. Cross-links to partial evaluation concept page work.
 
