@@ -82,7 +82,7 @@ jobs:
           exit_code=${{ steps.compare.outcome == 'success' && '0' || '1' }}
 
           # First-ever run: baseline benchmarks failed (no bench files on main)
-          if [ "$baseline_outcome" = "failure" ] && [ ! -f /tmp/baseline.json ]; then
+          if [ "$baseline_outcome" = "failure" ] && ([ ! -f /tmp/baseline.json ] || [ ! -s /tmp/baseline.json ]); then
             echo "status=first_run" >> "$GITHUB_OUTPUT"
             echo "message=First benchmark run — no baseline on main branch yet. Results recorded for future comparisons." >> "$GITHUB_OUTPUT"
           elif [ ! -f /tmp/report.json ]; then
