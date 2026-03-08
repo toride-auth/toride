@@ -44,6 +44,11 @@ resources:
       - role: admin
         from_global_role: superadmin
 
+      - role: editor
+        actor_type: User
+        when:
+          $actor.department: $resource.department
+
   Task:
     roles: [viewer, editor]
     permissions: [read, update, delete]
@@ -83,80 +88,41 @@ Key things to notice:
 - **Derived roles** propagate roles through relations (e.g., a project `editor` is also a task `editor`)
 - **Rules** add conditions that can override grants (e.g., forbid edits on completed projects)
 
-## 3. Implement a Resolver
+## 3. Create the Engine with Resolvers
 
-The resolver tells Toride how to look up roles, relations, and attributes from your data source. Create a file at `src/auth/resolver.ts`:
-
-```typescript
-import type { RelationResolver } from "toride";
-
-// Replace these with your actual database queries
-const resolver: RelationResolver = {
-  async getRoles(actor, resource) {
-    // Look up direct role assignments for this actor on this resource
-    // Return an array of role names, e.g., ["editor"]
-    const assignments = await db.roleAssignment.findMany({
-      where: {
-        userId: actor.id,
-        resourceType: resource.type,
-        resourceId: resource.id,
-      },
-    });
-    return assignments.map((a) => a.role);
-  },
-
-  async getRelated(resource, relation) {
-    // Given a resource and relation name, return the related resource
-    switch (`${resource.type}.${relation}`) {
-      case "Task.project": {
-        const task = await db.task.findById(resource.id);
-        return { type: "Project", id: task.projectId };
-      }
-      case "Task.assignee": {
-        const task = await db.task.findById(resource.id);
-        return { type: "User", id: task.assigneeId };
-      }
-      default:
-        throw new Error(`Unknown relation: ${resource.type}.${relation}`);
-    }
-  },
-
-  async getAttributes(ref) {
-    // Return the attributes for an actor or resource
-    // The engine uses these to evaluate conditions in rules
-    const record = await db.findById(ref.type, ref.id);
-    return record;
-  },
-};
-
-export { resolver };
-```
-
-The three resolver methods correspond to the three types of lookups the engine needs:
-
-| Method | Purpose | When it's called |
-|--------|---------|-----------------|
-| `getRoles` | Look up direct role assignments | Every permission check |
-| `getRelated` | Follow a relation to another resource | When evaluating derived roles via relations |
-| `getAttributes` | Fetch attributes for condition evaluation | When rules have `when` conditions |
-
-## 4. Create the Engine
-
-Bring the policy and resolver together to create the engine. Create `src/auth/engine.ts`:
+Bring the policy and resolvers together to create the engine. Each resolver is a per-type function that fetches attributes for a resource — including relation references as `{ type, id }` objects. Create `src/auth/engine.ts`:
 
 ```typescript
 import { Toride, loadYaml } from "toride";
-import { resolver } from "./resolver";
 
+// Replace the db calls with your actual database queries
 const engine = new Toride({
   policy: await loadYaml("./policy.yaml"),
-  resolver,
+  resolvers: {
+    Task: async (ref) => {
+      const task = await db.task.findById(ref.id);
+      return {
+        project: { type: "Project", id: task.projectId },
+        assignee: { type: "User", id: task.assigneeId },
+        status: task.status,
+      };
+    },
+    Project: async (ref) => {
+      const project = await db.project.findById(ref.id);
+      return {
+        status: project.status,
+        department: project.department,
+      };
+    },
+  },
 });
 
 export { engine };
 ```
 
-## 5. Run Your First Permission Check
+Each resolver is a function per resource type that returns a flat object of attributes. Relation fields contain `ResourceRef` objects (`{ type, id }`) that the engine follows when traversing relations. The engine calls a resolver when it needs to evaluate conditions or traverse relations for that resource type.
+
+## 4. Run Your First Permission Check
 
 Now you can check permissions anywhere in your application:
 
@@ -185,14 +151,15 @@ console.log(allowed); // true or false
 
 The engine will:
 
-1. Look up Alice's direct roles on Task 42 via `getRoles`
-2. Follow the `project` and `assignee` relations via `getRelated`
-3. Derive additional roles from those relations
-4. Check which permissions those roles grant
-5. Evaluate any rules (e.g., the `forbid` rule for completed projects)
-6. Return the final decision
+1. Evaluate all `derived_roles` entries on Task 42 (e.g., `from_role` on project, `from_relation` assignee)
+2. For relation-based derivation, resolve Task attributes via the `Task` resolver
+3. Follow relations to related resources (Project, User) and check roles there recursively
+4. Combine all derived roles into a deduplicated set
+5. Expand grants for the combined role set
+6. Evaluate any rules (e.g., the `forbid` rule for completed projects)
+7. Return the final decision
 
-## 6. Explore More Features
+## 5. Explore More Features
 
 Once your basic authorization check is working, explore these features:
 
