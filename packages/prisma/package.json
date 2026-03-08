@@ -1,6 +1,6 @@
 {
   "name": "@toride/prisma",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Prisma integration for Toride authorization engine",
   "type": "module",
   "exports": {
