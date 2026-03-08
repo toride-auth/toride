@@ -59,11 +59,11 @@
 
 **Independent Test**: Navigate to each concept page, verify explanations are clear, code examples are present, cross-links to related concepts work.
 
-- [ ] T008 [US3] Create policy format guide `docs/concepts/policy-format.md` covering YAML policy structure, resource types, actions, roles, rules, and conditions
-- [ ] T009 [US3] Create roles and relations guide `docs/concepts/roles-and-relations.md` covering direct roles, derived roles (all 5 derivation sources), global roles, and relation definitions
-- [ ] T010 [US3] Create conditions and rules guide `docs/concepts/conditions-and-rules.md` covering permit/forbid rules, ABAC conditions, condition expressions, and rule evaluation order
-- [ ] T011 [US3] Create partial evaluation guide `docs/concepts/partial-evaluation.md` covering `buildConstraints()`, constraint output format, and usage with Prisma/Drizzle adapters
-- [ ] T012 [US3] Create client-side hints guide `docs/concepts/client-side-hints.md` covering permission snapshots for UI rendering, `buildPermissionHints()`, and frontend usage patterns
+- [X] T008 [US3] Create policy format guide `docs/concepts/policy-format.md` covering YAML policy structure, resource types, actions, roles, rules, and conditions
+- [X] T009 [US3] Create roles and relations guide `docs/concepts/roles-and-relations.md` covering direct roles, derived roles (all 5 derivation sources), global roles, and relation definitions
+- [X] T010 [US3] Create conditions and rules guide `docs/concepts/conditions-and-rules.md` covering permit/forbid rules, ABAC conditions, condition expressions, and rule evaluation order
+- [X] T011 [US3] Create partial evaluation guide `docs/concepts/partial-evaluation.md` covering `buildConstraints()`, constraint output format, and usage with Prisma/Drizzle adapters
+- [X] T012 [US3] Create client-side hints guide `docs/concepts/client-side-hints.md` covering permission snapshots for UI rendering, `buildPermissionHints()`, and frontend usage patterns
 
 **Checkpoint**: All 5 concept pages render, cross-links between concepts work, each page has YAML and TypeScript examples.
 
