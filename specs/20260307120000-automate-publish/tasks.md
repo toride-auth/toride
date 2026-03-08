@@ -46,7 +46,7 @@
 
 ### Polish
 
-- [ ] T014 Validate workflow end-to-end: dry-run with `act` or review YAML syntax, verify all FR requirements (FR-001 through FR-015) are covered in `.github/workflows/publish.yml`
+- [X] T014 Validate workflow end-to-end: dry-run with `act` or review YAML syntax, verify all FR requirements (FR-001 through FR-015) are covered in `.github/workflows/publish.yml`
 
 **Checkpoint**: Complete publish pipeline — push a `v*` tag to trigger automated publish of all 4 packages with provenance, correct dist-tags, and GitHub Release creation.
 

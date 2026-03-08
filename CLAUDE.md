@@ -97,6 +97,7 @@ Nx caches `build`, `test`, and `lint` targets locally (`.nx/cache`). Repeated ru
 - N/A (in-process library, user provides data access) (improve-resolvers)
 - TypeScript (strict mode), Node.js 20+ LTS + vitest ^2.0.0 (bench mode / tinybench), existing toride engine (performance-metrics)
 - N/A (JSON artifacts stored as CI artifacts) (performance-metrics)
+- TypeScript (strict mode), Node.js 20 LTS + Nx v22.x (`nx release`), `@nx/js` (new dev dependency), pnpm 10.x, GitHub Actions (automate-publish)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
