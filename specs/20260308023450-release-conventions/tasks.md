@@ -59,8 +59,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T004 [P] [US2] Create `lefthook.yml` at repo root with a `commit-msg` hook that runs `pnpm exec commitlint --edit {1}` per `research.md` Decision 3
-- [ ] T005 [P] [US2] Create `commitlint.config.js` at repo root with `export default { extends: ['@commitlint/config-conventional'] }` per `research.md` Decision 3
+- [x] T004 [P] [US2] Create `lefthook.yml` at repo root with a `commit-msg` hook that runs `pnpm exec commitlint --edit {1}` per `research.md` Decision 3
+- [x] T005 [P] [US2] Create `commitlint.config.js` at repo root with `export default { extends: ['@commitlint/config-conventional'] }` per `research.md` Decision 3
 
 **Checkpoint**: A non-conventional commit message is rejected by the hook. A conventional commit message passes. `pnpm install` in a fresh clone auto-installs the hooks.
 
