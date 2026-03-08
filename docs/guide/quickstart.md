@@ -54,8 +54,8 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      project: { resource: Project, cardinality: one }
-      assignee: { resource: User, cardinality: one }
+      project: Project
+      assignee: User
 
     grants:
       viewer: [read]
