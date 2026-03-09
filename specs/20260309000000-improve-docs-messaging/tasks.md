@@ -67,9 +67,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T006 [US2] Rewrite intro paragraph in `docs/guide/getting-started.md` (line 3) — replace "provide a resolver that connects to your database" with language framing resolvers as functions that return attributes from any data source
-- [ ] T007 [US2] Update ORM Adapters body in `docs/guide/getting-started.md` (line 49) — replace "database-level WHERE clauses" with "query-level constraints" or "WHERE clauses for your ORM"
-- [ ] T008 [US2] Update Project Setup item 2 in `docs/guide/getting-started.md` (line 75) — replace "from your database" with "from any data source". Use canonical term "data source" per spec clarification.
+- [X] T006 [US2] Rewrite intro paragraph in `docs/guide/getting-started.md` (line 3) — replace "provide a resolver that connects to your database" with language framing resolvers as functions that return attributes from any data source
+- [X] T007 [US2] Update ORM Adapters body in `docs/guide/getting-started.md` (line 49) — replace "database-level WHERE clauses" with "query-level constraints" or "WHERE clauses for your ORM"
+- [X] T008 [US2] Update Project Setup item 2 in `docs/guide/getting-started.md` (line 75) — replace "from your database" with "from any data source". Use canonical term "data source" per spec clarification.
 
 **Checkpoint**: Getting Started page uses "data source" consistently, zero occurrences of "your database"
 
