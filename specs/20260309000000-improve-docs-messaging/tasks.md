@@ -38,7 +38,7 @@
 
 **⚠️ CRITICAL**: Config must be updated before the Why Toride page content is written
 
-- [ ] T003 Add "Why Toride" as first Guide sidebar item and update nav link in `docs/.vitepress/config.ts` — add `{ text: "Why Toride", link: "/guide/why-toride" }` before "Getting Started" in the Guide sidebar items array; update nav Guide link to `/guide/why-toride`
+- [X] T003 Add "Why Toride" as first Guide sidebar item and update nav link in `docs/.vitepress/config.ts` — add `{ text: "Why Toride", link: "/guide/why-toride" }` before "Getting Started" in the Guide sidebar items array; update nav Guide link to `/guide/why-toride`
 
 **Checkpoint**: VitePress config updated — `why-toride` appears in sidebar and nav
 

@@ -11,7 +11,7 @@ export default defineConfig({
     },
 
     nav: [
-      { text: "Guide", link: "/guide/getting-started" },
+      { text: "Guide", link: "/guide/why-toride" },
       { text: "Concepts", link: "/concepts/policy-format" },
       { text: "Integrations", link: "/integrations/prisma" },
     ],
@@ -20,6 +20,7 @@ export default defineConfig({
       {
         text: "Guide",
         items: [
+          { text: "Why Toride", link: "/guide/why-toride" },
           { text: "Getting Started", link: "/guide/getting-started" },
           { text: "Quickstart", link: "/guide/quickstart" },
         ],
