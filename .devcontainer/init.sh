@@ -73,4 +73,25 @@ else
   touch .devcontainer/.env.app
 fi
 
+# --- Extract Claude Code OAuth token from macOS Keychain ---
+# Claude Code stores OAuth credentials in macOS Keychain under
+# "Claude Code-credentials". Inside a Linux container, the Keychain is
+# inaccessible, causing Claude to prompt for login every time.
+# We extract the token here (on the host) and inject it via env var.
+if command -v security &>/dev/null; then
+  CLAUDE_CREDS=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true)
+  if [ -n "$CLAUDE_CREDS" ]; then
+    # Extract accessToken from the JSON credential blob
+    CLAUDE_OAUTH_TOKEN=$(echo "$CLAUDE_CREDS" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('claudeAiOauth',{}).get('accessToken',''))" 2>/dev/null || true)
+    if [ -n "$CLAUDE_OAUTH_TOKEN" ]; then
+      echo "CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_OAUTH_TOKEN}" >> .devcontainer/.env.app
+      echo "[devcontainer-wt] Injected Claude Code OAuth token from macOS Keychain."
+    else
+      echo "[devcontainer-wt] WARNING: Could not extract Claude OAuth token from Keychain."
+    fi
+  else
+    echo "[devcontainer-wt] No Claude Code credentials found in macOS Keychain (skipping)."
+  fi
+fi
+
 echo "[devcontainer-wt] init.sh complete for worktree '${WORKTREE_NAME}' branch '${BRANCH_NAME}' (project: ${PROJECT_NAME}, mode: minimum)"
