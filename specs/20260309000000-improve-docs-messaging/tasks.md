@@ -83,9 +83,9 @@
 
 ### Implementation for User Story 3
 
-- [ ] T009 [US3] Rewrite Step 3 in `docs/guide/quickstart.md` — replace the current `db.*`-based resolver example with the in-memory resolver example from `specs/20260309000000-improve-docs-messaging/quickstart.md`. Update the framing text to explain that resolvers are functions returning attributes from any data source.
-- [ ] T010 [US3] Add new "Real-World: Database Resolvers" section in `docs/guide/quickstart.md` after Step 4 (renumber as Step 5 or new section before "Explore More Features") — use the database resolver example from `specs/20260309000000-improve-docs-messaging/quickstart.md`. Frame as "In production, your resolvers will typically query a database."
-- [ ] T011 [US3] Update "What's Next" links in `docs/guide/quickstart.md` (line 218) — replace "database-level filtering" with "query-level filtering"
+- [X] T009 [US3] Rewrite Step 3 in `docs/guide/quickstart.md` — replace the current `db.*`-based resolver example with the in-memory resolver example from `specs/20260309000000-improve-docs-messaging/quickstart.md`. Update the framing text to explain that resolvers are functions returning attributes from any data source.
+- [X] T010 [US3] Add new "Real-World: Database Resolvers" section in `docs/guide/quickstart.md` after Step 4 (renumber as Step 5 or new section before "Explore More Features") — use the database resolver example from `specs/20260309000000-improve-docs-messaging/quickstart.md`. Frame as "In production, your resolvers will typically query a database."
+- [X] T011 [US3] Update "What's Next" links in `docs/guide/quickstart.md` (line 218) — replace "database-level filtering" with "query-level filtering"
 
 **Checkpoint**: Quickstart shows in-memory first, database second; in-memory example is self-contained and runnable without a database
 
