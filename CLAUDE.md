@@ -164,6 +164,7 @@ chore: update dependencies
 - N/A (static site generator, Markdown files) (add-readme-and-official-site)
 - Markdown + TypeScript code snippets (must match `toride` package exports) + VitePress 1.6.4 (docs site), toride core package (API reference) (sync-docs)
 - N/A (static Markdown files) (sync-docs)
+- TypeScript (VitePress config), Markdown (content) + VitePress 1.6.4 (standalone in `docs/`) (main)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
