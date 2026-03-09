@@ -4,9 +4,12 @@ layout: home
 hero:
   name: Toride
   text: Relation-aware authorization for TypeScript
-  tagline: Define policies in YAML, resolve relations from your database, and let the engine handle the rest — including partial evaluation for data filtering.
+  tagline: Define your authorization model in YAML. Bring any data source. Let the engine handle role propagation and data filtering.
   actions:
     - theme: brand
+      text: Why Toride
+      link: /guide/why-toride
+    - theme: alt
       text: Get Started
       link: /guide/getting-started
     - theme: alt
@@ -14,10 +17,10 @@ hero:
       link: https://github.com/toride-auth/toride
 
 features:
-  - title: YAML Policies
-    details: Define your authorization rules declaratively in YAML — roles, relations, conditions, and grants in one readable file.
+  - title: YAML Policies + Type Safety
+    details: Define your entire authorization model declaratively in YAML — roles, relations, conditions, and grants in one file. Codegen validates your resolvers at compile time.
+  - title: Database-Agnostic
+    details: Resolvers are just functions. Return attributes from any data source — in-memory objects, REST APIs, or databases. No infrastructure requirements.
   - title: Relation-Aware
-    details: Derive roles through resource relations automatically. No manual role propagation needed.
-  - title: Partial Evaluation
-    details: Generate database-level WHERE clauses from your policies for efficient data filtering with Prisma or Drizzle.
+    details: Model resource hierarchies in YAML and derive roles automatically through relations. No manual role propagation needed.
 ---

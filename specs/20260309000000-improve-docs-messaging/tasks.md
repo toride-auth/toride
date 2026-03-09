@@ -52,8 +52,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T004 [US1] Rewrite hero section in `docs/index.md` — replace tagline (remove "resolve relations from your database"), add "Why Toride" as primary brand action before "Get Started", keep "View on GitHub" as alt action. Draft 2-3 tagline options per `specs/20260309000000-improve-docs-messaging/research.md` Decision 1 and choose the best. Tagline must convey: type-safe YAML policies, database-agnostic design, and relation-aware role derivation.
-- [ ] T005 [US1] Rewrite feature cards in `docs/index.md` — replace current 3 cards with cards mapping to 3 pillars: (1) YAML Policies + Type Safety (codegen validates policies at compile time), (2) Database-Agnostic (resolvers are just functions, any data source), (3) Relation-Aware (declarative role derivation through YAML relations). Remove "Generate database-level WHERE clauses" from current Partial Evaluation card.
+- [X] T004 [US1] Rewrite hero section in `docs/index.md` — replace tagline (remove "resolve relations from your database"), add "Why Toride" as primary brand action before "Get Started", keep "View on GitHub" as alt action. Draft 2-3 tagline options per `specs/20260309000000-improve-docs-messaging/research.md` Decision 1 and choose the best. Tagline must convey: type-safe YAML policies, database-agnostic design, and relation-aware role derivation.
+- [X] T005 [US1] Rewrite feature cards in `docs/index.md` — replace current 3 cards with cards mapping to 3 pillars: (1) YAML Policies + Type Safety (codegen validates policies at compile time), (2) Database-Agnostic (resolvers are just functions, any data source), (3) Relation-Aware (declarative role derivation through YAML relations). Remove "Generate database-level WHERE clauses" from current Partial Evaluation card.
 
 **Checkpoint**: Landing page conveys all three value propositions, zero occurrences of "your database"
 
