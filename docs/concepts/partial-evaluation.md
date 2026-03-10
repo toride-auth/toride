@@ -1,6 +1,6 @@
 # Partial Evaluation
 
-Partial evaluation lets you translate authorization rules into database queries, so you can filter data **at the database level** instead of loading all records and checking permissions one by one. This is how Toride supports "show me all projects I can read" queries efficiently.
+Partial evaluation lets you translate authorization rules into query constraints, so you can push authorization **into the data layer** instead of loading all records and checking permissions one by one. When your data source is a database, this means generating WHERE clauses that filter at the query level. This is how Toride supports "show me all projects I can read" queries efficiently.
 
 ## The Problem
 
@@ -101,7 +101,7 @@ Actor attributes and environment values are **inlined** during partial evaluatio
 
 ## Constraint Adapters
 
-A **constraint adapter** translates the constraint AST into your database's query format. Toride provides adapters for Prisma and Drizzle, or you can write your own.
+A **constraint adapter** translates the constraint AST into your data store's query format. Toride provides adapters for Prisma and Drizzle, or you can write your own.
 
 ### The Adapter Interface
 

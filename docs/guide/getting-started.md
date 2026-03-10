@@ -1,6 +1,6 @@
 # Getting Started
 
-Toride is a relation-aware authorization engine for TypeScript. You define policies in YAML, provide a resolver that connects to your database, and the engine handles permission checks — including partial evaluation for data filtering.
+Toride is a relation-aware authorization engine for TypeScript. You define policies in YAML, provide resolvers — simple functions that return attributes from any data source — and the engine handles permission checks, including partial evaluation for data filtering.
 
 ## Prerequisites
 
@@ -46,7 +46,7 @@ pnpm add @toride/drizzle
 
 :::
 
-These adapters translate authorization constraints into database-level WHERE clauses so you can efficiently filter data based on permissions.
+These adapters translate authorization constraints into query-level WHERE clauses so you can efficiently filter data based on permissions.
 
 ### Code Generation (Optional)
 
@@ -72,7 +72,7 @@ This generates TypeScript types from your YAML policy, ensuring your resolver im
 A typical Toride project has three parts:
 
 1. **A YAML policy file** that defines your authorization rules (actors, resources, roles, permissions, and conditions)
-2. **Resource resolvers** that tell the engine how to fetch attributes for each resource type from your database
+2. **Resource resolvers** that tell the engine how to fetch attributes for each resource type from any data source
 3. **The engine** that evaluates permission checks against the policy using the resolver
 
 Here is a minimal project structure:

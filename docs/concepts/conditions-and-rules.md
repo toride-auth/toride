@@ -468,5 +468,5 @@ const allowed = await engine.can(
 
 - [Policy Format](/concepts/policy-format) -- see the full YAML structure reference
 - [Roles & Relations](/concepts/roles-and-relations) -- understand role derivation patterns
-- [Partial Evaluation](/concepts/partial-evaluation) -- translate conditions into database queries
+- [Partial Evaluation](/concepts/partial-evaluation) -- translate conditions into data-layer queries
 - [Client-Side Hints](/concepts/client-side-hints) -- send permission snapshots to the frontend
