@@ -1,6 +1,6 @@
 # Roles & Relations
 
-Toride uses a declarative role model where all roles are **derived** from policy rules rather than directly assigned via a runtime lookup. This page explains how roles work, how relations connect resources, and how the five derivation patterns let actors gain roles automatically.
+Toride uses a declarative role model where all roles are **derived** from policy rules rather than directly assigned via a runtime lookup. All five derivation patterns -- global roles, related-resource roles, relation identity, actor-type conditions, and condition-only rules -- are declared entirely in YAML, making the policy file the single source of truth for how actors gain roles. This page explains how roles work, how relations connect resources, and how each pattern lets actors gain roles automatically.
 
 ## How Roles Work
 
@@ -54,14 +54,28 @@ Relations serve two purposes:
 
 ### Resolving Relations
 
-At runtime, the engine resolves relations through your **resolver**. When Toride needs to follow a relation, it calls your resolver to fetch the related resource reference:
+At runtime, the engine resolves relations through your **resolver** -- a plain function that returns attributes from any data source. When Toride needs to follow a relation, it calls your resolver to fetch the related resource reference:
 
 ```typescript
+// In-memory data — no database required
+const tasks = {
+  "task-42": {
+    projectId: "proj-1",
+    assigneeId: "alice",
+    watcherIds: ["bob", "carol"],
+    status: "active",
+  },
+};
+
+const projects = {
+  "proj-1": { orgId: "org-1", status: "active" },
+};
+
 const engine = new Toride({
   policy: await loadYaml("./policy.yaml"),
   resolvers: {
     Task: async (ref) => {
-      const task = await db.task.findById(ref.id);
+      const task = tasks[ref.id];
       return {
         project: { type: "Project", id: task.projectId },
         assignee: { type: "User", id: task.assigneeId },
@@ -70,7 +84,7 @@ const engine = new Toride({
       };
     },
     Project: async (ref) => {
-      const project = await db.project.findById(ref.id);
+      const project = projects[ref.id];
       return {
         org: { type: "Organization", id: project.orgId },
         status: project.status,
@@ -80,7 +94,7 @@ const engine = new Toride({
 });
 ```
 
-Resolvers return a flat object where relation fields contain `ResourceRef` objects (with `type` and `id`). For `many` relations, return an array of `ResourceRef` objects. Non-relation fields (like `status`) are plain attribute values used in [conditions](/concepts/conditions-and-rules).
+Resolvers return a flat object where relation fields contain `ResourceRef` objects (with `type` and `id`). For `many` relations, return an array of `ResourceRef` objects. Non-relation fields (like `status`) are plain attribute values used in [conditions](/concepts/conditions-and-rules). Because resolvers are just functions, they work with any data source -- in-memory objects, REST APIs, databases, or anything else that can return the expected shape.
 
 ## The Five Derivation Patterns
 

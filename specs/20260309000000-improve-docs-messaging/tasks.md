@@ -113,9 +113,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T013 [P] [US5] Update intro paragraph of `docs/concepts/policy-format.md` (line 3) — add "single source of truth" framing: policies declare the entire authorization model in one file, serving as the single source of truth for who can do what
-- [ ] T014 [P] [US5] Update intro paragraph of `docs/concepts/roles-and-relations.md` (line 3) — add note about all five derivation patterns being declared in YAML, reinforcing YAML as the authoritative source for the authorization model
-- [ ] T015 [US5] Update "Resolving Relations" section in `docs/concepts/roles-and-relations.md` (line 57) — replace `db.*` example with in-memory example (plain objects), add note that resolvers work with any data source. Use canonical term "data source".
+- [X] T013 [P] [US5] Update intro paragraph of `docs/concepts/policy-format.md` (line 3) — add "single source of truth" framing: policies declare the entire authorization model in one file, serving as the single source of truth for who can do what
+- [X] T014 [P] [US5] Update intro paragraph of `docs/concepts/roles-and-relations.md` (line 3) — add note about all five derivation patterns being declared in YAML, reinforcing YAML as the authoritative source for the authorization model
+- [X] T015 [US5] Update "Resolving Relations" section in `docs/concepts/roles-and-relations.md` (line 57) — replace `db.*` example with in-memory example (plain objects), add note that resolvers work with any data source. Use canonical term "data source".
 
 **Checkpoint**: Concept pages emphasize YAML expressiveness with "single source of truth" framing
 
