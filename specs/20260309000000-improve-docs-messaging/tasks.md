@@ -129,11 +129,11 @@
 
 ### Implementation for User Story 6
 
-- [ ] T016 [P] [US6] Update "What's Next" link text in `docs/concepts/policy-format.md` (line 310) — replace "filter data at the database level" with "push authorization into data-layer queries"
-- [ ] T017 [P] [US6] Update "What's Next" link text in `docs/concepts/roles-and-relations.md` (line 342) — replace "filter data at the database level" with "push authorization into data-layer queries"
-- [ ] T018 [P] [US6] Update "What's Next" link text in `docs/concepts/conditions-and-rules.md` (line 471) — replace "translate conditions into database queries" with "translate conditions into data-layer queries"
-- [ ] T019 [P] [US6] Update "What's Next" link text in `docs/concepts/client-side-hints.md` (line 263) — replace "filter data at the database level" with "push authorization into data-layer queries"
-- [ ] T020 [US6] Reframe `docs/concepts/partial-evaluation.md` — update intro (line 3) to add "when your data source is a database" framing; replace "your database's query format" (line 104) with "your data store's query format"; ensure language frames partial evaluation as an optional capability for database-backed data sources, not a core requirement. Keep "database" where technically accurate (e.g., "WHERE clauses") but add conditional framing.
+- [X] T016 [P] [US6] Update "What's Next" link text in `docs/concepts/policy-format.md` (line 310) — replace "filter data at the database level" with "push authorization into data-layer queries"
+- [X] T017 [P] [US6] Update "What's Next" link text in `docs/concepts/roles-and-relations.md` (line 342) — replace "filter data at the database level" with "push authorization into data-layer queries"
+- [X] T018 [P] [US6] Update "What's Next" link text in `docs/concepts/conditions-and-rules.md` (line 471) — replace "translate conditions into database queries" with "translate conditions into data-layer queries"
+- [X] T019 [P] [US6] Update "What's Next" link text in `docs/concepts/client-side-hints.md` (line 263) — replace "filter data at the database level" with "push authorization into data-layer queries"
+- [X] T020 [US6] Reframe `docs/concepts/partial-evaluation.md` — update intro (line 3) to add "when your data source is a database" framing; replace "your database's query format" (line 104) with "your data store's query format"; ensure language frames partial evaluation as an optional capability for database-backed data sources, not a core requirement. Keep "database" where technically accurate (e.g., "WHERE clauses") but add conditional framing.
 
 **Checkpoint**: Zero occurrences of "your database" or "from your database" in non-integration docs; partial evaluation page uses conditional framing
 

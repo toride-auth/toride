@@ -307,4 +307,4 @@ Merging is additive: resources from both policies are combined. If both policies
 
 - [Roles & Relations](/concepts/roles-and-relations) -- understand the five role derivation patterns
 - [Conditions & Rules](/concepts/conditions-and-rules) -- learn the full condition expression syntax
-- [Partial Evaluation](/concepts/partial-evaluation) -- filter data at the database level
+- [Partial Evaluation](/concepts/partial-evaluation) -- push authorization into data-layer queries

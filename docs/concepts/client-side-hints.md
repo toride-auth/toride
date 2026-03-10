@@ -260,6 +260,6 @@ app.post("/api/projects/:id", async (req, res) => {
 
 ## What's Next
 
-- [Partial Evaluation](/concepts/partial-evaluation) -- filter data at the database level
+- [Partial Evaluation](/concepts/partial-evaluation) -- push authorization into data-layer queries
 - [Roles & Relations](/concepts/roles-and-relations) -- understand how roles are resolved for snapshots
 - [Conditions & Rules](/concepts/conditions-and-rules) -- learn the rules that determine permissions

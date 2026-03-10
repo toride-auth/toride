@@ -353,4 +353,4 @@ Both errors are fail-closed: if the engine cannot resolve a derivation path, the
 
 - [Policy Format](/concepts/policy-format) -- see how roles fit into the full policy structure
 - [Conditions & Rules](/concepts/conditions-and-rules) -- add conditional logic on top of role-based grants
-- [Partial Evaluation](/concepts/partial-evaluation) -- filter data at the database level using role constraints
+- [Partial Evaluation](/concepts/partial-evaluation) -- push authorization into data-layer queries
