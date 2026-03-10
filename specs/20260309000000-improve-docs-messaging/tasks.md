@@ -99,7 +99,7 @@
 
 ### Implementation for User Story 4
 
-- [ ] T012 [US4] Write full content for `docs/guide/why-toride.md` per the page contract in `specs/20260309000000-improve-docs-messaging/contracts/page-contracts.md`. Structure: (1) one-paragraph positioning intro, (2) "YAML as the Single Source of Truth" with policy snippet, (3) "Type Safety via Codegen" with codegen example, (4) "Database-Agnostic by Design" with in-memory resolver example, (5) "Relation-Based Policies" with 3+ level hierarchy YAML (Org → Project → Task), (6) "Partial Evaluation" with constraint generation example. Use technical & concise tone — code examples and bullet points, no marketing prose. Zero competitor product names.
+- [X] T012 [US4] Write full content for `docs/guide/why-toride.md` per the page contract in `specs/20260309000000-improve-docs-messaging/contracts/page-contracts.md`. Structure: (1) one-paragraph positioning intro, (2) "YAML as the Single Source of Truth" with policy snippet, (3) "Type Safety via Codegen" with codegen example, (4) "Database-Agnostic by Design" with in-memory resolver example, (5) "Relation-Based Policies" with 3+ level hierarchy YAML (Org → Project → Task), (6) "Partial Evaluation" with constraint generation example. Use technical & concise tone — code examples and bullet points, no marketing prose. Zero competitor product names.
 
 **Checkpoint**: Why Toride page exists with all 5 sections, 3+ level hierarchy YAML example, no competitor names
 
