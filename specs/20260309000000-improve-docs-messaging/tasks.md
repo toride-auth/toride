@@ -143,10 +143,10 @@
 
 **Purpose**: Final validation and cleanup across all changes
 
-- [ ] T021 Run full-text search across `docs/**/*.md` (excluding `docs/integrations/`) for banned phrases: "your database", "from your database", "connects to your database", "fetch from your database" — fix any remaining occurrences
-- [ ] T022 Verify canonical term usage — search for "data provider", "data access layer", "data access functions" across all docs and replace with "data source" where referring to resolver data origins
-- [ ] T023 Verify the Prisma and Drizzle integration pages use "if you use Prisma/Drizzle" framing rather than "when you connect to your database" — make minor framing adjustments only if needed in `docs/integrations/prisma.md` and `docs/integrations/drizzle.md`
-- [ ] T024 Build the VitePress docs site (`cd docs && npx vitepress build`) and confirm no build errors — verify all internal links resolve correctly
+- [X] T021 Run full-text search across `docs/**/*.md` (excluding `docs/integrations/`) for banned phrases: "your database", "from your database", "connects to your database", "fetch from your database" — fix any remaining occurrences
+- [X] T022 Verify canonical term usage — search for "data provider", "data access layer", "data access functions" across all docs and replace with "data source" where referring to resolver data origins
+- [X] T023 Verify the Prisma and Drizzle integration pages use "if you use Prisma/Drizzle" framing rather than "when you connect to your database" — make minor framing adjustments only if needed in `docs/integrations/prisma.md` and `docs/integrations/drizzle.md`
+- [X] T024 Build the VitePress docs site (`cd docs && npx vitepress build`) and confirm no build errors — verify all internal links resolve correctly
 
 **Checkpoint**: All banned phrases eliminated, canonical terminology consistent, docs site builds cleanly
 
