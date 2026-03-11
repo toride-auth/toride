@@ -54,9 +54,9 @@
 
 ### Components (can be built in parallel)
 
-- [ ] T013 [P] [US1+US2] Create `examples/prisma-app/src/components/ProjectList.tsx` — Hono JSX component rendering project cards as links to `/projects/:id`. Each card shows project name, department, status. Conditionally show action indicators based on permitted actions passed as props.
-- [ ] T014 [P] [US1+US2] Create `examples/prisma-app/src/components/ProjectDetail.tsx` — Hono JSX component showing project info header, task creation form (visible only if `create_task` permitted, uses `hx-post` to `/projects/:id/tasks` with `hx-target` for task list), and task list container. Accept project, tasks, and permissions props.
-- [ ] T015 [P] [US1+US2] Create `examples/prisma-app/src/components/TaskItem.tsx` — Hono JSX component for a single task row: title, status badge, assignee name. Conditionally render inline edit form (`hx-put /tasks/:id`) and delete button (`hx-delete /tasks/:id` with `hx-swap="outerHTML"`) based on permitted actions props. Error container div for authorization rejection messages.
+- [x] T013 [P] [US1+US2] Create `examples/prisma-app/src/components/ProjectList.tsx` — Hono JSX component rendering project cards as links to `/projects/:id`. Each card shows project name, department, status. Conditionally show action indicators based on permitted actions passed as props.
+- [x] T014 [P] [US1+US2] Create `examples/prisma-app/src/components/ProjectDetail.tsx` — Hono JSX component showing project info header, task creation form (visible only if `create_task` permitted, uses `hx-post` to `/projects/:id/tasks` with `hx-target` for task list), and task list container. Accept project, tasks, and permissions props.
+- [x] T015 [P] [US1+US2] Create `examples/prisma-app/src/components/TaskItem.tsx` — Hono JSX component for a single task row: title, status badge, assignee name. Conditionally render inline edit form (`hx-put /tasks/:id`) and delete button (`hx-delete /tasks/:id` with `hx-swap="outerHTML"`) based on permitted actions props. Error container div for authorization rejection messages.
 
 ### Routes (depend on components)
 
