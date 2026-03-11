@@ -54,11 +54,11 @@
 
 ### Implementation
 
-- [ ] T010 [P] [US3] Update JSDoc on `ResourceResolver` type in `packages/toride/src/types.ts` — explain resolver is optional per resource type, inline attributes used as fallback (per contracts/jsdoc-contract.md)
-- [ ] T011 [P] [US3] Update JSDoc on `Resolvers` type in `packages/toride/src/types.ts` — clarify "trivial resolution" as the "default resolver" pattern, mention inline attributes as default data source
-- [ ] T012 [P] [US3] Update JSDoc on `TorideOptions.resolvers` property in `packages/toride/src/types.ts` — add `@example` block showing inline-only usage without resolvers, explain merge precedence
-- [ ] T013 [P] [US3] Update JSDoc on `AttributeCache` class in `packages/toride/src/evaluation/cache.ts` — frame "no resolver" paths as "default resolver behavior", reference GraphQL analogy
-- [ ] T014 [US3] Run lint to confirm JSDoc changes introduce no type errors: `pnpm exec nx run toride:lint`
+- [X] T010 [P] [US3] Update JSDoc on `ResourceResolver` type in `packages/toride/src/types.ts` — explain resolver is optional per resource type, inline attributes used as fallback (per contracts/jsdoc-contract.md)
+- [X] T011 [P] [US3] Update JSDoc on `Resolvers` type in `packages/toride/src/types.ts` — clarify "trivial resolution" as the "default resolver" pattern, mention inline attributes as default data source
+- [X] T012 [P] [US3] Update JSDoc on `TorideOptions.resolvers` property in `packages/toride/src/types.ts` — add `@example` block showing inline-only usage without resolvers, explain merge precedence
+- [X] T013 [P] [US3] Update JSDoc on `AttributeCache` class in `packages/toride/src/evaluation/cache.ts` — frame "no resolver" paths as "default resolver behavior", reference GraphQL analogy
+- [X] T014 [US3] Run lint to confirm JSDoc changes introduce no type errors: `pnpm exec nx run toride:lint`
 
 **Checkpoint**: All 4 target types have updated JSDoc. SC-002 and FR-005 satisfied.
 

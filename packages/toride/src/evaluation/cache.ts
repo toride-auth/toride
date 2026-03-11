@@ -23,11 +23,19 @@ function isResourceRef(value: unknown): value is ResourceRef {
  * Per-check attribute cache. Created fresh for each `can()` call.
  * Stores Promises to prevent duplicate concurrent calls for the same key.
  *
- * Resolution strategy:
+ * Resolution strategy (implements the **default resolver** pattern):
  * 1. If the ref has inline attributes AND a resolver exists, merge both (inline wins).
- * 2. If the ref has inline attributes but no resolver, use inline only.
+ * 2. If the ref has inline attributes but no resolver, use inline only — **default
+ *    resolver behavior**. Inline {@link ResourceRef.attributes} serve as the sole
+ *    data source, analogous to GraphQL's default field resolver returning
+ *    `parent[fieldName]`.
  * 3. If the ref has no inline attributes but a resolver exists, use resolver result.
- * 4. If neither, return empty object (trivial resolver behavior).
+ * 4. If neither, return empty object — **default resolver behavior** with no data.
+ *    All `$resource.<field>` references resolve to `undefined`, causing conditions
+ *    to fail (default-deny).
+ *
+ * In all cases, **inline attributes take precedence** over resolver results on a
+ * field-by-field basis.
  *
  * T016: When a resolved attribute matches a declared relation AND is ResourceRef-shaped,
  * it is treated as a relation target for path traversal.
