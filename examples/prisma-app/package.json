@@ -1,0 +1,28 @@
+{
+  "name": "prisma-example-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.tsx",
+    "start": "tsx src/index.tsx",
+    "prisma": "prisma"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@prisma/client": "^6.4.0",
+    "hono": "^4.7.0",
+    "toride": "^0.1.0",
+    "@toride/prisma": "^0.1.0",
+    "yaml": "^2.3.0"
+  },
+  "devDependencies": {
+    "prisma": "^6.4.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^20.0.0"
+  }
+}
