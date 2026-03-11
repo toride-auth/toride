@@ -65,7 +65,7 @@
 
 ### Entry Point
 
-- [ ] T018 [US1+US2] Create `examples/prisma-app/src/index.tsx` — Hono app entry point: create app, apply user middleware, mount project routes, mount task routes. Add `GET /` redirect to `/projects`. Add `POST /switch-user` route that reads `userId` from form body, sets `currentUser` cookie (use `setCookie` from `hono/cookie`), returns `HX-Redirect: /projects` header. Start server on port 3000 via `@hono/node-server` `serve()`. Log startup URL.
+- [x] T018 [US1+US2] Create `examples/prisma-app/src/index.tsx` — Hono app entry point: create app, apply user middleware, mount project routes, mount task routes. Add `GET /` redirect to `/projects`. Add `POST /switch-user` route that reads `userId` from form body, sets `currentUser` cookie (use `setCookie` from `hono/cookie`), returns `HX-Redirect: /projects` header. Start server on port 3000 via `@hono/node-server` `serve()`. Log startup URL.
 
 **Checkpoint**: Full app functional — switching users changes visible projects/tasks, CRUD operations work for authorized users, unauthorized attempts show error messages.
 
