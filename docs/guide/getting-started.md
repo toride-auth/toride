@@ -1,3 +1,7 @@
+---
+description: Installation instructions for all packages, prerequisites (Node.js 20+, TypeScript), and project structure.
+---
+
 # Getting Started
 
 Toride is a relation-aware authorization engine for TypeScript. You define policies in YAML, provide resolvers — simple functions that return attributes from any data source — and the engine handles permission checks, including partial evaluation for data filtering.

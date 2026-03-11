@@ -1,3 +1,7 @@
+---
+description: Permission snapshots — engine.snapshot() on the server, TorideClient from toride/client for synchronous UI permission checks with default-deny semantics, React integration pattern.
+---
+
 # Client-Side Hints
 
 Client-side hints let you send a **permission snapshot** from the server to the browser, so your frontend can make instant, synchronous permission checks to control UI rendering. Instead of calling the server for every "should I show this button?" decision, the client checks a local snapshot.

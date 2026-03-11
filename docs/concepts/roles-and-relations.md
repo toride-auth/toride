@@ -1,3 +1,7 @@
+---
+description: The five role derivation patterns — global role, role on related resource, relation identity, actor type with condition, and condition only — plus cycle detection and depth limits.
+---
+
 # Roles & Relations
 
 Toride uses a declarative role model where all roles are **derived** from policy rules rather than directly assigned via a runtime lookup. All five derivation patterns -- global roles, related-resource roles, relation identity, actor-type conditions, and condition-only rules -- are declared entirely in YAML, making the policy file the single source of truth for how actors gain roles. This page explains how roles work, how relations connect resources, and how each pattern lets actors gain roles automatically.

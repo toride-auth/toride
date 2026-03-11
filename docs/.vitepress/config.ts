@@ -1,9 +1,18 @@
 import { defineConfig } from "vitepress";
+import llmstxt from "vitepress-plugin-llms";
 
 export default defineConfig({
   title: "Toride",
   description: "Relation-aware authorization for TypeScript",
   base: "/toride/",
+
+  vite: {
+    plugins: [
+      llmstxt({
+        domain: "https://toride-auth.github.io",
+      }),
+    ],
+  },
 
   themeConfig: {
     search: {
@@ -33,6 +42,7 @@ export default defineConfig({
             text: "Roles & Relations",
             link: "/concepts/roles-and-relations",
           },
+          { text: "Resolvers", link: "/concepts/resolvers" },
           {
             text: "Conditions & Rules",
             link: "/concepts/conditions-and-rules",

@@ -34,6 +34,16 @@ export interface BatchCheckItem {
  * Per-type resolver function.
  * Called when the engine needs attributes not available inline.
  * Called at most once per unique resource per evaluation (cached).
+ *
+ * Registering a resolver is **optional** per resource type. When no resolver is
+ * registered, inline {@link ResourceRef.attributes} are used as the sole data
+ * source — this is referred to as "default resolver" behavior (analogous to
+ * GraphQL's default field resolver, which returns `parent[fieldName]`).
+ *
+ * A resolver is only needed when attributes must be fetched from an external
+ * source (e.g., a database). When both inline attributes and a resolver are
+ * present, inline attributes take precedence field-by-field over resolver
+ * results.
  */
 export type ResourceResolver = (
   ref: ResourceRef,
@@ -41,8 +51,16 @@ export type ResourceResolver = (
 
 /**
  * Map of resource type names to their resolver functions.
- * Not all types need resolvers — types without resolvers use trivial resolution
- * (fields are undefined unless provided inline).
+ *
+ * Not all types need resolvers. Types without a registered resolver use
+ * **default resolver** behavior (also called "trivial resolution"): the engine
+ * reads attribute values directly from the inline {@link ResourceRef.attributes}
+ * passed at the call site. Fields not present inline resolve to `undefined`,
+ * causing conditions that reference them to fail (default-deny).
+ *
+ * This mirrors GraphQL's default field resolver pattern, where an unresolved
+ * field simply returns `parent[fieldName]` — here, inline attributes play the
+ * role of the `parent` object.
  */
 export type Resolvers = Record<string, ResourceResolver>;
 
@@ -56,7 +74,29 @@ export type EvaluatorFn = (
 /** Engine construction options. */
 export interface TorideOptions {
   readonly policy: Policy;
-  /** Per-type resolver map. Optional — engine works without resolvers if all data is inline. */
+  /**
+   * Per-type resolver map.
+   *
+   * Optional — the engine works without any resolvers when all required data is
+   * provided inline via {@link ResourceRef.attributes}. This "default resolver"
+   * mode is the simplest way to use toride and requires no async data fetching.
+   *
+   * When both inline attributes and a resolver are present for the same resource
+   * type, **inline attributes take precedence** over resolver results on a
+   * field-by-field basis.
+   *
+   * @example
+   * ```ts
+   * // Inline-only mode — no resolvers needed
+   * const toride = new Toride({ policy });
+   *
+   * const allowed = await toride.can(actor, "read", {
+   *   type: "Document",
+   *   id: "doc-1",
+   *   attributes: { status: "published", ownerId: "user-42" },
+   * });
+   * ```
+   */
   readonly resolvers?: Resolvers;
   readonly maxConditionDepth?: number;
   readonly maxDerivedRoleDepth?: number;
