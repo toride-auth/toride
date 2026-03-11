@@ -1,3 +1,7 @@
+---
+description: createDrizzleAdapter() with relation and role assignment config, createDrizzleResolver() with custom ID column, intermediate query description format with _op field.
+---
+
 # Drizzle Integration
 
 `@toride/drizzle` provides a constraint adapter and resolver helper for [Drizzle ORM](https://orm.drizzle.team/). It translates Toride's constraint AST into intermediate query description objects that you can use with Drizzle's query builder.

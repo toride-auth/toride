@@ -1,3 +1,7 @@
+---
+description: Complete YAML policy reference — actors, global_roles, resources, roles, permissions, grants, relations, derived_roles, rules, and policy composition with mergePolicies().
+---
+
 # Policy Format
 
 Toride policies are written in YAML (or JSON) and serve as the **single source of truth** for your entire authorization model. A single policy file declares who your actors are, what resources they can access, how roles map to permissions, and under what conditions access should be granted or denied -- no imperative code required. Every authorization decision the engine makes traces back to what is declared in this file.

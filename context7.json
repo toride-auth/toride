@@ -1,0 +1,15 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Toride",
+  "description": "Relation-aware authorization engine for TypeScript — define policies in YAML, resolve roles through relations, check permissions with can()",
+  "folders": ["docs"],
+  "excludeFolders": ["packages", "node_modules", ".nx"],
+  "excludeFiles": ["CHANGELOG.md"],
+  "rules": [
+    "Toride is an in-process library, not a hosted service",
+    "Policies are defined in YAML, not code",
+    "Resolvers are plain functions — any data source works",
+    "Use buildConstraints() for data filtering instead of checking each record with can()",
+    "Always handle all three constraint results: forbidden, unrestricted, and constraints"
+  ]
+}

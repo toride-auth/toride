@@ -1,3 +1,7 @@
+---
+description: CLI (toride-codegen) and programmatic API (generateTypes), generated type reference (Actions, Resources, RoleMap, PermissionMap, RelationMap, ResolverMap), watch mode.
+---
+
 # Codegen
 
 `@toride/codegen` generates TypeScript type declarations from your Toride policy file. This gives you compile-time safety for resource names, roles, permissions, and relations -- so typos and mismatches are caught before runtime.

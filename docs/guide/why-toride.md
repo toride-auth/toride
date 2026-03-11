@@ -1,3 +1,7 @@
+---
+description: Overview of design philosophy — YAML as single source of truth, type safety via codegen, database-agnostic resolvers, relation-based role propagation, and partial evaluation for data filtering.
+---
+
 # Why Toride
 
 Toride is a relation-aware authorization engine for TypeScript. You define your entire authorization model in YAML, generate type-safe bindings, and plug in any data source — no database required.

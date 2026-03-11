@@ -1,3 +1,7 @@
+---
+description: createPrismaAdapter() with relation mapping and role assignment config, createPrismaResolver() with select option, constraint-to-Prisma WHERE clause translation reference.
+---
+
 # Prisma Integration
 
 `@toride/prisma` provides a constraint adapter and resolver helper for [Prisma ORM](https://www.prisma.io/). It translates Toride's constraint AST into Prisma `where` clause objects, so you can push authorization logic down to the database.

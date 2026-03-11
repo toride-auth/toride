@@ -1,3 +1,7 @@
+---
+description: buildConstraints() API, constraint AST node types, the ConstraintAdapter interface, translateConstraints(), and ORM adapter integration for query-level filtering.
+---
+
 # Partial Evaluation
 
 Partial evaluation lets you translate authorization rules into query constraints, so you can push authorization **into the data layer** instead of loading all records and checking permissions one by one. When your data source is a database, this means generating WHERE clauses that filter at the query level. This is how Toride supports "show me all projects I can read" queries efficiently.

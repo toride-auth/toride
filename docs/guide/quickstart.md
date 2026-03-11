@@ -1,3 +1,7 @@
+---
+description: Step-by-step walkthrough — define a YAML policy, create resolvers, run permission checks with can(), batch checks, permittedActions(), and explain().
+---
+
 # Quickstart
 
 This guide walks you through your first authorization check with Toride — from defining a policy to running a permission check — in under 5 minutes.

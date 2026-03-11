@@ -1,3 +1,7 @@
+---
+description: ABAC conditions — reference paths ($actor, $resource, $env), operators (eq, neq, gt, in, exists, contains, custom), logical combinators (any/all), forbid-wins principle, and strict null semantics.
+---
+
 # Conditions & Rules
 
 Conditions and rules add attribute-based access control (ABAC) on top of Toride's role-based model. While [grants](/concepts/policy-format#grants) provide static role-to-permission mappings, rules let you conditionally permit or forbid actions based on resource attributes, actor attributes, and environment context.
