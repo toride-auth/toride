@@ -75,8 +75,8 @@
 
 **Purpose**: Make the code serve as a self-documenting learning resource. Also covers cross-cutting polish.
 
-- [ ] T019 [P] [US4] Add integration-point comments to `examples/prisma-app/src/engine.ts` — explain policy loading pattern, resolver registration for each resource type, adapter creation purpose, and how the engine connects toride to Prisma.
-- [ ] T020 [P] [US4] Add authorization-pattern comments to `examples/prisma-app/src/routes/projects.tsx` and `examples/prisma-app/src/routes/tasks.tsx` — annotate `buildConstraints` → `translateConstraints` flow, `can()` check pattern, `permittedActions` usage, and error handling approach at each key integration point.
+- [x] T019 [P] [US4] Add integration-point comments to `examples/prisma-app/src/engine.ts` — explain policy loading pattern, resolver registration for each resource type, adapter creation purpose, and how the engine connects toride to Prisma.
+- [x] T020 [P] [US4] Add authorization-pattern comments to `examples/prisma-app/src/routes/projects.tsx` and `examples/prisma-app/src/routes/tasks.tsx` — annotate `buildConstraints` → `translateConstraints` flow, `can()` check pattern, `permittedActions` usage, and error handling approach at each key integration point.
 - [ ] T021 Validate quickstart.md scenarios end-to-end: run setup commands, verify all 3 role-based filtering scenarios (Alice sees Alpha only, Bob sees Alpha+Beta, Charlie sees all non-archived), verify mutation scenarios (Bob creates/edits, Alice gets rejected), verify archived Project Gamma is hidden.
 
 **Checkpoint**: A developer unfamiliar with toride can read engine.ts and route handlers and understand where/how authorization is configured without external docs. All quickstart scenarios pass.
