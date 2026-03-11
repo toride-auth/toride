@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { prisma } from "../db.js";
-import { engine, adapter } from "../engine.js";
+import { engine } from "../engine.js";
 import { toActorRef } from "../types.js";
 import type { AppEnv } from "../types.js";
 import { Layout } from "../components/Layout.js";
@@ -11,36 +11,32 @@ import { TaskItem } from "../components/TaskItem.js";
 const app = new Hono<AppEnv>();
 
 // ---------------------------------------------------------------------------
-// PATTERN: buildConstraints → translateConstraints (list filtering)
+// PATTERN: Authorization-filtered list queries
 //
-// For list pages, we don't check permissions on each row individually.
-// Instead, buildConstraints() evaluates the policy and returns one of three
-// discriminated results:
+// For list pages, we push authorization filtering down to the database so we
+// only fetch rows the user is allowed to see. This app's policy combines
+// multiple access paths:
 //
-//   { forbidden: true }      — actor has zero access; skip the query entirely
-//   { unrestricted: true }   — actor can see everything; query without a filter
-//   { constraints: [...] }   — partial access; pass constraints through
-//                               translateConstraints() to get a Prisma WHERE
+//   1. Superadmin global role → access all non-archived projects
+//   2. Department-based derived role → $actor.department == $resource.department
+//   3. Direct role assignments → viewer/editor/admin via RoleAssignment table
+//   4. Forbid rule → archived projects are excluded for everyone
 //
-// This pushes authorization filtering down to the database, so you only fetch
-// rows the user is allowed to see. The policy's "forbid" rules (e.g., archived
-// projects) are folded into the constraints automatically.
+// We check the superadmin case first (no WHERE filter needed beyond archived),
+// then build a combined OR clause covering department match and direct role
+// assignments. The forbid rule (archived) is applied in all cases.
+//
+// NOTE: buildConstraints() can also be used here for simpler policies where
+// all access paths map to real database columns. This app uses a hybrid
+// approach because the policy includes virtual attributes (viewer_ids, etc.)
+// that exist in the resolver but not in the database schema. See engine.ts
+// for details on the resolver design.
 // ---------------------------------------------------------------------------
 
 app.get("/", async (c) => {
   const user = c.get("currentUser");
   const allUsers = c.get("allUsers");
   const actor = toActorRef(user);
-
-  // ---------------------------------------------------------------------------
-  // Step 1: Build authorization constraints for reading Projects.
-  // The engine evaluates all role derivations, grants, and forbid rules from
-  // policy.yaml to determine what this actor can read. For example:
-  //   - Alice (viewer on Alpha only) gets constraints scoping to Alpha
-  //   - Charlie (superadmin) gets { unrestricted: true }
-  //   - Archived projects are excluded by the forbid rule
-  // ---------------------------------------------------------------------------
-  const result = await engine.buildConstraints(actor, "read", "Project");
 
   type ProjectRow = {
     id: string;
@@ -52,52 +48,49 @@ app.get("/", async (c) => {
   let projects: ProjectRow[] = [];
 
   // ---------------------------------------------------------------------------
-  // Step 2: Handle the three-way discriminated union result.
-  // The constraint result is a tagged union — use "in" narrowing to branch.
-  // This pattern ensures you handle all cases and keeps the TypeScript types
-  // correct without casts.
+  // Step 1: Determine the actor's access level and build the query filter.
   //
-  // buildConstraints evaluates derived roles and policy rules to produce a
-  // WHERE clause, but it does NOT cover explicit role assignments stored in
-  // the RoleAssignment table. To include those, we build an additional OR
-  // clause that checks for direct role assignments granting read access.
+  // Superadmins (identified by the isSuperAdmin attribute) get admin role on
+  // all projects via the global_roles + derived_roles policy rules. They can
+  // read everything except archived projects (the forbid rule still applies).
+  //
+  // For other users, we build a WHERE clause combining two access paths:
+  //   Path 1: Direct role assignments from the RoleAssignment table
+  //   Path 2: Department-based derived role ($actor.department == $resource.department)
+  // Both paths exclude archived projects per the policy's forbid rule.
   // ---------------------------------------------------------------------------
 
-  // Roles that grant "read" access (from the policy's grants section)
-  const readRoles = ["viewer", "editor", "admin"];
-
-  // Direct role assignment filter: projects where the actor has an explicit
-  // role assignment that grants read access AND the project is not archived
-  const directRoleFilter = {
-    AND: [
-      {
-        roleAssignments: {
-          some: { userId: actor.id, role: { in: readRoles } },
-        },
-      },
-      { archived: { not: true } },
-    ],
-  };
-
-  if ("forbidden" in result) {
-    // No derived-role access, but the actor might still have direct role
-    // assignments granting read access (e.g., Alice as explicit viewer)
+  if (actor.attributes?.isSuperAdmin) {
+    // Superadmin: can read all projects, but the policy's forbid rule still
+    // excludes archived projects. We apply that filter here to stay consistent.
     projects = await prisma.project.findMany({
-      where: directRoleFilter,
+      where: { archived: { not: true } },
       orderBy: { name: "asc" },
     });
-  } else if ("unrestricted" in result) {
-    // Actor can read all projects — no WHERE clause needed
-    projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
   } else {
-    // Partial access from derived roles — combine with direct role assignments
-    // using OR so the actor sees projects from BOTH access paths
-    const derivedWhere = engine.translateConstraints(
-      result.constraints,
-      adapter,
-    );
+    // Non-superadmin: combine direct role assignments + department match
+    const readRoles = ["viewer", "editor", "admin"];
     projects = await prisma.project.findMany({
-      where: { OR: [derivedWhere, directRoleFilter] },
+      where: {
+        AND: [
+          { archived: { not: true } },
+          {
+            OR: [
+              // Path 1: Actor has an explicit role assignment granting read
+              {
+                roleAssignments: {
+                  some: { userId: actor.id, role: { in: readRoles } },
+                },
+              },
+              // Path 2: Actor's department matches the project's department
+              // (derived editor role from policy.yaml)
+              ...(actor.attributes?.department
+                ? [{ department: actor.attributes.department as string }]
+                : []),
+            ],
+          },
+        ],
+      },
       orderBy: { name: "asc" },
     });
   }
