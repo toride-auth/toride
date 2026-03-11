@@ -42,6 +42,7 @@ export default defineConfig({
             text: "Roles & Relations",
             link: "/concepts/roles-and-relations",
           },
+          { text: "Resolvers", link: "/concepts/resolvers" },
           {
             text: "Conditions & Rules",
             link: "/concepts/conditions-and-rules",

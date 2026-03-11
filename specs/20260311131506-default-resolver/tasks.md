@@ -72,8 +72,8 @@
 
 ### Implementation
 
-- [ ] T015 [US4] Create resolver concepts page at `docs/concepts/resolvers.md` covering: (a) what resolvers do, (b) default resolver concept, (c) inline-only code example, (d) resolver + inline merge code example, (e) precedence rules, (f) no data = deny behavior
-- [ ] T016 [US4] Add sidebar entry for resolvers page in `docs/.vitepress/config.ts` under the Concepts section
+- [X] T015 [US4] Create resolver concepts page at `docs/concepts/resolvers.md` covering: (a) what resolvers do, (b) default resolver concept, (c) inline-only code example, (d) resolver + inline merge code example, (e) precedence rules, (f) no data = deny behavior
+- [X] T016 [US4] Add sidebar entry for resolvers page in `docs/.vitepress/config.ts` under the Concepts section
 
 **Checkpoint**: Resolvers page is reachable from site navigation with all required content. SC-003 and FR-006 satisfied.
 
