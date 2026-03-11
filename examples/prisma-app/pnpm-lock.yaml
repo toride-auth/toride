@@ -23,9 +23,6 @@ importers:
       toride:
         specifier: ^0.1.0
         version: 0.1.0(typescript@5.9.3)
-      yaml:
-        specifier: ^2.3.0
-        version: 2.8.2
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

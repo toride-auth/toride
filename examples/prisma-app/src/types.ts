@@ -22,6 +22,7 @@ export function toActorRef(user: User): ActorRef {
     type: "User",
     id: user.id,
     attributes: {
+      id: user.id,
       email: user.email,
       department: user.department,
       isSuperAdmin: user.isSuperAdmin,

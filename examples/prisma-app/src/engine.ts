@@ -40,12 +40,43 @@ export const adapter = createPrismaAdapter();
 // a resolver whenever you use can(), permittedActions(), or when derived roles
 // require attribute checks (e.g., "$actor.department == $resource.department").
 //
-// createPrismaResolver(prisma, "project") generates a standard resolver that
-// maps a ResourceRef { type: "Project", id: "..." } to the Prisma model's
-// fields automatically. This works for flat models with no relation-based
-// policy rules.
+// For simple models, createPrismaResolver(prisma, "model") generates a
+// standard resolver automatically. However, when you need to include related
+// data (like role assignments) in the resource attributes for policy evaluation,
+// a custom resolver is required.
+//
+// The Project resolver below includes each user's role assignments as arrays
+// of user IDs (viewer_ids, editor_ids, admin_ids). This allows the policy to
+// use "$actor.id: { in: $resource.viewer_ids }" to check direct role
+// assignments during can() and permittedActions() evaluation.
 // ---------------------------------------------------------------------------
-const projectResolver = createPrismaResolver(prisma, "project");
+const projectResolver = async (ref: { type: string; id: string }) => {
+  const project = await prisma.project.findUnique({
+    where: { id: ref.id },
+    include: {
+      roleAssignments: { select: { userId: true, role: true } },
+    },
+  });
+  if (!project) return {};
+  // Build per-role user ID arrays for policy condition checks
+  const viewerIds: string[] = [];
+  const editorIds: string[] = [];
+  const adminIds: string[] = [];
+  for (const ra of project.roleAssignments) {
+    if (ra.role === "viewer") viewerIds.push(ra.userId);
+    if (ra.role === "editor") editorIds.push(ra.userId);
+    if (ra.role === "admin") adminIds.push(ra.userId);
+  }
+  return {
+    name: project.name,
+    department: project.department,
+    status: project.status,
+    archived: project.archived,
+    viewer_ids: viewerIds,
+    editor_ids: editorIds,
+    admin_ids: adminIds,
+  };
+};
 
 // ---------------------------------------------------------------------------
 // 4. CUSTOM TASK RESOLVER

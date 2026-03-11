@@ -16,7 +16,7 @@ async function main() {
     data: {
       name: "Alice",
       email: "alice@example.com",
-      department: "engineering",
+      department: "design",
       isSuperAdmin: false,
     },
   });

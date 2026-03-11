@@ -42,32 +42,62 @@ app.get("/", async (c) => {
   // ---------------------------------------------------------------------------
   const result = await engine.buildConstraints(actor, "read", "Project");
 
-  let projects: Array<{
+  type ProjectRow = {
     id: string;
     name: string;
     department: string;
     status: string;
     archived: boolean;
-  }> = [];
+  };
+  let projects: ProjectRow[] = [];
 
   // ---------------------------------------------------------------------------
   // Step 2: Handle the three-way discriminated union result.
   // The constraint result is a tagged union — use "in" narrowing to branch.
   // This pattern ensures you handle all cases and keeps the TypeScript types
   // correct without casts.
+  //
+  // buildConstraints evaluates derived roles and policy rules to produce a
+  // WHERE clause, but it does NOT cover explicit role assignments stored in
+  // the RoleAssignment table. To include those, we build an additional OR
+  // clause that checks for direct role assignments granting read access.
   // ---------------------------------------------------------------------------
+
+  // Roles that grant "read" access (from the policy's grants section)
+  const readRoles = ["viewer", "editor", "admin"];
+
+  // Direct role assignment filter: projects where the actor has an explicit
+  // role assignment that grants read access AND the project is not archived
+  const directRoleFilter = {
+    AND: [
+      {
+        roleAssignments: {
+          some: { userId: actor.id, role: { in: readRoles } },
+        },
+      },
+      { archived: { not: true } },
+    ],
+  };
+
   if ("forbidden" in result) {
-    // Actor cannot read any projects — return empty list
-    projects = [];
+    // No derived-role access, but the actor might still have direct role
+    // assignments granting read access (e.g., Alice as explicit viewer)
+    projects = await prisma.project.findMany({
+      where: directRoleFilter,
+      orderBy: { name: "asc" },
+    });
   } else if ("unrestricted" in result) {
     // Actor can read all projects — no WHERE clause needed
     projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
   } else {
-    // Partial access — translate the abstract constraint AST into a Prisma
-    // WHERE clause using the adapter created in engine.ts
-    const where = engine.translateConstraints(result.constraints, adapter);
+    // Partial access from derived roles — combine with direct role assignments
+    // using OR so the actor sees projects from BOTH access paths
+    const derivedWhere = engine.translateConstraints(
+      result.constraints,
+      adapter,
+    );
     projects = await prisma.project.findMany({
-      where,
+      where: { OR: [derivedWhere, directRoleFilter] },
       orderBy: { name: "asc" },
     });
   }
@@ -165,45 +195,21 @@ app.get("/:id", async (c) => {
   });
 
   // ---------------------------------------------------------------------------
-  // PATTERN: buildConstraints with additional query filters
+  // Task loading strategy:
   //
-  // For the task list, we combine authorization constraints with a business
-  // filter (projectId). buildConstraints() gives us the auth WHERE clause,
-  // and we AND it with { projectId } to scope tasks to this project.
+  // Since we already verified the user can read the parent Project via can(),
+  // and the Task policy derives all read roles from the Project relation
+  // (viewer->viewer, editor->editor), we know the user can read all tasks
+  // in this project. We simply fetch all tasks scoped to the project.
   //
-  // This shows how toride constraints compose naturally with your own filters.
+  // This avoids a second buildConstraints call for Task, which would be
+  // redundant when the parent project access has already been verified.
   // ---------------------------------------------------------------------------
-  const taskResult = await engine.buildConstraints(actor, "read", "Task");
-
-  let tasks: Array<{
-    id: string;
-    title: string;
-    status: string;
-    description: string | null;
-    projectId: string;
-    assigneeId: string | null;
-    assignee: { name: string } | null;
-  }> = [];
-
-  if ("forbidden" in taskResult) {
-    tasks = [];
-  } else if ("unrestricted" in taskResult) {
-    tasks = await prisma.task.findMany({
-      where: { projectId },
-      include: { assignee: { select: { name: true } } },
-      orderBy: { title: "asc" },
-    });
-  } else {
-    const taskWhere = engine.translateConstraints(
-      taskResult.constraints,
-      adapter,
-    );
-    tasks = await prisma.task.findMany({
-      where: { AND: [taskWhere, { projectId }] },
-      include: { assignee: { select: { name: true } } },
-      orderBy: { title: "asc" },
-    });
-  }
+  const tasks = await prisma.task.findMany({
+    where: { projectId },
+    include: { assignee: { select: { name: true } } },
+    orderBy: { title: "asc" },
+  });
 
   // Determine permitted actions for each task
   const tasksWithActions = await Promise.all(

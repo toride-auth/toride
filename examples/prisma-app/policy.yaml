@@ -25,13 +25,35 @@ resources:
       admin: [all]
 
     derived_roles:
+      # Superadmin gets admin role on all projects
       - role: admin
         from_global_role: superadmin
 
+      # Users in the same department get editor role (attribute-based)
       - role: editor
         actor_type: User
         when:
-          $actor.department: $resource.department
+          $actor.department:
+            eq: $resource.department
+
+      # Direct role assignments from the RoleAssignment table:
+      # The project resolver includes viewer_ids, editor_ids, admin_ids
+      # arrays containing user IDs for each role. These derived_roles entries
+      # check if the actor's ID is in the appropriate array.
+      - role: viewer
+        when:
+          $actor.id:
+            in: $resource.viewer_ids
+
+      - role: editor
+        when:
+          $actor.id:
+            in: $resource.editor_ids
+
+      - role: admin
+        when:
+          $actor.id:
+            in: $resource.admin_ids
 
     rules:
       - effect: forbid
