@@ -158,6 +158,8 @@ export interface FieldAccessDef {
 export interface ResourceBlock {
   readonly roles: string[];
   readonly permissions: string[];
+  /** Optional typed attribute declarations for this resource type. */
+  readonly attributes?: Record<string, AttributeType>;
   /** Relations map field names to target resource type names (simplified). */
   readonly relations?: Record<string, string>;
   readonly grants?: Record<string, string[]>;

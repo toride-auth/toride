@@ -32,10 +32,10 @@
 
 **Independent Test**: Parse a policy with resource `attributes: { status: string }`, verify it passes validation. Parse one with `attributes: { status: invalid }`, verify it fails.
 
-- [ ] T003 [US2] Add `attributes` field to `ResourceBlockSchema` (valibot) in `packages/toride/src/policy/schema.ts` — optional `v.record(v.string(), AttributeTypeSchema)` reusing existing `AttributeTypeSchema`
-- [ ] T004 [US2] Update policy validator to validate resource attribute declarations in `packages/toride/src/policy/validator.ts` — reject invalid types, accept valid ones, ensure existing policies without attributes still pass
-- [ ] T005 [P] [US2] Add runtime tests for resource attributes in `packages/toride/src/policy/validator.test.ts` — policy with attributes parses, without attributes works, invalid types rejected
-- [ ] T006 [P] [US2] Update parser if needed in `packages/toride/src/policy/parser.ts` to pass through resource attributes from YAML
+- [X] T003 [US2] Add `attributes` field to `ResourceBlockSchema` (valibot) in `packages/toride/src/policy/schema.ts` — optional `v.record(v.string(), AttributeTypeSchema)` reusing existing `AttributeTypeSchema`
+- [X] T004 [US2] Update policy validator to validate resource attribute declarations in `packages/toride/src/policy/validator.ts` — reject invalid types, accept valid ones, ensure existing policies without attributes still pass
+- [X] T005 [P] [US2] Add runtime tests for resource attributes in `packages/toride/src/policy/validator.test.ts` — policy with attributes parses, without attributes works, invalid types rejected
+- [X] T006 [P] [US2] Update parser if needed in `packages/toride/src/policy/parser.ts` to pass through resource attributes from YAML
 
 **Checkpoint**: Policy YAML with resource `attributes` parses and validates. Existing policy fixtures unchanged.
 

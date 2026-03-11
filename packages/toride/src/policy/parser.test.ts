@@ -240,6 +240,73 @@ resources:
       ]);
     });
 
+    it("parses a policy with resource attributes", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      email: string
+resources:
+  Document:
+    roles: [viewer, editor]
+    permissions: [read, update]
+    attributes:
+      status: string
+      priority: number
+      archived: boolean
+    grants:
+      viewer: [read]
+      editor: [read, update]
+`;
+      const policy = await loadYaml(yaml);
+      expect(policy.resources.Document.attributes).toEqual({
+        status: "string",
+        priority: "number",
+        archived: "boolean",
+      });
+    });
+
+    it("parses a policy without resource attributes (backward compatible)", async () => {
+      const policy = await loadYaml(VALID_YAML);
+      // attributes should be undefined when not specified
+      expect(policy.resources.Task.attributes).toBeUndefined();
+    });
+
+    it("rejects invalid resource attribute types", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      email: string
+resources:
+  Document:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      status: array
+`;
+      await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
+    });
+
+    it("rejects non-string resource attribute type values", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      email: string
+resources:
+  Document:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      status: 42
+`;
+      await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
+    });
+
     it("throws ValidationError for missing version", async () => {
       const yaml = `
 actors:
