@@ -67,4 +67,4 @@ resources:
       - effect: forbid
         permissions: [update, delete]
         when:
-          resource.project.archived: true
+          $resource.project.archived: true
