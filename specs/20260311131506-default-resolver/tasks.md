@@ -34,13 +34,13 @@
 
 ### Tests (TDD — write first, verify they pass against existing behavior)
 
-- [ ] T003 [US1] [US2] Create test file `packages/toride/src/__integration__/default-resolver.test.ts` with describe block "default resolver"
-- [ ] T004 [P] [US1] [US2] Add test: inline attributes resolve `$resource.<field>` conditions without a registered resolver (SC-001, acceptance 1.1)
-- [ ] T005 [P] [US1] [US2] Add test: missing inline fields resolve to undefined and conditions fail — default-deny preserved (SC-001, acceptance 1.2)
-- [ ] T006 [P] [US1] [US2] Add test: operator conditions (e.g., `gt`) work with inline-only data (SC-001, acceptance 1.3)
-- [ ] T007 [P] [US1] [US2] Add test: multiple fields resolve independently from inline attributes
-- [ ] T008 [P] [US1] [US2] Add test: when resolver IS registered alongside inline attributes, inline takes precedence (merge behavior, acceptance 2.2)
-- [ ] T009 [US1] [US2] Run full test suite to confirm new tests pass and no regressions: `pnpm exec nx run toride:test`
+- [X] T003 [US1] [US2] Create test file `packages/toride/src/__integration__/default-resolver.test.ts` with describe block "default resolver"
+- [X] T004 [P] [US1] [US2] Add test: inline attributes resolve `$resource.<field>` conditions without a registered resolver (SC-001, acceptance 1.1)
+- [X] T005 [P] [US1] [US2] Add test: missing inline fields resolve to undefined and conditions fail — default-deny preserved (SC-001, acceptance 1.2)
+- [X] T006 [P] [US1] [US2] Add test: operator conditions (e.g., `gt`) work with inline-only data (SC-001, acceptance 1.3)
+- [X] T007 [P] [US1] [US2] Add test: multiple fields resolve independently from inline attributes
+- [X] T008 [P] [US1] [US2] Add test: when resolver IS registered alongside inline attributes, inline takes precedence (merge behavior, acceptance 2.2)
+- [X] T009 [US1] [US2] Run full test suite to confirm new tests pass and no regressions: `pnpm exec nx run toride:test`
 
 **Checkpoint**: Dedicated default-resolver test file exists with all scenarios passing. SC-001 and FR-004 satisfied.
 
