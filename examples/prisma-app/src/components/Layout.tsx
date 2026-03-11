@@ -1,12 +1,5 @@
 import type { FC, PropsWithChildren } from "hono/jsx";
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  isSuperAdmin: boolean;
-};
+import type { User } from "../types.js";
 
 type LayoutProps = PropsWithChildren<{
   currentUser: User;

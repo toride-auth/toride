@@ -1,14 +1,7 @@
 import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
 import { prisma } from "./db.js";
-
-type User = {
-  id: string;
-  name: string;
-  email: string;
-  department: string;
-  isSuperAdmin: boolean;
-};
+import type { User } from "./types.js";
 
 type Env = {
   Variables: {
