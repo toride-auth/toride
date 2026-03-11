@@ -18,24 +18,38 @@
   "bin": {
     "toride": "./dist/cli.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
+    "typetest": "tsd --files 'src/__typetests__/*.test-d.ts'",
     "lint": "tsc --noEmit",
     "bench": "vitest bench"
   },
   "nx": {
-    "tags": ["type:core"]
+    "tags": [
+      "type:core"
+    ]
   },
   "dependencies": {
-    "yaml": "^2.3.0",
-    "valibot": "^1.2.0"
+    "valibot": "^1.2.0",
+    "yaml": "^2.3.0"
   },
-  "keywords": ["authorization", "rbac", "rebac", "abac", "permissions"],
+  "keywords": [
+    "authorization",
+    "rbac",
+    "rebac",
+    "abac",
+    "permissions"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/toride-auth/toride"
+  },
+  "devDependencies": {
+    "tsd": "^0.33.0"
   }
 }
