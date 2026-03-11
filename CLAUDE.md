@@ -165,6 +165,10 @@ chore: update dependencies
 - Markdown + TypeScript code snippets (must match `toride` package exports) + VitePress 1.6.4 (docs site), toride core package (API reference) (sync-docs)
 - N/A (static Markdown files) (sync-docs)
 - TypeScript (VitePress config), Markdown (content) + VitePress 1.6.4 (standalone in `docs/`) (main)
+- TypeScript (strict mode), Node.js 20+ LTS + hono, htmx (CDN), @hono/node-server, prisma, @prisma/client, toride, @toride/prisma, tsx, yaml (add-example)
+- SQLite via Prisma (file-based, zero external services) (add-example)
+- TypeScript (strict mode), Node.js 20+ LTS + hono, @hono/node-server, toride (^0.1.0), @toride/prisma (^0.1.0), @prisma/client, prisma, tsx, yaml, htmx (CDN) (add-example)
+- SQLite via Prisma (file-based, `prisma/dev.db`) (add-example)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)
