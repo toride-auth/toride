@@ -1,0 +1,70 @@
+version: "1"
+
+actors:
+  User:
+    attributes:
+      id: string
+      email: string
+      department: string
+      isSuperAdmin: boolean
+
+global_roles:
+  superadmin:
+    actor_type: User
+    when:
+      $actor.isSuperAdmin: true
+
+resources:
+  Project:
+    roles: [viewer, editor, admin]
+    permissions: [read, update, delete, create_task]
+
+    grants:
+      viewer: [read]
+      editor: [read, update, create_task]
+      admin: [all]
+
+    derived_roles:
+      - role: admin
+        from_global_role: superadmin
+
+      - role: editor
+        actor_type: User
+        when:
+          $actor.department: $resource.department
+
+    rules:
+      - effect: forbid
+        permissions: [read, update, delete, create_task]
+        when:
+          $resource.archived: true
+
+  Task:
+    roles: [viewer, editor]
+    permissions: [read, update, delete]
+
+    relations:
+      project: Project
+      assignee: User
+
+    grants:
+      viewer: [read]
+      editor: [read, update, delete]
+
+    derived_roles:
+      - role: editor
+        from_role: editor
+        on_relation: project
+
+      - role: viewer
+        from_role: viewer
+        on_relation: project
+
+      - role: editor
+        from_relation: assignee
+
+    rules:
+      - effect: forbid
+        permissions: [update, delete]
+        when:
+          resource.project.archived: true
