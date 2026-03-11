@@ -83,10 +83,10 @@
 
 **Purpose**: Final validation across all stories
 
-- [ ] T017 Run full test suite across all packages: `pnpm run test`
-- [ ] T018 Run full lint across all packages: `pnpm run lint`
-- [ ] T019 Validate quickstart.md scenarios manually (run code snippets from `specs/20260311131506-default-resolver/quickstart.md`)
-- [ ] T020 Verify no breaking changes: confirm existing `inline-attributes.test.ts` is unmodified (FR-007, SC-004)
+- [X] T017 Run full test suite across all packages: `pnpm run test`
+- [X] T018 Run full lint across all packages: `pnpm run lint`
+- [X] T019 Validate quickstart.md scenarios manually (run code snippets from `specs/20260311131506-default-resolver/quickstart.md`)
+- [X] T020 Verify no breaking changes: confirm existing `inline-attributes.test.ts` is unmodified (FR-007, SC-004)
 
 **Checkpoint**: All success criteria (SC-001 through SC-004) met. Feature complete.
 
