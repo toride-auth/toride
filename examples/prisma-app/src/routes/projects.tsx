@@ -31,10 +31,10 @@ app.get("/", async (c) => {
     archived: boolean;
   }> = [];
 
-  if ("forbidden" in result && result.forbidden) {
+  if ("forbidden" in result) {
     // Actor cannot read any projects
     projects = [];
-  } else if ("unrestricted" in result && result.unrestricted) {
+  } else if ("unrestricted" in result) {
     // Actor can read all projects
     projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
   } else {
@@ -123,9 +123,9 @@ app.get("/:id", async (c) => {
     assignee: { name: string } | null;
   }> = [];
 
-  if ("forbidden" in taskResult && taskResult.forbidden) {
+  if ("forbidden" in taskResult) {
     tasks = [];
-  } else if ("unrestricted" in taskResult && taskResult.unrestricted) {
+  } else if ("unrestricted" in taskResult) {
     tasks = await prisma.task.findMany({
       where: { projectId },
       include: { assignee: { select: { name: true } } },
