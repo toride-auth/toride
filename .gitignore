@@ -21,3 +21,6 @@ coverage/
 # VitePress
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# Devcontainer (generated from template)
+.devcontainer/devcontainer.json
