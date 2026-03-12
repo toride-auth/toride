@@ -51,11 +51,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Update `buildConstraints<R>()` signature in `packages/toride/src/engine.ts` to return `Promise<ConstraintResult<R>>` where `R extends S["resources"]`, and narrow `action` parameter to `S["permissionMap"][R]`
-- [ ] T010 [US1] Update `translateConstraints()` signature in `packages/toride/src/partial/translator.ts` to accept `ConstraintResult<R>` and `ConstraintAdapter<TQueryMap>`, returning `TQueryMap[R]`
-- [ ] T011 [US1] Update any internal helpers in `packages/toride/src/partial/constraint-builder.ts` that construct `ConstraintResult` to pass through the `R` type parameter
-- [ ] T012 [US1] Create constraint pipeline type tests in `packages/toride/src/__typetests__/constraint-pipeline.test-d.ts` — test that `buildConstraints` returns `ConstraintResult<"Document">`, `translateConstraints` returns mapped type, invalid resource/action combos error, DefaultSchema degrades to `string`
-- [ ] T013 [US1] Update existing type tests in `packages/toride/src/__typetests__/engine.test-d.ts` to reflect `buildConstraints` signature changes
+- [X] T009 [US1] Update `buildConstraints<R>()` signature in `packages/toride/src/engine.ts` to return `Promise<ConstraintResult<R>>` where `R extends S["resources"]`, and narrow `action` parameter to `S["permissionMap"][R]`
+- [X] T010 [US1] Update `translateConstraints()` signature in `packages/toride/src/partial/translator.ts` to accept `ConstraintResult<R>` and `ConstraintAdapter<TQueryMap>`, returning `TQueryMap[R]`
+- [X] T011 [US1] Update any internal helpers in `packages/toride/src/partial/constraint-builder.ts` that construct `ConstraintResult` to pass through the `R` type parameter
+- [X] T012 [US1] Create constraint pipeline type tests in `packages/toride/src/__typetests__/constraint-pipeline.test-d.ts` — test that `buildConstraints` returns `ConstraintResult<"Document">`, `translateConstraints` returns mapped type, invalid resource/action combos error, DefaultSchema degrades to `string`
+- [X] T013 [US1] Update existing type tests in `packages/toride/src/__typetests__/engine.test-d.ts` to reflect `buildConstraints` signature changes
 
 **Checkpoint**: Constraint pipeline is fully typed end-to-end. `pnpm exec nx run toride:build && pnpm exec nx run toride:lint` green. Type tests verify correct inference.
 

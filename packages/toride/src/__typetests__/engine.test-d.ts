@@ -9,6 +9,7 @@ import type {
   CheckOptions,
   TorideOptions,
   PermissionSnapshot,
+  ConstraintResult,
 } from "../index.js";
 import { Toride, createToride } from "../index.js";
 
@@ -148,8 +149,16 @@ async () => {
 // ─── T016: buildConstraints<R>() type narrowing ─────────────────
 
 // Valid: "read" is a Document permission, "Document" is a valid resource type
+// T013: buildConstraints returns ConstraintResult<"Document">
 async () => {
-  await typedEngine.buildConstraints(actor, "read", "Document");
+  const result = await typedEngine.buildConstraints(actor, "read", "Document");
+  expectType<ConstraintResult<"Document">>(result);
+};
+
+// T013: buildConstraints returns ConstraintResult<"Organization">
+async () => {
+  const result = await typedEngine.buildConstraints(actor, "manage", orgRef.type as "Organization");
+  expectType<ConstraintResult<"Organization">>(result);
 };
 
 // @ts-expect-error - "reed" is not a valid Document permission

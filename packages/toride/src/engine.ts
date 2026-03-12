@@ -20,7 +20,6 @@ import type {
   QueryEvent,
 } from "./types.js";
 import type {
-  Constraint,
   ConstraintResult,
   ConstraintAdapter,
 } from "./partial/constraint-types.js";
@@ -297,12 +296,25 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   /**
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
+   *
+   * Accepts ConstraintResult<R> from buildConstraints() and returns
+   * TQueryMap[R] — the adapter's mapped output type for resource R.
+   * The resource type R is inferred from the ConstraintResult phantom type.
    */
-  translateConstraints<TQueryMap extends Record<string, unknown>>(
-    constraints: Constraint,
+  translateConstraints<
+    R extends string,
+    TQueryMap extends Record<string, unknown>,
+  >(
+    constraints: ConstraintResult<R>,
     adapter: ConstraintAdapter<TQueryMap>,
-  ): TQueryMap[string] {
-    return translateConstraintsImpl(constraints, adapter);
+  ): TQueryMap[R] {
+    if ("unrestricted" in constraints || "forbidden" in constraints) {
+      throw new Error(
+        "Cannot translate unrestricted or forbidden ConstraintResult. " +
+        "Check for 'constraints' property before calling translateConstraints().",
+      );
+    }
+    return translateConstraintsImpl(constraints.constraints, adapter) as TQueryMap[R];
   }
 
   /**
