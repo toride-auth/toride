@@ -5,10 +5,11 @@ export const CLIENT_VERSION = "0.0.1";
 
 // Import type only - no runtime dependency on server code
 import type { PermissionSnapshot } from "./snapshot.js";
+import type { TorideSchema, DefaultSchema } from "./types.js";
 
-/** Minimal resource reference for client-side lookups. */
-export interface ClientResourceRef {
-  readonly type: string;
+/** Minimal resource reference for client-side lookups. Generic over S for type narrowing. */
+export interface ClientResourceRef<S extends TorideSchema = DefaultSchema> {
+  readonly type: S["resources"];
   readonly id: string;
 }
 
@@ -16,10 +17,13 @@ export interface ClientResourceRef {
  * Client-side permission checker that provides instant synchronous checks
  * against a PermissionSnapshot received from the server.
  *
+ * Generic over TorideSchema so that action names and resource types
+ * are validated at compile time when a concrete schema is provided.
+ *
  * Default-deny: unknown resources or actions return false.
  * The snapshot is defensively copied to prevent external mutation.
  */
-export class TorideClient {
+export class TorideClient<S extends TorideSchema = DefaultSchema> {
   private readonly permissions: Map<string, ReadonlySet<string>>;
 
   constructor(snapshot: PermissionSnapshot) {
@@ -34,7 +38,7 @@ export class TorideClient {
    * Returns true if the action is permitted for the resource, false otherwise.
    * Unknown resources return false (default-deny).
    */
-  can(action: string, resource: ClientResourceRef): boolean {
+  can(action: S["actions"], resource: ClientResourceRef<S>): boolean {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return false;
@@ -45,11 +49,11 @@ export class TorideClient {
    * Return the list of permitted actions for a resource.
    * Returns empty array for unknown resources.
    */
-  permittedActions(resource: ClientResourceRef): string[] {
+  permittedActions(resource: ClientResourceRef<S>): S["actions"][] {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return [];
-    return [...actions];
+    return [...actions] as S["actions"][];
   }
 }
 

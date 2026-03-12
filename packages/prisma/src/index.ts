@@ -3,7 +3,7 @@
 
 export const VERSION = "0.0.1";
 
-import type { ConstraintAdapter, LeafConstraint, ResourceRef } from "toride";
+import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, DefaultSchema } from "toride";
 
 /** Prisma WHERE clause type (plain object). */
 export type PrismaWhere = Record<string, unknown>;
@@ -122,13 +122,16 @@ export interface PrismaResolverOptions {
  * @param options - Optional configuration.
  * @returns A ResourceResolver function.
  */
-export function createPrismaResolver(
+export function createPrismaResolver<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   client: any,
-  modelName: string,
+  modelName: R,
   options?: PrismaResolverOptions,
-): (ref: ResourceRef) => Promise<Record<string, unknown>> {
-  return async (ref: ResourceRef): Promise<Record<string, unknown>> => {
+): (ref: ResourceRef<S, R>) => Promise<S["resourceAttributeMap"][R]> {
+  return async (ref: ResourceRef<S, R>): Promise<S["resourceAttributeMap"][R]> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = (client as Record<string, any>)[modelName];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +140,6 @@ export function createPrismaResolver(
       query.select = options.select;
     }
     const result = await model.findUnique(query);
-    return (result as Record<string, unknown>) ?? {};
+    return (result as S["resourceAttributeMap"][R]) ?? ({} as S["resourceAttributeMap"][R]);
   };
 }

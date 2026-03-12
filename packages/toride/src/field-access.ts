@@ -1,21 +1,22 @@
 // T093-T094: Field-level access control (canField, permittedFields)
 
-import type { ActorRef, ResourceRef, CheckOptions } from "./types.js";
+import type { TorideSchema, DefaultSchema, ActorRef, ResourceRef, CheckOptions } from "./types.js";
 
 /**
  * Interface for the engine methods needed by field-access functions.
  * Keeps field-access decoupled from the full Toride class.
+ * Generic over TorideSchema for type safety when used with Toride<S>.
  */
-export interface FieldAccessEngine {
+export interface FieldAccessEngine<S extends TorideSchema = DefaultSchema> {
   resolvedRoles(
-    actor: ActorRef,
-    resource: ResourceRef,
+    actor: ActorRef<S>,
+    resource: ResourceRef<S>,
     options?: CheckOptions,
   ): Promise<string[]>;
   can(
-    actor: ActorRef,
+    actor: ActorRef<S>,
     action: string,
-    resource: ResourceRef,
+    resource: ResourceRef<S>,
     options?: CheckOptions,
   ): Promise<boolean>;
 }

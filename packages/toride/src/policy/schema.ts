@@ -100,6 +100,7 @@ export const FieldAccessDefSchema = v.object({
 export const ResourceBlockSchema = v.object({
   roles: v.array(v.string()),
   permissions: v.array(v.string()),
+  attributes: v.optional(v.record(v.string(), AttributeTypeSchema)),
   relations: v.optional(v.record(v.string(), v.string())),
   grants: v.optional(v.record(v.string(), v.array(v.string()))),
   derived_roles: v.optional(v.array(DerivedRoleEntrySchema)),

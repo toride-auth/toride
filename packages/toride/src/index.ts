@@ -19,6 +19,9 @@ export type {
   StrictValidationResult,
 } from "./policy/validator.js";
 
+// ─── Schema Types ─────────────────────────────────────────────────
+export type { TorideSchema, DefaultSchema } from "./types.js";
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 export type {
   ActorRef,
@@ -62,6 +65,10 @@ export { Toride, createToride } from "./engine.js";
 
 // ─── Snapshot (T081/T084) ────────────────────────────────────────
 export type { PermissionSnapshot } from "./snapshot.js";
+
+// ─── Client (T082) ──────────────────────────────────────────────
+export { TorideClient } from "./client.js";
+export type { ClientResourceRef } from "./client.js";
 
 // ─── Constraint AST Types (T016) ─────────────────────────────────
 export type {

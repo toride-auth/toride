@@ -2,32 +2,86 @@
 // T017: Evaluation result types
 // T018: Error types
 
+// ─── Schema Interface ─────────────────────────────────────────────
+
+/**
+ * Shape constraint for Toride's type parameter.
+ * Each property is a union or mapped type that codegen fills with literals.
+ */
+export interface TorideSchema {
+  /** Union of all resource type names (e.g., "Document" | "Organization") */
+  resources: string;
+  /** Global union of all action/permission names across all resources */
+  actions: string;
+  /** Union of all actor type names (e.g., "User" | "ServiceAccount") */
+  actorTypes: string;
+  /** Per-resource permission unions: { Document: "read" | "write"; ... } */
+  permissionMap: { [R in string]: string };
+  /** Per-resource role unions: { Document: "admin" | "editor"; ... } */
+  roleMap: { [R in string]: string };
+  /** Per-resource attribute shapes: { Document: { status: string; ownerId: string }; ... } */
+  resourceAttributeMap: { [R in string]: Record<string, unknown> };
+  /** Per-actor attribute shapes: { User: { email: string; is_admin: boolean }; ... } */
+  actorAttributeMap: { [A in string]: Record<string, unknown> };
+  /** Per-resource relation maps: { Document: { org: "Organization" }; ... } */
+  relationMap: { [R in string]: Record<string, string> };
+}
+
+/**
+ * Default schema where everything is string / Record<string, unknown>.
+ * Used when Toride is instantiated without a type parameter.
+ * Provides full backward compatibility with the current untyped API.
+ */
+export interface DefaultSchema extends TorideSchema {
+  resources: string;
+  actions: string;
+  actorTypes: string;
+  permissionMap: Record<string, string>;
+  roleMap: Record<string, string>;
+  resourceAttributeMap: Record<string, Record<string, unknown>>;
+  actorAttributeMap: Record<string, Record<string, unknown>>;
+  relationMap: Record<string, Record<string, string>>;
+}
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 
-/** Represents an entity performing actions. */
-export interface ActorRef {
-  readonly type: string;
-  readonly id: string;
-  readonly attributes: Record<string, unknown>;
-}
+/**
+ * Represents an entity performing actions.
+ * Generic discriminated union over actor types in S.
+ * When S = DefaultSchema, collapses to the original untyped shape.
+ */
+export type ActorRef<S extends TorideSchema = DefaultSchema> = {
+  [A in S["actorTypes"]]: {
+    readonly type: A;
+    readonly id: string;
+    readonly attributes: S["actorAttributeMap"][A];
+  };
+}[S["actorTypes"]];
 
-/** Represents a protected entity being accessed. */
-export interface ResourceRef {
-  readonly type: string;
+/**
+ * Represents a protected entity being accessed.
+ * Generic over schema S and resource type R.
+ * When S = DefaultSchema, collapses to the original untyped shape.
+ */
+export type ResourceRef<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> = {
+  readonly type: R;
   readonly id: string;
   /** Pre-fetched attributes. Inline values take precedence over resolver results. */
-  readonly attributes?: Record<string, unknown>;
-}
+  readonly attributes?: S["resourceAttributeMap"][R];
+};
 
 /** Optional per-check configuration. */
 export interface CheckOptions {
   readonly env?: Record<string, unknown>;
 }
 
-/** A single item in a canBatch() call. */
-export interface BatchCheckItem {
-  readonly action: string;
-  readonly resource: ResourceRef;
+/** A single item in a canBatch() call. Action narrowed to global actions union. */
+export interface BatchCheckItem<S extends TorideSchema = DefaultSchema> {
+  readonly action: S["actions"];
+  readonly resource: ResourceRef<S>;
 }
 
 /**
@@ -45,8 +99,11 @@ export interface BatchCheckItem {
  * present, inline attributes take precedence field-by-field over resolver
  * results.
  */
-export type ResourceResolver = (
-  ref: ResourceRef,
+export type ResourceResolver<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> = (
+  ref: ResourceRef<S, R>,
 ) => Promise<Record<string, unknown>>;
 
 /**
@@ -62,7 +119,9 @@ export type ResourceResolver = (
  * field simply returns `parent[fieldName]` — here, inline attributes play the
  * role of the `parent` object.
  */
-export type Resolvers = Record<string, ResourceResolver>;
+export type Resolvers<S extends TorideSchema = DefaultSchema> = {
+  [R in S["resources"]]?: ResourceResolver<S, R>;
+};
 
 /** Custom evaluator function signature. */
 export type EvaluatorFn = (
@@ -72,7 +131,7 @@ export type EvaluatorFn = (
 ) => Promise<boolean>;
 
 /** Engine construction options. */
-export interface TorideOptions {
+export interface TorideOptions<S extends TorideSchema = DefaultSchema> {
   readonly policy: Policy;
   /**
    * Per-type resolver map.
@@ -97,7 +156,7 @@ export interface TorideOptions {
    * });
    * ```
    */
-  readonly resolvers?: Resolvers;
+  readonly resolvers?: Resolvers<S>;
   readonly maxConditionDepth?: number;
   readonly maxDerivedRoleDepth?: number;
   readonly customEvaluators?: Record<string, EvaluatorFn>;
@@ -158,6 +217,8 @@ export interface FieldAccessDef {
 export interface ResourceBlock {
   readonly roles: string[];
   readonly permissions: string[];
+  /** Optional typed attribute declarations for this resource type. */
+  readonly attributes?: Record<string, AttributeType>;
   /** Relations map field names to target resource type names (simplified). */
   readonly relations?: Record<string, string>;
   readonly grants?: Record<string, string[]>;
@@ -249,10 +310,13 @@ export interface MatchedRule {
 }
 
 /** Full decision trace from explain(). */
-export interface ExplainResult {
+export interface ExplainResult<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> {
   readonly allowed: boolean;
   readonly resolvedRoles: ResolvedRolesDetail;
-  readonly grantedPermissions: string[];
+  readonly grantedPermissions: S["permissionMap"][R][];
   readonly matchedRules: MatchedRule[];
   readonly finalDecision: string;
 }

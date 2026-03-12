@@ -3,7 +3,7 @@
 
 export const VERSION = "0.0.1";
 
-import type { ConstraintAdapter, LeafConstraint, ResourceRef } from "toride";
+import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, DefaultSchema } from "toride";
 
 /**
  * Drizzle query representation.
@@ -155,16 +155,19 @@ export interface DrizzleResolverOptions {
  * @param options - Optional configuration.
  * @returns A ResourceResolver function.
  */
-export function createDrizzleResolver(
+export function createDrizzleResolver<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+>(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   db: any,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   table: any,
   options?: DrizzleResolverOptions,
-): (ref: ResourceRef) => Promise<Record<string, unknown>> {
+): (ref: ResourceRef<S, R>) => Promise<S["resourceAttributeMap"][R]> {
   const idColumn = options?.idColumn ?? "id";
 
-  return async (ref: ResourceRef): Promise<Record<string, unknown>> => {
+  return async (ref: ResourceRef<S, R>): Promise<S["resourceAttributeMap"][R]> => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rows: any[] = await db
       .select()
@@ -172,8 +175,8 @@ export function createDrizzleResolver(
       .where({ [idColumn]: ref.id });
 
     if (!rows || rows.length === 0) {
-      return {};
+      return {} as S["resourceAttributeMap"][R];
     }
-    return rows[0] as Record<string, unknown>;
+    return rows[0] as S["resourceAttributeMap"][R];
   };
 }

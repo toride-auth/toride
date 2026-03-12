@@ -429,6 +429,94 @@ describe("cross-reference validator", () => {
     expect(() => validatePolicy(policy)).not.toThrow();
   });
 
+  // ─── T005: Resource attributes validation ──────────────────────
+
+  describe("resource attributes validation", () => {
+    it("accepts a policy with valid resource attributes", () => {
+      const policy = makePolicy({
+        resources: {
+          Document: {
+            roles: ["viewer", "editor"],
+            permissions: ["read", "update"],
+            grants: {
+              viewer: ["read"],
+              editor: ["read", "update"],
+            },
+            attributes: {
+              status: "string",
+              priority: "number",
+              archived: "boolean",
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("accepts a policy with mixed resources (some with attributes, some without)", () => {
+      const policy = makePolicy({
+        resources: {
+          Document: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            attributes: {
+              status: "string",
+            },
+          },
+          Task: {
+            roles: ["editor"],
+            permissions: ["update"],
+            grants: { editor: ["update"] },
+            // no attributes
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("accepts all valid attribute types (string, number, boolean)", () => {
+      const policy = makePolicy({
+        resources: {
+          Document: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            attributes: {
+              title: "string",
+              wordCount: "number",
+              isPublished: "boolean",
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("preserves resource attributes in the validated policy object", () => {
+      const policy = makePolicy({
+        resources: {
+          Document: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            attributes: {
+              status: "string",
+              priority: "number",
+            },
+          },
+        },
+      });
+      const result = validatePolicyResult(policy);
+      expect(result.errors).toHaveLength(0);
+      // Verify attributes are present on the resource block
+      expect(policy.resources.Document.attributes).toEqual({
+        status: "string",
+        priority: "number",
+      });
+    });
+  });
+
   // ─── T073: $actor attribute validation ─────────────────────────
 
   describe("$actor attribute validation", () => {
