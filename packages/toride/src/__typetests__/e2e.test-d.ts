@@ -19,8 +19,8 @@ import type {
   CheckOptions,
   PermissionSnapshot,
   ClientResourceRef,
-} from "../../dist/index.js";
-import { Toride, createToride, TorideClient } from "../../dist/index.js";
+} from "../index.js";
+import { Toride, createToride, TorideClient } from "../index.js";
 
 // ═══════════════════════════════════════════════════════════════════════
 // Step 1: Simulated codegen output (GeneratedSchema)

@@ -9,7 +9,7 @@ import type {
   TorideOptions,
   BatchCheckItem,
   ExplainResult,
-} from "../../dist/index.js";
+} from "../index.js";
 
 // ─── Test Schema ─────────────────────────────────────────────────
 // A concrete schema with literal types, simulating codegen output.

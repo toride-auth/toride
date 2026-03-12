@@ -5,8 +5,8 @@ import type {
   Resolvers,
   ResourceResolver,
   TorideOptions,
-} from "../../dist/index.js";
-import { Toride, createToride } from "../../dist/index.js";
+} from "../index.js";
+import { Toride, createToride } from "../index.js";
 
 // ─── Test Schema ─────────────────────────────────────────────────
 

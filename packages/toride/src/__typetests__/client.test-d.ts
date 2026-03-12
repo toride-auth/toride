@@ -1,13 +1,13 @@
 import { expectType, expectAssignable, expectNotAssignable } from "tsd";
 import {
   TorideClient,
-} from "../../dist/index.js";
+} from "../index.js";
 import type {
   TorideSchema,
   DefaultSchema,
   PermissionSnapshot,
   ClientResourceRef,
-} from "../../dist/index.js";
+} from "../index.js";
 
 // ─── Test Schema ─────────────────────────────────────────────────
 // A concrete schema with literal types, simulating codegen output.

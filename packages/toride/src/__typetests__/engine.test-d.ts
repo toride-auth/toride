@@ -9,8 +9,8 @@ import type {
   CheckOptions,
   TorideOptions,
   PermissionSnapshot,
-} from "../../dist/index.js";
-import { Toride, createToride } from "../../dist/index.js";
+} from "../index.js";
+import { Toride, createToride } from "../index.js";
 
 // ─── Test Schema ─────────────────────────────────────────────────
 // A concrete schema with literal types, simulating codegen output.
