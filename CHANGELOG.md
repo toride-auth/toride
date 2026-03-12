@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-13
+
+### Added
+- Deep type safety with per-resource type narrowing across the entire API surface
+- Phantom type parameters on `ConstraintResult<R>`, `ConstraintAdapter<TQueryMap>`, `PermissionSnapshot<S>`, and `ClientResourceRef<S, R>`
+- `canField<R>()` now validates field names at compile time against `resourceAttributeMap`
+- `resolvedRoles<R>()` returns per-resource role unions instead of `string[]`
+- `can()` and `permittedActions()` narrow action types per resource
+- `TQueryMap` generic on `createPrismaAdapter()` and `createDrizzleAdapter()` for per-resource query output typing
+
+### Changed
+- **BREAKING**: `ConstraintAdapter<TQuery>` changed to `ConstraintAdapter<TQueryMap extends Record<string, unknown>>`
+- **BREAKING**: `translateConstraints()` now accepts `ConstraintResult<R>` instead of `Constraint` — callers must pass the full `buildConstraints()` result
+- **BREAKING**: `permittedFields<R>()` returns typed field union arrays instead of `string[]`
+
 ## [0.2.0] - 2026-03-12
 
 ### Added
