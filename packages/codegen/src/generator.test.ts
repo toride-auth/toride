@@ -12,6 +12,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
       Project: {
         roles: ["viewer", "editor", "admin"],
         permissions: ["read", "update", "delete", "create_task"],
+        attributes: { status: "string", priority: "number" },
         relations: {
           org: "Organization",
         },
@@ -108,12 +109,159 @@ describe("generateTypes", () => {
     expect(output).toContain("export type Resources = never");
   });
 
-  it("generates ResolverMap type keyed by Resources", () => {
+  it("generates ResolverMap type with typed return values from ResourceAttributeMap", () => {
     const output = generateTypes(makePolicy());
     expect(output).toContain("export type ResolverMap");
     expect(output).not.toContain("TypedResolvers");
     expect(output).toContain("[R in Resources]?");
-    expect(output).toContain("Promise<Record<string, unknown>>");
+    expect(output).toContain("ResourceAttributeMap[R]");
+    expect(output).toContain("Promise<ResourceAttributeMap[R]>");
+    expect(output).not.toContain("Promise<Record<string, unknown>>");
+  });
+
+  it("generates import for TorideSchema from toride", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain('import type { TorideSchema } from "toride";');
+  });
+
+  it("generates ActorTypes union type", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain("export type ActorTypes =");
+    expect(output).toMatch(/"User"/);
+  });
+
+  it("generates ActorTypes as never when no actors", () => {
+    const policy = makePolicy({ actors: {} });
+    const output = generateTypes(policy);
+    expect(output).toContain("export type ActorTypes = never;");
+  });
+
+  it("generates ActorAttributeMap with typed attributes per actor", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain("export interface ActorAttributeMap");
+    expect(output).toMatch(/User:\s*\{\s*email:\s*string;\s*department:\s*string;\s*\}/);
+  });
+
+  it("generates empty ActorAttributeMap when no actors", () => {
+    const policy = makePolicy({ actors: {} });
+    const output = generateTypes(policy);
+    expect(output).toContain("export interface ActorAttributeMap {");
+    // Should be an empty interface (just opening and closing braces)
+    expect(output).toMatch(/export interface ActorAttributeMap \{\s*\}/);
+  });
+
+  it("generates ResourceAttributeMap with typed attributes per resource", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain("export interface ResourceAttributeMap");
+    expect(output).toMatch(/Project:\s*\{\s*status:\s*string;\s*priority:\s*number;\s*\}/);
+  });
+
+  it("generates ResourceAttributeMap with Record<string, unknown> for resources without attributes", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain("export interface ResourceAttributeMap");
+    // Task has no attributes, should fall back to Record<string, unknown>
+    expect(output).toMatch(/Task:\s*Record<string, unknown>/);
+  });
+
+  it("generates GeneratedSchema extending TorideSchema", () => {
+    const output = generateTypes(makePolicy());
+    expect(output).toContain("export interface GeneratedSchema extends TorideSchema");
+    expect(output).toMatch(/resources:\s*Resources;/);
+    expect(output).toMatch(/actions:\s*Actions;/);
+    expect(output).toMatch(/actorTypes:\s*ActorTypes;/);
+    expect(output).toMatch(/permissionMap:\s*PermissionMap;/);
+    expect(output).toMatch(/roleMap:\s*RoleMap;/);
+    expect(output).toMatch(/resourceAttributeMap:\s*ResourceAttributeMap;/);
+    expect(output).toMatch(/actorAttributeMap:\s*ActorAttributeMap;/);
+    expect(output).toMatch(/relationMap:\s*RelationMap;/);
+  });
+
+  it("generates types in correct order", () => {
+    const output = generateTypes(makePolicy());
+    const importPos = output.indexOf('import type { TorideSchema }');
+    const actionsPos = output.indexOf("export type Actions");
+    const resourcesPos = output.indexOf("export type Resources");
+    const actorTypesPos = output.indexOf("export type ActorTypes");
+    const roleMapPos = output.indexOf("export interface RoleMap");
+    const permissionMapPos = output.indexOf("export interface PermissionMap");
+    const resourceAttrPos = output.indexOf("export interface ResourceAttributeMap");
+    const actorAttrPos = output.indexOf("export interface ActorAttributeMap");
+    const relationMapPos = output.indexOf("export interface RelationMap");
+    const resolverMapPos = output.indexOf("export type ResolverMap");
+    const generatedSchemaPos = output.indexOf("export interface GeneratedSchema");
+
+    expect(importPos).toBeLessThan(actionsPos);
+    expect(actionsPos).toBeLessThan(resourcesPos);
+    expect(resourcesPos).toBeLessThan(actorTypesPos);
+    expect(actorTypesPos).toBeLessThan(roleMapPos);
+    expect(roleMapPos).toBeLessThan(permissionMapPos);
+    expect(permissionMapPos).toBeLessThan(resourceAttrPos);
+    expect(resourceAttrPos).toBeLessThan(actorAttrPos);
+    expect(actorAttrPos).toBeLessThan(relationMapPos);
+    expect(relationMapPos).toBeLessThan(resolverMapPos);
+    expect(resolverMapPos).toBeLessThan(generatedSchemaPos);
+  });
+
+  it("maps attribute types correctly (string, number, boolean)", () => {
+    const policy = makePolicy({
+      actors: {
+        User: { attributes: { name: "string", age: "number", active: "boolean" } },
+      },
+      resources: {
+        Item: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: { title: "string", count: "number", published: "boolean" },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    // Actor attributes
+    expect(output).toMatch(/User:\s*\{\s*name:\s*string;\s*age:\s*number;\s*active:\s*boolean;\s*\}/);
+    // Resource attributes
+    expect(output).toMatch(/Item:\s*\{\s*title:\s*string;\s*count:\s*number;\s*published:\s*boolean;\s*\}/);
+  });
+
+  it("rejects unsafe actor type names", () => {
+    const policy = makePolicy({
+      actors: {
+        'bad"actor': { attributes: { email: "string" } },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
+  it("rejects unsafe actor attribute field names", () => {
+    const policy = makePolicy({
+      actors: {
+        User: { attributes: { "bad-field": "string" } },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
+  });
+
+  it("generates multiple actor types in ActorTypes union", () => {
+    const policy = makePolicy({
+      actors: {
+        User: { attributes: { email: "string" } },
+        ServiceAccount: { attributes: { scope: "string" } },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/export type ActorTypes = "User" \| "ServiceAccount"/);
+  });
+
+  it("rejects unsafe resource attribute field names", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: { "bad-field": "string" },
+        },
+      },
+    });
+    expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
   });
 
   it("rejects unsafe resource names with special characters", () => {

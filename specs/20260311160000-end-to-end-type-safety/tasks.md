@@ -85,13 +85,13 @@
 
 **Independent Test**: Run codegen on a sample policy with resource attributes → output contains all new type maps. Output compiles as valid TypeScript.
 
-- [ ] T023 [US4] Generate `ActorTypes` union type in `packages/codegen/src/generator.ts` — union of all actor type name literals
-- [ ] T024 [US4] Generate `ActorAttributeMap` interface in `packages/codegen/src/generator.ts` — per-actor typed attributes from actor declarations
-- [ ] T025 [US4] Generate `ResourceAttributeMap` interface in `packages/codegen/src/generator.ts` — per-resource typed attributes from new resource `attributes` declarations, fallback `Record<string, unknown>` for resources without attributes
-- [ ] T026 [US4] Generate `GeneratedSchema extends TorideSchema` interface in `packages/codegen/src/generator.ts` — aggregates Resources, Actions, ActorTypes, PermissionMap, RoleMap, ResourceAttributeMap, ActorAttributeMap, RelationMap
-- [ ] T027 [US4] Update `ResolverMap` generation to use typed return values from `ResourceAttributeMap` in `packages/codegen/src/generator.ts`
-- [ ] T028 [US4] Add `import type { TorideSchema } from "toride"` to codegen output header in `packages/codegen/src/generator.ts`
-- [ ] T029 [P] [US4] Update codegen tests in `packages/codegen/src/generator.test.ts` — verify new types in output, existing types preserved, output compiles
+- [X] T023 [US4] Generate `ActorTypes` union type in `packages/codegen/src/generator.ts` — union of all actor type name literals
+- [X] T024 [US4] Generate `ActorAttributeMap` interface in `packages/codegen/src/generator.ts` — per-actor typed attributes from actor declarations
+- [X] T025 [US4] Generate `ResourceAttributeMap` interface in `packages/codegen/src/generator.ts` — per-resource typed attributes from new resource `attributes` declarations, fallback `Record<string, unknown>` for resources without attributes
+- [X] T026 [US4] Generate `GeneratedSchema extends TorideSchema` interface in `packages/codegen/src/generator.ts` — aggregates Resources, Actions, ActorTypes, PermissionMap, RoleMap, ResourceAttributeMap, ActorAttributeMap, RelationMap
+- [X] T027 [US4] Update `ResolverMap` generation to use typed return values from `ResourceAttributeMap` in `packages/codegen/src/generator.ts`
+- [X] T028 [US4] Add `import type { TorideSchema } from "toride"` to codegen output header in `packages/codegen/src/generator.ts`
+- [X] T029 [P] [US4] Update codegen tests in `packages/codegen/src/generator.test.ts` — verify new types in output, existing types preserved, output compiles
 
 **Checkpoint**: Codegen produces complete `GeneratedSchema` for a sample policy. All existing codegen tests pass (`pnpm exec nx run @toride/codegen:test`).
 
