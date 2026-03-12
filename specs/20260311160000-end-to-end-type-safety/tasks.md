@@ -117,10 +117,10 @@
 
 **Independent Test**: `createDrizzleResolver<GeneratedSchema, "Document">(db, table)` constrains return type. Invalid resource type errors.
 
-- [ ] T033 [P] [US7] Make `createDrizzleResolver<S, R>()` generic in `packages/drizzle/src/index.ts` — resource type param narrows return type to `S["resourceAttributeMap"][R]`
-- [ ] T034 [P] [US7] Make `createPrismaResolver<S, R>()` generic in `packages/prisma/src/index.ts` — resource type param narrows return type to `S["resourceAttributeMap"][R]`
-- [ ] T035 [P] [US7] Add type tests for Drizzle resolver in `packages/drizzle/src/` — typed return shape, invalid resource errors
-- [ ] T036 [P] [US7] Add type tests for Prisma resolver in `packages/prisma/src/` — typed return shape, invalid resource errors
+- [X] T033 [P] [US7] Make `createDrizzleResolver<S, R>()` generic in `packages/drizzle/src/index.ts` — resource type param narrows return type to `S["resourceAttributeMap"][R]`
+- [X] T034 [P] [US7] Make `createPrismaResolver<S, R>()` generic in `packages/prisma/src/index.ts` — resource type param narrows return type to `S["resourceAttributeMap"][R]`
+- [X] T035 [P] [US7] Add type tests for Drizzle resolver in `packages/drizzle/src/` — typed return shape, invalid resource errors
+- [X] T036 [P] [US7] Add type tests for Prisma resolver in `packages/prisma/src/` — typed return shape, invalid resource errors
 
 **Checkpoint**: Integration factories are generic. All existing integration tests pass (`pnpm exec nx run @toride/drizzle:test && pnpm exec nx run @toride/prisma:test`).
 
