@@ -123,8 +123,8 @@ async () => {
     "anything",
     "AnyResource",
   );
-  // Default schema: ConstraintResult<string>
-  expectType<ConstraintResult<string>>(result);
+  // Default schema: ConstraintResult<"AnyResource"> is assignable to ConstraintResult<string>
+  expectAssignable<ConstraintResult<string>>(result);
 };
 
 declare const untypedAdapter: ConstraintAdapter;

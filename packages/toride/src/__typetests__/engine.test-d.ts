@@ -202,7 +202,7 @@ typedEngine.resolvedRoles(actor, { type: "Docuemnt" as const, id: "d1" });
 
 async () => {
   const result = await typedEngine.snapshot(actor, [docRef, orgRef]);
-  expectType<PermissionSnapshot>(result);
+  expectType<PermissionSnapshot<TestSchema>>(result);
 };
 
 // @ts-expect-error - "Docuemnt" is not a valid resource type
