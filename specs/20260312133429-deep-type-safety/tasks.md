@@ -133,9 +133,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Update `TorideClient.can<R>()` signature in `packages/toride/src/client.ts` to narrow action to `S['permissionMap'][R]` with R inferred from `resource.type`
-- [ ] T027 [US2] Update `TorideClient.permittedActions<R>()` in `packages/toride/src/client.ts` to return `S['permissionMap'][R][]`
-- [ ] T028 [US2] Update type tests in `packages/toride/src/__typetests__/client.test-d.ts` — test per-resource action narrowing, invalid actions error, permittedActions return type, DefaultSchema backward compat
+- [x] T026 [US2] Update `TorideClient.can<R>()` signature in `packages/toride/src/client.ts` to narrow action to `S['permissionMap'][R]` with R inferred from `resource.type`
+- [x] T027 [US2] Update `TorideClient.permittedActions<R>()` in `packages/toride/src/client.ts` to return `S['permissionMap'][R][]`
+- [x] T028 [US2] Update type tests in `packages/toride/src/__typetests__/client.test-d.ts` — test per-resource action narrowing, invalid actions error, permittedActions return type, DefaultSchema backward compat
 
 **Checkpoint**: Client provides per-resource action narrowing. `pnpm exec nx run toride:build && pnpm exec nx run toride:lint` green.
 

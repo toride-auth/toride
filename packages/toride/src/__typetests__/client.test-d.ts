@@ -78,11 +78,41 @@ typedClient.can("read", { type: "Docuemnt" as const, id: "d1" });
 const defaultCanResult = defaultClient.can("anything", { type: "Whatever", id: "w1" });
 expectType<boolean>(defaultCanResult);
 
+// ─── T028: Per-resource action narrowing on can() ────────────────
+
+// @ts-expect-error - "manage" is NOT a Document permission (only read | write | delete)
+typedClient.can("manage", { type: "Document" as const, id: "d1" });
+
+// @ts-expect-error - "write" is NOT an Organization permission (only manage | read)
+typedClient.can("write", { type: "Organization" as const, id: "o1" });
+
+// @ts-expect-error - "delete" is NOT an Organization permission
+typedClient.can("delete", { type: "Organization" as const, id: "o1" });
+
+// Valid: "read" is a Document permission
+typedClient.can("read", { type: "Document" as const, id: "d1" });
+
+// Valid: "write" is a Document permission
+typedClient.can("write", { type: "Document" as const, id: "d1" });
+
+// Valid: "delete" is a Document permission
+typedClient.can("delete", { type: "Document" as const, id: "d1" });
+
+// Valid: "manage" is an Organization permission
+typedClient.can("manage", { type: "Organization" as const, id: "o1" });
+
+// Valid: "read" is an Organization permission
+typedClient.can("read", { type: "Organization" as const, id: "o1" });
+
 // ─── T031: permittedActions() return type narrowing ──────────────
 
-// Typed client returns the global actions union array
-const typedActions = typedClient.permittedActions({ type: "Document" as const, id: "d1" });
-expectType<("read" | "write" | "delete" | "manage")[]>(typedActions);
+// Typed client returns per-resource permission array for Document
+const typedDocActions = typedClient.permittedActions({ type: "Document" as const, id: "d1" });
+expectType<("read" | "write" | "delete")[]>(typedDocActions);
+
+// Typed client returns per-resource permission array for Organization
+const typedOrgActions = typedClient.permittedActions({ type: "Organization" as const, id: "o1" });
+expectType<("manage" | "read")[]>(typedOrgActions);
 
 // @ts-expect-error - "Docuemnt" is not a valid resource type
 typedClient.permittedActions({ type: "Docuemnt" as const, id: "d1" });

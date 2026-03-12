@@ -42,7 +42,7 @@ export class TorideClient<S extends TorideSchema = DefaultSchema> {
    * Returns true if the action is permitted for the resource, false otherwise.
    * Unknown resources return false (default-deny).
    */
-  can(action: S["actions"], resource: ClientResourceRef<S>): boolean {
+  can<R extends S["resources"]>(action: S["permissionMap"][R], resource: ClientResourceRef<S, R>): boolean {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return false;
@@ -53,11 +53,11 @@ export class TorideClient<S extends TorideSchema = DefaultSchema> {
    * Return the list of permitted actions for a resource.
    * Returns empty array for unknown resources.
    */
-  permittedActions(resource: ClientResourceRef<S>): S["actions"][] {
+  permittedActions<R extends S["resources"]>(resource: ClientResourceRef<S, R>): S["permissionMap"][R][] {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return [];
-    return [...actions] as S["actions"][];
+    return [...actions] as S["permissionMap"][R][];
   }
 }
 
