@@ -44,11 +44,16 @@ export interface DrizzleAdapterOptions {
  * Produces intermediate query description objects that capture the
  * operation type, field, and value. These can be used with drizzle-orm
  * operators or processed by custom query builders.
+ *
+ * @typeParam TQueryMap - Maps resource type names to their Drizzle query types.
+ *   Defaults to `Record<string, DrizzleQuery>` for backward compatibility.
  */
-export function createDrizzleAdapter(
+export function createDrizzleAdapter<
+  TQueryMap extends Record<string, DrizzleQuery> = Record<string, DrizzleQuery>,
+>(
   table: AnyTable,
   options?: DrizzleAdapterOptions,
-): ConstraintAdapter<DrizzleQuery> {
+): ConstraintAdapter<TQueryMap> {
   const relations = options?.relations ?? {};
   const roleAssignments = options?.roleAssignments;
 
@@ -134,7 +139,7 @@ export function createDrizzleAdapter(
     not(query: DrizzleQuery): DrizzleQuery {
       return { _op: "not", child: query };
     },
-  };
+  } as unknown as ConstraintAdapter<TQueryMap>;
 }
 
 /** Options for createDrizzleResolver. */

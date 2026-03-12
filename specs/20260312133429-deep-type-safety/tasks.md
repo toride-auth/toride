@@ -116,10 +116,10 @@
 
 ### Implementation for Adapters
 
-- [ ] T022 [P] [US1] Update `createPrismaAdapter()` in `packages/prisma/src/index.ts` to accept `TQueryMap extends Record<string, PrismaWhere> = Record<string, PrismaWhere>` and return `ConstraintAdapter<TQueryMap>`
-- [ ] T023 [P] [US1] Update `createDrizzleAdapter()` in `packages/drizzle/src/index.ts` to accept `TQueryMap extends Record<string, DrizzleQuery> = Record<string, DrizzleQuery>` and return `ConstraintAdapter<TQueryMap>`
-- [ ] T024 [P] [US1] Add adapter type tests in `packages/prisma/src/__typetests__/resolver.test-d.ts` (or new file `adapter.test-d.ts`) — test typed and untyped adapter creation, verify output types
-- [ ] T025 [P] [US1] Add adapter type tests in `packages/drizzle/src/__typetests__/resolver.test-d.ts` (or new file `adapter.test-d.ts`) — test typed and untyped adapter creation, verify output types
+- [x] T022 [P] [US1] Update `createPrismaAdapter()` in `packages/prisma/src/index.ts` to accept `TQueryMap extends Record<string, PrismaWhere> = Record<string, PrismaWhere>` and return `ConstraintAdapter<TQueryMap>`
+- [x] T023 [P] [US1] Update `createDrizzleAdapter()` in `packages/drizzle/src/index.ts` to accept `TQueryMap extends Record<string, DrizzleQuery> = Record<string, DrizzleQuery>` and return `ConstraintAdapter<TQueryMap>`
+- [x] T024 [P] [US1] Add adapter type tests in `packages/prisma/src/__typetests__/resolver.test-d.ts` (or new file `adapter.test-d.ts`) — test typed and untyped adapter creation, verify output types
+- [x] T025 [P] [US1] Add adapter type tests in `packages/drizzle/src/__typetests__/resolver.test-d.ts` (or new file `adapter.test-d.ts`) — test typed and untyped adapter creation, verify output types
 
 **Checkpoint**: Both adapters accept TQueryMap. `pnpm exec nx run @toride/prisma:build && pnpm exec nx run @toride/drizzle:build` green.
 

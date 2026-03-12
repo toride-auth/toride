@@ -27,15 +27,22 @@ export interface PrismaAdapterOptions {
  *
  * No Prisma dependency required - produces plain JS objects matching
  * Prisma's WHERE clause structure.
+ *
+ * @typeParam TQueryMap - Maps resource type names to their Prisma WHERE clause types.
+ *   Defaults to `Record<string, PrismaWhere>` for backward compatibility.
  */
-export function createPrismaAdapter(
+export function createPrismaAdapter<
+  TQueryMap extends Record<string, PrismaWhere> = Record<string, PrismaWhere>,
+>(
   options?: PrismaAdapterOptions,
-): ConstraintAdapter<PrismaWhere> {
+): ConstraintAdapter<TQueryMap> {
   const relationMapping = options?.relationMapping ?? {};
   const roleTable = options?.roleAssignmentTable ?? "roleAssignments";
   const userIdField = options?.roleAssignmentFields?.userId ?? "userId";
   const roleField = options?.roleAssignmentFields?.role ?? "role";
 
+  // Internal implementation uses PrismaWhere (the base type).
+  // Cast to ConstraintAdapter<TQueryMap> since TQueryMap values extend PrismaWhere.
   return {
     translate(constraint: LeafConstraint): PrismaWhere {
       switch (constraint.type) {
@@ -101,7 +108,7 @@ export function createPrismaAdapter(
     not(query: PrismaWhere): PrismaWhere {
       return { NOT: query };
     },
-  };
+  } as unknown as ConstraintAdapter<TQueryMap>;
 }
 
 /** Options for createPrismaResolver. */
