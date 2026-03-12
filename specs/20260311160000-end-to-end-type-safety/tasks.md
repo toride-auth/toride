@@ -130,11 +130,11 @@
 
 **Purpose**: End-to-end validation, export cleanup, full test suite green.
 
-- [ ] T037 [P] Write end-to-end type test in `packages/toride/src/__typetests__/e2e.test-d.ts` — codegen output → `Toride<GeneratedSchema>` → typed `can()` → typed `permittedActions()` → `TorideClient<GeneratedSchema>`
-- [ ] T038 Run `pnpm run build` across all packages — verify clean compilation
-- [ ] T039 Run `pnpm run test` across all packages — verify all runtime tests pass
-- [ ] T040 Run `pnpm run lint` across all packages — verify no type errors
-- [ ] T041 Verify all new types are exported from `packages/toride/src/index.ts` — `TorideSchema`, `DefaultSchema`, and updated generic types
+- [X] T037 [P] Write end-to-end type test in `packages/toride/src/__typetests__/e2e.test-d.ts` — codegen output → `Toride<GeneratedSchema>` → typed `can()` → typed `permittedActions()` → `TorideClient<GeneratedSchema>`
+- [X] T038 Run `pnpm run build` across all packages — verify clean compilation
+- [X] T039 Run `pnpm run test` across all packages — verify all runtime tests pass
+- [X] T040 Run `pnpm run lint` across all packages — verify no type errors
+- [X] T041 Verify all new types are exported from `packages/toride/src/index.ts` — `TorideSchema`, `DefaultSchema`, and updated generic types
 
 **Checkpoint**: Full monorepo builds, tests, and lints cleanly. End-to-end type flow works.
 
