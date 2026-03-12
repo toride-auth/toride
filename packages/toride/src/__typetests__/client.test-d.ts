@@ -133,3 +133,75 @@ const invalidRef: ClientResourceRef<TestSchema> = { type: "Invalid", id: "d1" };
 // Default ClientResourceRef accepts any string
 const defaultRef: ClientResourceRef = { type: "anything", id: "d1" };
 expectType<string>(defaultRef.type);
+
+// ─── T031 (US5): Typed PermissionSnapshot — schema flows through ─
+
+// A different schema to test cross-schema mismatch
+interface DifferentSchema extends TorideSchema {
+  resources: "Project" | "Task";
+  actions: "view" | "edit";
+  actorTypes: "Member";
+  permissionMap: {
+    Project: "view" | "edit";
+    Task: "view";
+  };
+  roleMap: {
+    Project: "owner";
+    Task: "assignee";
+  };
+  resourceAttributeMap: {
+    Project: { name: string };
+    Task: { priority: number };
+  };
+  actorAttributeMap: {
+    Member: { role: string };
+  };
+  relationMap: {
+    Project: Record<string, string>;
+    Task: { project: "Project" };
+  };
+}
+
+// Positive: PermissionSnapshot<TestSchema> is accepted by TorideClient<TestSchema>
+const snapshotForClient = {} as PermissionSnapshot<TestSchema>;
+const clientFromSnapshot = new TorideClient<TestSchema>(snapshotForClient);
+
+// After construction, can() retains per-resource narrowing
+const canReadDoc = clientFromSnapshot.can("read", { type: "Document" as const, id: "d1" });
+expectType<boolean>(canReadDoc);
+
+// After construction, permittedActions() retains per-resource narrowing
+const docActions = clientFromSnapshot.permittedActions({ type: "Document" as const, id: "d1" });
+expectType<("read" | "write" | "delete")[]>(docActions);
+
+const orgActions = clientFromSnapshot.permittedActions({ type: "Organization" as const, id: "o1" });
+expectType<("manage" | "read")[]>(orgActions);
+
+// @ts-expect-error - "manage" is not a Document permission after snapshot roundtrip
+clientFromSnapshot.can("manage", { type: "Document" as const, id: "d1" });
+
+// Negative: PermissionSnapshot<DefaultSchema> is NOT assignable to PermissionSnapshot<TestSchema>
+// (phantom __schema field prevents this)
+expectNotAssignable<PermissionSnapshot<TestSchema>>(defaultSnapshot);
+
+// Negative: PermissionSnapshot<TestSchema> is NOT assignable to PermissionSnapshot<DifferentSchema>
+const differentSnapshot = {} as PermissionSnapshot<DifferentSchema>;
+expectNotAssignable<PermissionSnapshot<TestSchema>>(differentSnapshot);
+expectNotAssignable<PermissionSnapshot<DifferentSchema>>(typedSnapshot);
+
+// Serialization boundary: simulate JSON deserialization and cast back
+const serialized: string = JSON.stringify(typedSnapshot);
+const deserialized = JSON.parse(serialized) as PermissionSnapshot<TestSchema>;
+const clientFromDeserialized = new TorideClient<TestSchema>(deserialized);
+
+// Typed can() works after deserialization roundtrip
+const canAfterDeserialize = clientFromDeserialized.can("write", { type: "Document" as const, id: "d1" });
+expectType<boolean>(canAfterDeserialize);
+
+// @ts-expect-error - invalid action still caught after deserialization
+clientFromDeserialized.can("invalid", { type: "Document" as const, id: "d1" });
+
+// DefaultSchema backward compat: PermissionSnapshot without type param works with untyped client
+const untypedSnapshot: PermissionSnapshot = { "X:1": ["a"] };
+const untypedClient = new TorideClient(untypedSnapshot);
+untypedClient.can("anything", { type: "X", id: "1" });

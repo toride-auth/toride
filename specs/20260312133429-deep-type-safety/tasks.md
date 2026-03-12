@@ -149,9 +149,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T029 [US5] Update `snapshot()` method signature in `packages/toride/src/engine.ts` to return `Promise<PermissionSnapshot<S>>`
-- [ ] T030 [US5] Update `TorideClient` constructor in `packages/toride/src/client.ts` to accept `PermissionSnapshot<S>` and preserve schema generic
-- [ ] T031 [US5] Add snapshot type tests in `packages/toride/src/__typetests__/client.test-d.ts` — test schema generic flows from snapshot through client, DefaultSchema backward compat
+- [X] T029 [US5] Update `snapshot()` method signature in `packages/toride/src/engine.ts` to return `Promise<PermissionSnapshot<S>>`
+- [X] T030 [US5] Update `TorideClient` constructor in `packages/toride/src/client.ts` to accept `PermissionSnapshot<S>` and preserve schema generic
+- [X] T031 [US5] Add snapshot type tests in `packages/toride/src/__typetests__/client.test-d.ts` — test schema generic flows from snapshot through client, DefaultSchema backward compat
 
 **Checkpoint**: Snapshot carries schema type through to client. `pnpm exec nx run toride:build && pnpm exec nx run toride:lint` green.
 
