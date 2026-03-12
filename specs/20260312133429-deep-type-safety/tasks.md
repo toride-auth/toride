@@ -84,10 +84,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T016 [US3] Update `canField<R>()` signature in `packages/toride/src/field-access.ts` to constrain `field` parameter to `keyof S['resourceAttributeMap'][R] & string`
-- [ ] T017 [US3] Update `permittedFields<R>()` signature in `packages/toride/src/field-access.ts` to return `Promise<(keyof S['resourceAttributeMap'][R] & string)[]>`
-- [ ] T018 [US3] Update `canField` and `permittedFields` delegating signatures in `packages/toride/src/engine.ts` to pass through the typed field parameter and return type
-- [ ] T019 [US3] Add field typing tests in `packages/toride/src/__typetests__/engine.test-d.ts` — test valid/invalid field names, return type of permittedFields, DefaultSchema fallback to `string`
+- [X] T016 [US3] Update `canField<R>()` signature in `packages/toride/src/field-access.ts` to constrain `field` parameter to `keyof S['resourceAttributeMap'][R] & string`
+- [X] T017 [US3] Update `permittedFields<R>()` signature in `packages/toride/src/field-access.ts` to return `Promise<(keyof S['resourceAttributeMap'][R] & string)[]>`
+- [X] T018 [US3] Update `canField` and `permittedFields` delegating signatures in `packages/toride/src/engine.ts` to pass through the typed field parameter and return type
+- [X] T019 [US3] Add field typing tests in `packages/toride/src/__typetests__/engine.test-d.ts` — test valid/invalid field names, return type of permittedFields, DefaultSchema fallback to `string`
 
 **Checkpoint**: Field-level methods are typed per resource. `pnpm exec nx run toride:build && pnpm exec nx run toride:lint` green.
 

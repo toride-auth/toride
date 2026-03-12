@@ -159,7 +159,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     operation: "read" | "update",
     resource: ResourceRef<S, R>,
-    field: string,
+    field: keyof S["resourceAttributeMap"][R] & string,
     options?: CheckOptions,
   ): Promise<boolean> {
     const r = resource as ResourceRef;
@@ -172,7 +172,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
       actor as ActorRef,
       operation,
       r,
-      field,
+      field as string,
       resourceBlock.field_access,
       options,
     );
@@ -187,7 +187,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     operation: "read" | "update",
     resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<string[]> {
+  ): Promise<(keyof S["resourceAttributeMap"][R] & string)[]> {
     const r = resource as ResourceRef;
     const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
@@ -200,7 +200,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
       r,
       resourceBlock.field_access,
       options,
-    );
+    ) as Promise<(keyof S["resourceAttributeMap"][R] & string)[]>;
   }
 
   /**
