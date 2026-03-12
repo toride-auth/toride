@@ -282,7 +282,7 @@ async () => {
 
 async () => {
   const fields = await typedEngine.permittedFields(userActor, "read", docRef);
-  expectType<string[]>(fields);
+  expectType<("status" | "ownerId")[]>(fields);
 };
 
 // @ts-expect-error - Invalid resource type
@@ -294,7 +294,7 @@ typedEngine.canField(userActor, "read", { type: "Docuemnt" as const, id: "d1" },
 
 async () => {
   const roles = await typedEngine.resolvedRoles(userActor, docRef);
-  expectType<string[]>(roles);
+  expectType<("owner" | "editor" | "viewer")[]>(roles);
 };
 
 // @ts-expect-error - Invalid resource type
@@ -339,7 +339,7 @@ typedClient.can("read", { type: "Docuemnt" as const, id: "d1" });
 
 // Typed permittedActions
 const permitted = typedClient.permittedActions({ type: "Document" as const, id: "d1" });
-expectType<("read" | "write" | "delete" | "manage")[]>(permitted);
+expectType<("read" | "write" | "delete")[]>(permitted);
 
 // @ts-expect-error - Invalid resource type
 typedClient.permittedActions({ type: "Docuemnt" as const, id: "d1" });
