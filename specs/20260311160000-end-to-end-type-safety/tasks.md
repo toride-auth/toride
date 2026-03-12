@@ -103,9 +103,9 @@
 
 **Independent Test**: `TorideClient<GeneratedSchema>.can("read", { type: "Document", id: "1" })` compiles. `can("reed", ...)` errors.
 
-- [ ] T030 [US6] Make `TorideClient<S extends TorideSchema = DefaultSchema>` generic in `packages/toride/src/client.ts` — `can()` action narrowed to `S["actions"]`, resource.type narrowed to `S["resources"]`
-- [ ] T031 [US6] Update `permittedActions()` return type to `S["actions"][]` in `packages/toride/src/client.ts`
-- [ ] T032 [P] [US6] Write type tests in `packages/toride/src/__typetests__/client.test-d.ts` — verify typed can(), invalid action errors, default schema backward compat
+- [x] T030 [US6] Make `TorideClient<S extends TorideSchema = DefaultSchema>` generic in `packages/toride/src/client.ts` — `can()` action narrowed to `S["actions"]`, resource.type narrowed to `S["resources"]`
+- [x] T031 [US6] Update `permittedActions()` return type to `S["actions"][]` in `packages/toride/src/client.ts`
+- [x] T032 [P] [US6] Write type tests in `packages/toride/src/__typetests__/client.test-d.ts` — verify typed can(), invalid action errors, default schema backward compat
 
 **Checkpoint**: TorideClient is generic. Type tests pass. All existing client runtime tests pass (`pnpm exec nx run toride:test`).
 
