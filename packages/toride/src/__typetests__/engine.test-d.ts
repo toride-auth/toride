@@ -234,10 +234,26 @@ async () => {
 // @ts-expect-error - "Docuemnt" is not a valid resource type
 typedEngine.permittedFields(actor, "read", { type: "Docuemnt" as const, id: "d1" });
 
-// ─── T017: resolvedRoles<R>() type narrowing ────────────────────
+// ─── T017/T020/T021: resolvedRoles<R>() type narrowing ──────────
 
+// Document roles are typed as ("editor" | "viewer")[]
 async () => {
   const result = await typedEngine.resolvedRoles(actor, docRef);
+  expectType<("editor" | "viewer")[]>(result);
+};
+
+// Organization roles are typed as ("admin" | "member")[]
+async () => {
+  const result = await typedEngine.resolvedRoles(actor, orgRef);
+  expectType<("admin" | "member")[]>(result);
+};
+
+// Backward compat: defaultEngine returns string[]
+async () => {
+  const result = await defaultEngine.resolvedRoles(
+    { type: "User", id: "u1", attributes: {} },
+    { type: "Whatever", id: "w1" },
+  );
   expectType<string[]>(result);
 };
 

@@ -210,7 +210,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<string[]> {
+  ): Promise<S["roleMap"][R][]> {
     const a = actor as ActorRef;
     const r = resource as ResourceRef;
     const resourceBlock = this.policy.resources[r.type];
@@ -225,7 +225,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
 
     const directRoles = result.resolvedRoles.direct;
     const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
-    return [...new Set([...directRoles, ...derivedRoleNames])];
+    return [...new Set([...directRoles, ...derivedRoleNames])] as S["roleMap"][R][];
   }
 
   /**
