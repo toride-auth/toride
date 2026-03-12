@@ -7,9 +7,12 @@ export const CLIENT_VERSION = "0.0.1";
 import type { PermissionSnapshot } from "./snapshot.js";
 import type { TorideSchema, DefaultSchema } from "./types.js";
 
-/** Minimal resource reference for client-side lookups. Generic over S for type narrowing. */
-export interface ClientResourceRef<S extends TorideSchema = DefaultSchema> {
-  readonly type: S["resources"];
+/** Minimal resource reference for client-side lookups. Generic over S and R for type narrowing. */
+export interface ClientResourceRef<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> {
+  readonly type: R;
   readonly id: string;
 }
 
@@ -26,9 +29,10 @@ export interface ClientResourceRef<S extends TorideSchema = DefaultSchema> {
 export class TorideClient<S extends TorideSchema = DefaultSchema> {
   private readonly permissions: Map<string, ReadonlySet<string>>;
 
-  constructor(snapshot: PermissionSnapshot) {
+  constructor(snapshot: PermissionSnapshot<S>) {
     this.permissions = new Map();
-    for (const [key, actions] of Object.entries(snapshot)) {
+    const entries = snapshot as Record<string, string[]>;
+    for (const [key, actions] of Object.entries(entries)) {
       this.permissions.set(key, new Set(actions));
     }
   }

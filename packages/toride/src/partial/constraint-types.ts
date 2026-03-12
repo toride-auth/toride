@@ -152,21 +152,29 @@ export type LeafConstraint =
 
 // ─── Constraint Result ────────────────────────────────────────────
 
-/** Result of partial evaluation. */
-export type ConstraintResult =
-  | { readonly unrestricted: true }
-  | { readonly forbidden: true }
-  | { readonly constraints: Constraint };
+/** Result of partial evaluation, tagged with resource type R (phantom). */
+export type ConstraintResult<R extends string = string> =
+  | { readonly unrestricted: true; readonly __resource?: R }
+  | { readonly forbidden: true; readonly __resource?: R }
+  | { readonly constraints: Constraint; readonly __resource?: R };
 
 // ─── Constraint Adapter ───────────────────────────────────────────
 
-/** User-provided adapter for translating constraint ASTs to queries. */
-export interface ConstraintAdapter<TQuery> {
-  translate(constraint: LeafConstraint): TQuery;
-  relation(field: string, resourceType: string, childQuery: TQuery): TQuery;
-  hasRole(actorId: string, actorType: string, role: string): TQuery;
-  unknown(name: string): TQuery;
-  and(queries: TQuery[]): TQuery;
-  or(queries: TQuery[]): TQuery;
-  not(query: TQuery): TQuery;
+/**
+ * User-provided adapter for translating constraint ASTs to queries.
+ * TQueryMap maps resource type names to their query output types.
+ *
+ * BREAKING CHANGE: Previously ConstraintAdapter<TQuery> with a single query type.
+ * Now uses a resource-to-query-type map for per-resource output typing.
+ */
+export interface ConstraintAdapter<
+  TQueryMap extends Record<string, unknown> = Record<string, unknown>,
+> {
+  translate(constraint: LeafConstraint): TQueryMap[string];
+  relation(field: string, resourceType: string, childQuery: TQueryMap[string]): TQueryMap[string];
+  hasRole(actorId: string, actorType: string, role: string): TQueryMap[string];
+  unknown(name: string): TQueryMap[string];
+  and(queries: TQueryMap[string][]): TQueryMap[string];
+  or(queries: TQueryMap[string][]): TQueryMap[string];
+  not(query: TQueryMap[string]): TQueryMap[string];
 }

@@ -142,11 +142,11 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     resources: ResourceRef<S>[],
     options?: CheckOptions,
-  ): Promise<PermissionSnapshot> {
+  ): Promise<PermissionSnapshot<S>> {
     return snapshotImpl(
-      this as unknown as SnapshotEngine,
-      actor as ActorRef,
-      resources as ResourceRef[],
+      this as unknown as SnapshotEngine<S>,
+      actor as ActorRef<S>,
+      resources as ResourceRef<S>[],
       options,
     );
   }
@@ -272,7 +272,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     action: S["permissionMap"][R],
     resourceType: R,
     options?: CheckOptions,
-  ): Promise<ConstraintResult> {
+  ): Promise<ConstraintResult<R>> {
     const a = actor as ActorRef;
     const act = action as string;
     const rt = resourceType as string;
@@ -291,17 +291,17 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     );
 
     this.fireQueryEvent(a, act, rt, constraintResult);
-    return constraintResult;
+    return constraintResult as ConstraintResult<R>;
   }
 
   /**
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
    */
-  translateConstraints<TQuery>(
+  translateConstraints<TQueryMap extends Record<string, unknown>>(
     constraints: Constraint,
-    adapter: ConstraintAdapter<TQuery>,
-  ): TQuery {
+    adapter: ConstraintAdapter<TQueryMap>,
+  ): TQueryMap[string] {
     return translateConstraintsImpl(constraints, adapter);
   }
 

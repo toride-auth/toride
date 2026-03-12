@@ -6,8 +6,13 @@ import type { TorideSchema, DefaultSchema, ActorRef, ResourceRef, CheckOptions }
  * A serializable map of permissions keyed by "Type:id".
  * Values are arrays of permitted action strings.
  * Suitable for JSON transport to client-side TorideClient.
+ *
+ * Generic over TorideSchema so that the type parameter flows through
+ * to TorideClient<S> on deserialization. The runtime structure is unchanged.
  */
-export type PermissionSnapshot = Record<string, string[]>;
+export type PermissionSnapshot<
+  S extends TorideSchema = DefaultSchema,
+> = Record<string, string[]> & { readonly __schema?: S | undefined };
 
 /**
  * Interface for the engine methods needed by snapshot().
@@ -34,12 +39,12 @@ export interface SnapshotEngine<S extends TorideSchema = DefaultSchema> {
  * @param options - Optional check options (e.g., env context)
  * @returns PermissionSnapshot map
  */
-export async function snapshot(
-  engine: SnapshotEngine,
-  actor: ActorRef,
-  resources: ResourceRef[],
+export async function snapshot<S extends TorideSchema = DefaultSchema>(
+  engine: SnapshotEngine<S>,
+  actor: ActorRef<S>,
+  resources: ResourceRef<S>[],
   options?: CheckOptions,
-): Promise<PermissionSnapshot> {
+): Promise<PermissionSnapshot<S>> {
   const entries = await Promise.all(
     resources.map(async (resource) => {
       const key = `${resource.type}:${resource.id}`;
@@ -47,5 +52,5 @@ export async function snapshot(
       return [key, actions] as const;
     }),
   );
-  return Object.fromEntries(entries);
+  return Object.fromEntries(entries) as PermissionSnapshot<S>;
 }

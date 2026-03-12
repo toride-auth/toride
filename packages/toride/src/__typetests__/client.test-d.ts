@@ -40,7 +40,12 @@ interface TestSchema extends TorideSchema {
 
 // ─── Test Fixtures ───────────────────────────────────────────────
 
-const snapshot: PermissionSnapshot = {
+const typedSnapshot = {
+  "Document:d1": ["read", "write"],
+  "Organization:o1": ["manage"],
+} as PermissionSnapshot<TestSchema>;
+
+const defaultSnapshot: PermissionSnapshot = {
   "Document:d1": ["read", "write"],
   "Organization:o1": ["manage"],
 };
@@ -48,11 +53,11 @@ const snapshot: PermissionSnapshot = {
 // ─── T030: TorideClient<S> is generic ────────────────────────────
 
 // Default client (no type param) behaves like today — accepts any string
-const defaultClient = new TorideClient(snapshot);
+const defaultClient = new TorideClient(defaultSnapshot);
 expectAssignable<TorideClient<DefaultSchema>>(defaultClient);
 
 // Typed client narrows action and resource types
-const typedClient = new TorideClient<TestSchema>(snapshot);
+const typedClient = new TorideClient<TestSchema>(typedSnapshot);
 
 // ─── T030: can() type narrowing ──────────────────────────────────
 

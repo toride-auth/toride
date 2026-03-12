@@ -14,7 +14,7 @@ import { AttributeCache } from "../evaluation/cache.js";
 /**
  * Create a string-based constraint adapter for testing translation output.
  */
-export function makeStringAdapter(): ConstraintAdapter<string> {
+export function makeStringAdapter(): ConstraintAdapter<Record<string, string>> {
   return {
     translate(c: LeafConstraint): string {
       switch (c.type) {
