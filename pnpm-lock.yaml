@@ -62,12 +62,20 @@ importers:
       toride:
         specifier: workspace:*
         version: link:../toride
+    devDependencies:
+      tsd:
+        specifier: ^0.33.0
+        version: 0.33.0
 
   packages/prisma:
     dependencies:
       toride:
         specifier: workspace:*
         version: link:../toride
+    devDependencies:
+      tsd:
+        specifier: ^0.33.0
+        version: 0.33.0
 
   packages/toride:
     dependencies:
