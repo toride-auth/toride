@@ -1,6 +1,6 @@
 {
   "name": "@toride/drizzle",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Drizzle ORM integration for Toride authorization engine",
   "type": "module",
   "exports": {
