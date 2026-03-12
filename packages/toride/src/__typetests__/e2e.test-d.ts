@@ -282,7 +282,7 @@ async () => {
 
 async () => {
   const fields = await typedEngine.permittedFields(userActor, "read", docRef);
-  expectType<string[]>(fields);
+  expectType<("status" | "ownerId")[]>(fields);
 };
 
 // @ts-expect-error - Invalid resource type
@@ -294,7 +294,7 @@ typedEngine.canField(userActor, "read", { type: "Docuemnt" as const, id: "d1" },
 
 async () => {
   const roles = await typedEngine.resolvedRoles(userActor, docRef);
-  expectType<string[]>(roles);
+  expectType<("owner" | "editor" | "viewer")[]>(roles);
 };
 
 // @ts-expect-error - Invalid resource type
@@ -306,7 +306,7 @@ typedEngine.resolvedRoles(userActor, { type: "Docuemnt" as const, id: "d1" });
 
 async () => {
   const snap = await typedEngine.snapshot(userActor, [docRef, orgRef, taskRef]);
-  expectType<PermissionSnapshot>(snap);
+  expectType<PermissionSnapshot<GeneratedSchema>>(snap);
 };
 
 // @ts-expect-error - Invalid resource type
@@ -316,13 +316,13 @@ typedEngine.snapshot(userActor, [{ type: "Docuemnt" as const, id: "d1" }]);
 // Step 15: Typed TorideClient (US6)
 // ═══════════════════════════════════════════════════════════════════════
 
-const snapshot: PermissionSnapshot = {
+const typedSnapshot = {
   "Document:d1": ["read", "write"],
   "Organization:o1": ["manage"],
   "Task:t1": ["read"],
-};
+} as PermissionSnapshot<GeneratedSchema>;
 
-const typedClient = new TorideClient<GeneratedSchema>(snapshot);
+const typedClient = new TorideClient<GeneratedSchema>(typedSnapshot);
 
 // Valid: "read" is a valid action, "Document" is a valid resource
 const canResult = typedClient.can("read", { type: "Document" as const, id: "d1" });
@@ -339,7 +339,7 @@ typedClient.can("read", { type: "Docuemnt" as const, id: "d1" });
 
 // Typed permittedActions
 const permitted = typedClient.permittedActions({ type: "Document" as const, id: "d1" });
-expectType<("read" | "write" | "delete" | "manage")[]>(permitted);
+expectType<("read" | "write" | "delete")[]>(permitted);
 
 // @ts-expect-error - Invalid resource type
 typedClient.permittedActions({ type: "Docuemnt" as const, id: "d1" });
@@ -353,7 +353,12 @@ expectType<"Document" | "Organization" | "Task">(typedRef.type);
 // ═══════════════════════════════════════════════════════════════════════
 
 // Default client accepts any strings
-const defaultClient = new TorideClient(snapshot);
+const defaultSnapshot: PermissionSnapshot = {
+  "Document:d1": ["read", "write"],
+  "Organization:o1": ["manage"],
+  "Task:t1": ["read"],
+};
+const defaultClient = new TorideClient(defaultSnapshot);
 defaultClient.can("anything", { type: "Whatever", id: "w1" });
 
 const defaultRef: ClientResourceRef = { type: "anything", id: "d1" };

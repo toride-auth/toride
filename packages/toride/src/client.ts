@@ -7,9 +7,12 @@ export const CLIENT_VERSION = "0.0.1";
 import type { PermissionSnapshot } from "./snapshot.js";
 import type { TorideSchema, DefaultSchema } from "./types.js";
 
-/** Minimal resource reference for client-side lookups. Generic over S for type narrowing. */
-export interface ClientResourceRef<S extends TorideSchema = DefaultSchema> {
-  readonly type: S["resources"];
+/** Minimal resource reference for client-side lookups. Generic over S and R for type narrowing. */
+export interface ClientResourceRef<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> {
+  readonly type: R;
   readonly id: string;
 }
 
@@ -26,9 +29,10 @@ export interface ClientResourceRef<S extends TorideSchema = DefaultSchema> {
 export class TorideClient<S extends TorideSchema = DefaultSchema> {
   private readonly permissions: Map<string, ReadonlySet<string>>;
 
-  constructor(snapshot: PermissionSnapshot) {
+  constructor(snapshot: PermissionSnapshot<S>) {
     this.permissions = new Map();
-    for (const [key, actions] of Object.entries(snapshot)) {
+    const entries = snapshot as Record<string, string[]>;
+    for (const [key, actions] of Object.entries(entries)) {
       this.permissions.set(key, new Set(actions));
     }
   }
@@ -38,7 +42,7 @@ export class TorideClient<S extends TorideSchema = DefaultSchema> {
    * Returns true if the action is permitted for the resource, false otherwise.
    * Unknown resources return false (default-deny).
    */
-  can(action: S["actions"], resource: ClientResourceRef<S>): boolean {
+  can<R extends S["resources"]>(action: S["permissionMap"][R], resource: ClientResourceRef<S, R>): boolean {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return false;
@@ -49,11 +53,11 @@ export class TorideClient<S extends TorideSchema = DefaultSchema> {
    * Return the list of permitted actions for a resource.
    * Returns empty array for unknown resources.
    */
-  permittedActions(resource: ClientResourceRef<S>): S["actions"][] {
+  permittedActions<R extends S["resources"]>(resource: ClientResourceRef<S, R>): S["permissionMap"][R][] {
     const key = `${resource.type}:${resource.id}`;
     const actions = this.permissions.get(key);
     if (!actions) return [];
-    return [...actions] as S["actions"][];
+    return [...actions] as S["permissionMap"][R][];
   }
 }
 

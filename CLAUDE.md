@@ -168,6 +168,7 @@ chore: update dependencies
 - TypeScript (strict mode), Node.js 20+ LTS + vitest (test), tsup (build), VitePress 1.6.4 (docs) (default-resolver)
 - N/A (in-process library) (default-resolver)
 - TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test), tsd (type testing) (improve-typesafety)
+- TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), tsd (type testing) (improve-typesafety2)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

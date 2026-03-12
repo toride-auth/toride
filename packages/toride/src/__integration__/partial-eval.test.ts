@@ -19,7 +19,7 @@ describe("partial evaluation integration", () => {
   let createToride: (options: TorideOptions) => {
     can: (actor: ActorRef, action: string, resource: ResourceRef, options?: { env?: Record<string, unknown> }) => Promise<boolean>;
     buildConstraints: (actor: ActorRef, action: string, resourceType: string, options?: { env?: Record<string, unknown> }) => Promise<ConstraintResult>;
-    translateConstraints: <TQuery>(constraints: Constraint, adapter: ConstraintAdapter<TQuery>) => TQuery;
+    translateConstraints: <R extends string, TQueryMap extends Record<string, unknown>>(constraints: ConstraintResult<R>, adapter: ConstraintAdapter<TQueryMap>) => TQueryMap[R];
   };
   let loadYaml: (input: string) => Promise<Policy>;
 
@@ -232,10 +232,7 @@ resources:
     const result = await engine.buildConstraints(actor, "read", "Task");
     expect(result).toHaveProperty("constraints");
 
-    const translated = engine.translateConstraints(
-      (result as { constraints: Constraint }).constraints,
-      adapter,
-    );
+    const translated = engine.translateConstraints(result, adapter);
     // Verify exact translation output
     expect(translated).toBe('NOT(deleted = true)');
   });
@@ -291,7 +288,7 @@ resources:
       },
     });
 
-    const translated = engine.translateConstraints(constraints, adapter);
+    const translated = engine.translateConstraints(result, adapter);
     expect(translated).toBe("NOT(archived = true)");
   });
 
@@ -343,7 +340,7 @@ resources:
       },
     });
 
-    const translated = engine.translateConstraints(constraints, adapter);
+    const translated = engine.translateConstraints(result, adapter);
     expect(translated).toBe("NOT(UNKNOWN(businessHours))");
   });
 });

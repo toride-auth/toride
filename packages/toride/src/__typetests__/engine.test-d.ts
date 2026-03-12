@@ -9,6 +9,7 @@ import type {
   CheckOptions,
   TorideOptions,
   PermissionSnapshot,
+  ConstraintResult,
 } from "../index.js";
 import { Toride, createToride } from "../index.js";
 
@@ -148,8 +149,16 @@ async () => {
 // ─── T016: buildConstraints<R>() type narrowing ─────────────────
 
 // Valid: "read" is a Document permission, "Document" is a valid resource type
+// T013: buildConstraints returns ConstraintResult<"Document">
 async () => {
-  await typedEngine.buildConstraints(actor, "read", "Document");
+  const result = await typedEngine.buildConstraints(actor, "read", "Document");
+  expectType<ConstraintResult<"Document">>(result);
+};
+
+// T013: buildConstraints returns ConstraintResult<"Organization">
+async () => {
+  const result = await typedEngine.buildConstraints(actor, "manage", orgRef.type as "Organization");
+  expectType<ConstraintResult<"Organization">>(result);
 };
 
 // @ts-expect-error - "reed" is not a valid Document permission
@@ -158,31 +167,93 @@ typedEngine.buildConstraints(actor, "reed", "Document");
 // @ts-expect-error - "Docuemnt" is not a valid resource type
 typedEngine.buildConstraints(actor, "read", "Docuemnt");
 
-// ─── T017: canField<R>() type narrowing ─────────────────────────
+// ─── T017/T019: canField<R>() type narrowing ─────────────────────────
 
-// Valid: typed resource
+// Valid: "status" is a Document field
 async () => {
   const result = await typedEngine.canField(actor, "read", docRef, "status");
   expectType<boolean>(result);
 };
 
+// Valid: "ownerId" is a Document field
+async () => {
+  const result = await typedEngine.canField(actor, "read", docRef, "ownerId");
+  expectType<boolean>(result);
+};
+
+// Valid: "plan" is an Organization field
+async () => {
+  const result = await typedEngine.canField(actor, "read", orgRef, "plan");
+  expectType<boolean>(result);
+};
+
+// @ts-expect-error - "nonexistent" is not a valid Document field
+typedEngine.canField(actor, "read", docRef, "nonexistent");
+
+// @ts-expect-error - "nonexistent" is not a valid Organization field
+typedEngine.canField(actor, "read", orgRef, "nonexistent");
+
 // @ts-expect-error - "Docuemnt" is not a valid resource type
 typedEngine.canField(actor, "read", { type: "Docuemnt" as const, id: "d1" }, "status");
 
-// ─── T017: permittedFields<R>() type narrowing ──────────────────
+// Backward compat: defaultEngine accepts any string field
+async () => {
+  const result = await defaultEngine.canField(
+    { type: "User", id: "u1", attributes: {} },
+    "read",
+    { type: "Whatever", id: "w1" },
+    "anyField",
+  );
+  expectType<boolean>(result);
+};
 
+// ─── T017/T019: permittedFields<R>() type narrowing ──────────────────
+
+// permittedFields returns typed field union array for Document
 async () => {
   const result = await typedEngine.permittedFields(actor, "read", docRef);
+  expectType<("status" | "ownerId")[]>(result);
+};
+
+// permittedFields returns typed field union array for Organization
+async () => {
+  const result = await typedEngine.permittedFields(actor, "read", orgRef);
+  expectType<("plan")[]>(result);
+};
+
+// Backward compat: defaultEngine returns string[]
+async () => {
+  const result = await defaultEngine.permittedFields(
+    { type: "User", id: "u1", attributes: {} },
+    "read",
+    { type: "Whatever", id: "w1" },
+  );
   expectType<string[]>(result);
 };
 
 // @ts-expect-error - "Docuemnt" is not a valid resource type
 typedEngine.permittedFields(actor, "read", { type: "Docuemnt" as const, id: "d1" });
 
-// ─── T017: resolvedRoles<R>() type narrowing ────────────────────
+// ─── T017/T020/T021: resolvedRoles<R>() type narrowing ──────────
 
+// Document roles are typed as ("editor" | "viewer")[]
 async () => {
   const result = await typedEngine.resolvedRoles(actor, docRef);
+  expectType<("editor" | "viewer")[]>(result);
+};
+
+// Organization roles are typed as ("admin" | "member")[]
+async () => {
+  const result = await typedEngine.resolvedRoles(actor, orgRef);
+  expectType<("admin" | "member")[]>(result);
+};
+
+// Backward compat: defaultEngine returns string[]
+async () => {
+  const result = await defaultEngine.resolvedRoles(
+    { type: "User", id: "u1", attributes: {} },
+    { type: "Whatever", id: "w1" },
+  );
   expectType<string[]>(result);
 };
 
@@ -193,7 +264,7 @@ typedEngine.resolvedRoles(actor, { type: "Docuemnt" as const, id: "d1" });
 
 async () => {
   const result = await typedEngine.snapshot(actor, [docRef, orgRef]);
-  expectType<PermissionSnapshot>(result);
+  expectType<PermissionSnapshot<TestSchema>>(result);
 };
 
 // @ts-expect-error - "Docuemnt" is not a valid resource type

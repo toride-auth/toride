@@ -44,12 +44,15 @@ interface FieldAccessMap {
  *   permission check (can()).
  * - If there is no field_access section at all, all fields are unrestricted.
  */
-export async function canField(
-  engine: FieldAccessEngine,
-  actor: ActorRef,
+export async function canField<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+>(
+  engine: FieldAccessEngine<S>,
+  actor: ActorRef<S>,
   operation: "read" | "update",
-  resource: ResourceRef,
-  field: string,
+  resource: ResourceRef<S, R>,
+  field: keyof S["resourceAttributeMap"][R] & string,
   fieldAccess: FieldAccessMap | undefined,
   options?: CheckOptions,
 ): Promise<boolean> {
@@ -84,14 +87,17 @@ export async function canField(
  * - If the operation is NOT defined for that field, the field is unrestricted
  *   for that operation: include it if the actor has the resource-level permission.
  */
-export async function permittedFields(
-  engine: FieldAccessEngine,
-  actor: ActorRef,
+export async function permittedFields<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+>(
+  engine: FieldAccessEngine<S>,
+  actor: ActorRef<S>,
   operation: "read" | "update",
-  resource: ResourceRef,
+  resource: ResourceRef<S, R>,
   fieldAccess: FieldAccessMap | undefined,
   options?: CheckOptions,
-): Promise<string[]> {
+): Promise<(keyof S["resourceAttributeMap"][R] & string)[]> {
   // No field_access defined -> no declared fields to return
   if (!fieldAccess) {
     return [];
@@ -108,16 +114,17 @@ export async function permittedFields(
   // Check resource-level permission once (needed for unrestricted fields)
   let hasResourcePermission: boolean | undefined;
 
-  const permitted: string[] = [];
+  const permitted: (keyof S["resourceAttributeMap"][R] & string)[] = [];
 
   for (const fieldName of fieldNames) {
     const fieldDef = fieldAccess[fieldName];
     const allowedRoles = fieldDef?.[operation];
+    const typedFieldName = fieldName as keyof S["resourceAttributeMap"][R] & string;
 
     if (allowedRoles) {
       // Operation is restricted: check if actor has any of the allowed roles
       if (actorRoles.some((role) => allowedRoles.includes(role))) {
-        permitted.push(fieldName);
+        permitted.push(typedFieldName);
       }
     } else {
       // Operation not defined for this field -> unrestricted, check resource-level
@@ -125,7 +132,7 @@ export async function permittedFields(
         hasResourcePermission = await engine.can(actor, operation, resource, options);
       }
       if (hasResourcePermission) {
-        permitted.push(fieldName);
+        permitted.push(typedFieldName);
       }
     }
   }

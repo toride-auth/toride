@@ -21,11 +21,11 @@ const MAX_TRANSLATE_DEPTH = 100;
  * - NOT -> adapter.not()
  * - always/never -> throws (should be simplified out before translation)
  */
-export function translateConstraints<TQuery>(
+export function translateConstraints<TQueryMap extends Record<string, unknown>>(
   constraint: Constraint,
-  adapter: ConstraintAdapter<TQuery>,
+  adapter: ConstraintAdapter<TQueryMap>,
   _depth = 0,
-): TQuery {
+): TQueryMap[string] {
   if (_depth > MAX_TRANSLATE_DEPTH) {
     throw new Error(
       `translateConstraints exceeded maximum recursion depth (${MAX_TRANSLATE_DEPTH}). ` +

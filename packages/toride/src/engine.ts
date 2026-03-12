@@ -20,7 +20,6 @@ import type {
   QueryEvent,
 } from "./types.js";
 import type {
-  Constraint,
   ConstraintResult,
   ConstraintAdapter,
 } from "./partial/constraint-types.js";
@@ -142,11 +141,11 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     resources: ResourceRef<S>[],
     options?: CheckOptions,
-  ): Promise<PermissionSnapshot> {
+  ): Promise<PermissionSnapshot<S>> {
     return snapshotImpl(
-      this as unknown as SnapshotEngine,
-      actor as ActorRef,
-      resources as ResourceRef[],
+      this as unknown as SnapshotEngine<S>,
+      actor as ActorRef<S>,
+      resources as ResourceRef<S>[],
       options,
     );
   }
@@ -160,7 +159,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     operation: "read" | "update",
     resource: ResourceRef<S, R>,
-    field: string,
+    field: keyof S["resourceAttributeMap"][R] & string,
     options?: CheckOptions,
   ): Promise<boolean> {
     const r = resource as ResourceRef;
@@ -173,7 +172,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
       actor as ActorRef,
       operation,
       r,
-      field,
+      field as string,
       resourceBlock.field_access,
       options,
     );
@@ -188,7 +187,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     operation: "read" | "update",
     resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<string[]> {
+  ): Promise<(keyof S["resourceAttributeMap"][R] & string)[]> {
     const r = resource as ResourceRef;
     const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
@@ -201,7 +200,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
       r,
       resourceBlock.field_access,
       options,
-    );
+    ) as Promise<(keyof S["resourceAttributeMap"][R] & string)[]>;
   }
 
   /**
@@ -211,7 +210,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     actor: ActorRef<S>,
     resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<string[]> {
+  ): Promise<S["roleMap"][R][]> {
     const a = actor as ActorRef;
     const r = resource as ResourceRef;
     const resourceBlock = this.policy.resources[r.type];
@@ -226,7 +225,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
 
     const directRoles = result.resolvedRoles.direct;
     const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
-    return [...new Set([...directRoles, ...derivedRoleNames])];
+    return [...new Set([...directRoles, ...derivedRoleNames])] as S["roleMap"][R][];
   }
 
   /**
@@ -272,7 +271,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     action: S["permissionMap"][R],
     resourceType: R,
     options?: CheckOptions,
-  ): Promise<ConstraintResult> {
+  ): Promise<ConstraintResult<R>> {
     const a = actor as ActorRef;
     const act = action as string;
     const rt = resourceType as string;
@@ -291,18 +290,31 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     );
 
     this.fireQueryEvent(a, act, rt, constraintResult);
-    return constraintResult;
+    return constraintResult as ConstraintResult<R>;
   }
 
   /**
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
+   *
+   * Accepts ConstraintResult<R> from buildConstraints() and returns
+   * TQueryMap[R] — the adapter's mapped output type for resource R.
+   * The resource type R is inferred from the ConstraintResult phantom type.
    */
-  translateConstraints<TQuery>(
-    constraints: Constraint,
-    adapter: ConstraintAdapter<TQuery>,
-  ): TQuery {
-    return translateConstraintsImpl(constraints, adapter);
+  translateConstraints<
+    R extends string,
+    TQueryMap extends Record<string, unknown>,
+  >(
+    constraints: ConstraintResult<R>,
+    adapter: ConstraintAdapter<TQueryMap>,
+  ): TQueryMap[R] {
+    if ("unrestricted" in constraints || "forbidden" in constraints) {
+      throw new Error(
+        "Cannot translate unrestricted or forbidden ConstraintResult. " +
+        "Check for 'constraints' property before calling translateConstraints().",
+      );
+    }
+    return translateConstraintsImpl(constraints.constraints, adapter) as TQueryMap[R];
   }
 
   /**
