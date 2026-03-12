@@ -19,6 +19,9 @@ export type {
   StrictValidationResult,
 } from "./policy/validator.js";
 
+// ─── Schema Types ─────────────────────────────────────────────────
+export type { TorideSchema, DefaultSchema } from "./types.js";
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 export type {
   ActorRef,
