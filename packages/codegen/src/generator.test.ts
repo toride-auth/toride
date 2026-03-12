@@ -315,6 +315,147 @@ describe("generateTypes", () => {
     expect(() => generateTypes(policy)).toThrow(/Unsafe identifier/);
   });
 
+  it("generates never in RoleMap for resources with no roles", () => {
+    const policy = makePolicy({
+      resources: {
+        Webhook: {
+          roles: [],
+          permissions: ["trigger"],
+          grants: {},
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/Webhook:\s*never;/);
+    // Verify it's inside the RoleMap block
+    const roleMapBlock = output.slice(
+      output.indexOf("export interface RoleMap"),
+      output.indexOf("}", output.indexOf("export interface RoleMap")) + 1,
+    );
+    expect(roleMapBlock).toContain("Webhook: never;");
+  });
+
+  it("generates never in PermissionMap for resources with no permissions", () => {
+    const policy = makePolicy({
+      resources: {
+        Config: {
+          roles: ["admin"],
+          permissions: [],
+          grants: {},
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    const permMapBlock = output.slice(
+      output.indexOf("export interface PermissionMap"),
+      output.indexOf("}", output.indexOf("export interface PermissionMap")) + 1,
+    );
+    expect(permMapBlock).toContain("Config: never;");
+  });
+
+  it("full integration: policy exercising all codegen paths", () => {
+    const policy: Policy = {
+      version: "1",
+      actors: {
+        User: { attributes: { email: "string", active: "boolean" } },
+        ServiceAccount: { attributes: { scope: "string" } },
+      },
+      resources: {
+        Organization: {
+          roles: ["owner", "member"],
+          permissions: ["read", "manage"],
+          attributes: { name: "string", tier: "number" },
+          grants: { owner: ["all"], member: ["read"] },
+        },
+        Document: {
+          roles: ["viewer", "editor"],
+          permissions: ["read", "write", "delete"],
+          attributes: { title: "string", published: "boolean" },
+          relations: { org: "Organization", author: "User" },
+          grants: { viewer: ["read"], editor: ["read", "write", "delete"] },
+        },
+        AuditLog: {
+          roles: [],
+          permissions: ["read"],
+          grants: {},
+          relations: { org: "Organization" },
+        },
+        EmptyResource: {
+          roles: [],
+          permissions: [],
+          grants: {},
+        },
+      },
+    };
+    const output = generateTypes(policy);
+
+    // Actions: union of all unique permissions across resources
+    expect(output).toContain("export type Actions =");
+    for (const action of ["read", "manage", "write", "delete"]) {
+      expect(output).toContain(`"${action}"`);
+    }
+
+    // Resources: union of all resource names
+    for (const res of ["Organization", "Document", "AuditLog", "EmptyResource"]) {
+      expect(output).toContain(`"${res}"`);
+    }
+
+    // ActorTypes: both actors
+    expect(output).toMatch(/"User"/);
+    expect(output).toMatch(/"ServiceAccount"/);
+
+    // RoleMap: roles per resource, never for empty
+    expect(output).toMatch(/Organization:\s*"owner"\s*\|\s*"member"/);
+    expect(output).toMatch(/Document:\s*"viewer"\s*\|\s*"editor"/);
+    // AuditLog and EmptyResource have no roles
+    const roleMapStart = output.indexOf("export interface RoleMap");
+    const roleMapEnd = output.indexOf("}", roleMapStart) + 1;
+    const roleMap = output.slice(roleMapStart, roleMapEnd);
+    expect(roleMap).toMatch(/AuditLog:\s*never/);
+    expect(roleMap).toMatch(/EmptyResource:\s*never/);
+
+    // PermissionMap: permissions per resource, never for empty
+    const permMapStart = output.indexOf("export interface PermissionMap");
+    const permMapEnd = output.indexOf("}", permMapStart) + 1;
+    const permMap = output.slice(permMapStart, permMapEnd);
+    expect(permMap).toMatch(/Organization:\s*"read"\s*\|\s*"manage"/);
+    expect(permMap).toMatch(/EmptyResource:\s*never/);
+
+    // ResourceAttributeMap: typed for Organization/Document, Record<string, unknown> for others
+    expect(output).toMatch(/Organization:\s*\{\s*name:\s*string;\s*tier:\s*number;\s*\}/);
+    expect(output).toMatch(/Document:\s*\{\s*title:\s*string;\s*published:\s*boolean;\s*\}/);
+    expect(output).toMatch(/AuditLog:\s*Record<string, unknown>/);
+    expect(output).toMatch(/EmptyResource:\s*Record<string, unknown>/);
+
+    // ActorAttributeMap: typed for both actors
+    expect(output).toMatch(/User:\s*\{\s*email:\s*string;\s*active:\s*boolean;\s*\}/);
+    expect(output).toMatch(/ServiceAccount:\s*\{\s*scope:\s*string;\s*\}/);
+
+    // RelationMap: Document has relations, EmptyResource has none
+    expect(output).toMatch(/org:\s*"Organization"/);
+    expect(output).toMatch(/author:\s*"User"/);
+    // Extract the full RelationMap block (contains nested braces, so find the matching closing line)
+    const relationMapStart = output.indexOf("export interface RelationMap");
+    const relationMapSection = output.slice(relationMapStart, output.indexOf("export type ResolverMap"));
+    expect(relationMapSection).toMatch(/EmptyResource:\s*Record<string, never>/);
+
+    // GeneratedSchema: all 8 properties present
+    const schemaBlock = output.slice(output.indexOf("export interface GeneratedSchema"));
+    expect(schemaBlock).toContain("resources: Resources;");
+    expect(schemaBlock).toContain("actions: Actions;");
+    expect(schemaBlock).toContain("actorTypes: ActorTypes;");
+    expect(schemaBlock).toContain("permissionMap: PermissionMap;");
+    expect(schemaBlock).toContain("roleMap: RoleMap;");
+    expect(schemaBlock).toContain("resourceAttributeMap: ResourceAttributeMap;");
+    expect(schemaBlock).toContain("actorAttributeMap: ActorAttributeMap;");
+    expect(schemaBlock).toContain("relationMap: RelationMap;");
+
+    // Balanced braces
+    const openBraces = (output.match(/{/g) || []).length;
+    const closeBraces = (output.match(/}/g) || []).length;
+    expect(openBraces).toBe(closeBraces);
+  });
+
   it("produces valid TypeScript (no syntax errors)", () => {
     const output = generateTypes(makePolicy());
     // Basic structural checks

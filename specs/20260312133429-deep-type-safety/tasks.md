@@ -69,8 +69,8 @@
 
 ### Implementation for User Story 6
 
-- [ ] T014 [US6] Review and update `packages/codegen/src/generator.ts` to ensure generated schema emits all required type maps — per data-model.md, no structural changes should be needed, but verify `permissionMap`, `roleMap`, and `resourceAttributeMap` are correctly emitted
-- [ ] T015 [US6] Update codegen tests in `packages/codegen/src/generator.test.ts` to verify generated output includes all maps and satisfies `TorideSchema` interface
+- [X] T014 [US6] Review and update `packages/codegen/src/generator.ts` to ensure generated schema emits all required type maps — per data-model.md, no structural changes should be needed, but verify `permissionMap`, `roleMap`, and `resourceAttributeMap` are correctly emitted
+- [X] T015 [US6] Update codegen tests in `packages/codegen/src/generator.test.ts` to verify generated output includes all maps and satisfies `TorideSchema` interface
 
 **Checkpoint**: Codegen produces schemas that work with all updated engine/client signatures. `pnpm exec nx run @toride/codegen:build && pnpm exec nx run @toride/codegen:test` green.
 
