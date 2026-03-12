@@ -6,6 +6,8 @@
 // T095: Wire up canField() and permittedFields()
 
 import type {
+  TorideSchema,
+  DefaultSchema,
   ActorRef,
   ResourceRef,
   CheckOptions,
@@ -27,40 +29,44 @@ import { AttributeCache } from "./evaluation/cache.js";
 import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-builder.js";
 import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
 import { snapshot as snapshotImpl } from "./snapshot.js";
-import type { PermissionSnapshot } from "./snapshot.js";
+import type { PermissionSnapshot, SnapshotEngine } from "./snapshot.js";
 import {
   canField as canFieldImpl,
   permittedFields as permittedFieldsImpl,
 } from "./field-access.js";
+import type { FieldAccessEngine } from "./field-access.js";
 
 /**
  * Main authorization engine.
  * Creates a per-check cache, resolves direct roles, checks grants,
  * and returns boolean with default-deny semantics.
  */
-export class Toride {
+export class Toride<S extends TorideSchema = DefaultSchema> {
   private policy: Policy;
   private readonly resolvers: Resolvers;
   private readonly options: TorideOptions;
 
-  constructor(options: TorideOptions) {
+  constructor(options: TorideOptions<S>) {
     this.policy = options.policy;
-    this.resolvers = options.resolvers ?? {};
-    this.options = options;
+    this.resolvers = (options.resolvers ?? {}) as Resolvers;
+    this.options = options as unknown as TorideOptions;
   }
 
   /**
    * Check if an actor can perform an action on a resource.
    * Default-deny: returns false if resource type is unknown or no grants match.
    */
-  async can(
-    actor: ActorRef,
-    action: string,
-    resource: ResourceRef,
+  async can<R extends S["resources"]>(
+    actor: ActorRef<S>,
+    action: S["permissionMap"][R],
+    resource: ResourceRef<S, R>,
     options?: CheckOptions,
   ): Promise<boolean> {
-    const result = await this.evaluateInternal(actor, action, resource, options);
-    this.fireDecisionEvent(actor, action, resource, result);
+    const a = actor as ActorRef;
+    const r = resource as ResourceRef;
+    const act = action as string;
+    const result = await this.evaluateInternal(a, act, r, options);
+    this.fireDecisionEvent(a, act, r, result);
     return result.allowed;
   }
 
@@ -77,27 +83,32 @@ export class Toride {
    * T068: Return full ExplainResult with role derivation traces,
    * granted permissions, matched rules, and human-readable final decision.
    */
-  async explain(
-    actor: ActorRef,
-    action: string,
-    resource: ResourceRef,
+  async explain<R extends S["resources"]>(
+    actor: ActorRef<S>,
+    action: S["permissionMap"][R],
+    resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<ExplainResult> {
-    const result = await this.evaluateInternal(actor, action, resource, options);
-    this.fireDecisionEvent(actor, action, resource, result);
-    return result;
+  ): Promise<ExplainResult<S, R>> {
+    const a = actor as ActorRef;
+    const r = resource as ResourceRef;
+    const act = action as string;
+    const result = await this.evaluateInternal(a, act, r, options);
+    this.fireDecisionEvent(a, act, r, result);
+    return result as ExplainResult<S, R>;
   }
 
   /**
    * T069: Check all declared permissions for a resource and return permitted ones.
    * Uses a shared cache across all per-action evaluations.
    */
-  async permittedActions(
-    actor: ActorRef,
-    resource: ResourceRef,
+  async permittedActions<R extends S["resources"]>(
+    actor: ActorRef<S>,
+    resource: ResourceRef<S, R>,
     options?: CheckOptions,
-  ): Promise<string[]> {
-    const resourceBlock = this.policy.resources[resource.type];
+  ): Promise<S["permissionMap"][R][]> {
+    const a = actor as ActorRef;
+    const r = resource as ResourceRef;
+    const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
       return [];
     }
@@ -107,9 +118,9 @@ export class Toride {
 
     for (const action of resourceBlock.permissions) {
       const result = await this.evaluateInternal(
-        actor,
+        a,
         action,
-        resource,
+        r,
         options,
         sharedCache,
       );
@@ -118,7 +129,7 @@ export class Toride {
       }
     }
 
-    return permitted;
+    return permitted as S["permissionMap"][R][];
   }
 
   /**
@@ -128,11 +139,16 @@ export class Toride {
    * Suitable for serializing to the client via TorideClient.
    */
   async snapshot(
-    actor: ActorRef,
-    resources: ResourceRef[],
+    actor: ActorRef<S>,
+    resources: ResourceRef<S>[],
     options?: CheckOptions,
   ): Promise<PermissionSnapshot> {
-    return snapshotImpl(this, actor, resources, options);
+    return snapshotImpl(
+      this as unknown as SnapshotEngine,
+      actor as ActorRef,
+      resources as ResourceRef[],
+      options,
+    );
   }
 
   /**
@@ -140,46 +156,65 @@ export class Toride {
    * Restricted fields require the actor to have a role listed in field_access.
    * Unlisted fields are unrestricted: any actor with the resource-level permission can access them.
    */
-  async canField(
-    actor: ActorRef,
+  async canField<R extends S["resources"]>(
+    actor: ActorRef<S>,
     operation: "read" | "update",
-    resource: ResourceRef,
+    resource: ResourceRef<S, R>,
     field: string,
     options?: CheckOptions,
   ): Promise<boolean> {
-    const resourceBlock = this.policy.resources[resource.type];
+    const r = resource as ResourceRef;
+    const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
       return false;
     }
-    return canFieldImpl(this, actor, operation, resource, field, resourceBlock.field_access, options);
+    return canFieldImpl(
+      this as unknown as FieldAccessEngine,
+      actor as ActorRef,
+      operation,
+      r,
+      field,
+      resourceBlock.field_access,
+      options,
+    );
   }
 
   /**
    * T095: Return the list of declared field_access field names the actor can access
    * for the given operation. Only returns explicitly declared fields.
    */
-  async permittedFields(
-    actor: ActorRef,
+  async permittedFields<R extends S["resources"]>(
+    actor: ActorRef<S>,
     operation: "read" | "update",
-    resource: ResourceRef,
+    resource: ResourceRef<S, R>,
     options?: CheckOptions,
   ): Promise<string[]> {
-    const resourceBlock = this.policy.resources[resource.type];
+    const r = resource as ResourceRef;
+    const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
       return [];
     }
-    return permittedFieldsImpl(this, actor, operation, resource, resourceBlock.field_access, options);
+    return permittedFieldsImpl(
+      this as unknown as FieldAccessEngine,
+      actor as ActorRef,
+      operation,
+      r,
+      resourceBlock.field_access,
+      options,
+    );
   }
 
   /**
    * T070: Return flat deduplicated list of all resolved roles (direct + derived).
    */
-  async resolvedRoles(
-    actor: ActorRef,
-    resource: ResourceRef,
+  async resolvedRoles<R extends S["resources"]>(
+    actor: ActorRef<S>,
+    resource: ResourceRef<S, R>,
     options?: CheckOptions,
   ): Promise<string[]> {
-    const resourceBlock = this.policy.resources[resource.type];
+    const a = actor as ActorRef;
+    const r = resource as ResourceRef;
+    const resourceBlock = this.policy.resources[r.type];
     if (!resourceBlock) {
       return [];
     }
@@ -187,7 +222,7 @@ export class Toride {
     // Use any action just to trigger evaluation for role resolution;
     // pick the first permission or use a dummy
     const action = resourceBlock.permissions[0] ?? "__resolvedRoles__";
-    const result = await this.evaluateInternal(actor, action, resource, options);
+    const result = await this.evaluateInternal(a, action, r, options);
 
     const directRoles = result.resolvedRoles.direct;
     const derivedRoleNames = result.resolvedRoles.derived.map((d) => d.role);
@@ -199,26 +234,29 @@ export class Toride {
    * Returns boolean[] in the same order as the input checks.
    */
   async canBatch(
-    actor: ActorRef,
-    checks: BatchCheckItem[],
+    actor: ActorRef<S>,
+    checks: BatchCheckItem<S>[],
     options?: CheckOptions,
   ): Promise<boolean[]> {
     if (checks.length === 0) {
       return [];
     }
 
+    const a = actor as ActorRef;
     const sharedCache = new AttributeCache(this.resolvers);
     const results: boolean[] = [];
 
     for (const check of checks) {
+      const r = check.resource as ResourceRef;
+      const act = check.action as string;
       const result = await this.evaluateInternal(
-        actor,
-        check.action,
-        check.resource,
+        a,
+        act,
+        r,
         options,
         sharedCache,
       );
-      this.fireDecisionEvent(actor, check.action, check.resource, result);
+      this.fireDecisionEvent(a, act, r, result);
       results.push(result.allowed);
     }
 
@@ -229,17 +267,20 @@ export class Toride {
    * T064: Build constraint AST for partial evaluation / data filtering.
    * Returns ConstraintResult with unrestricted/forbidden sentinels or constraint AST.
    */
-  async buildConstraints(
-    actor: ActorRef,
-    action: string,
-    resourceType: string,
+  async buildConstraints<R extends S["resources"]>(
+    actor: ActorRef<S>,
+    action: S["permissionMap"][R],
+    resourceType: R,
     options?: CheckOptions,
   ): Promise<ConstraintResult> {
+    const a = actor as ActorRef;
+    const act = action as string;
+    const rt = resourceType as string;
     const cache = new AttributeCache(this.resolvers);
     const constraintResult = await buildConstraintsImpl(
-      actor,
-      action,
-      resourceType,
+      a,
+      act,
+      rt,
       cache,
       this.policy,
       {
@@ -249,7 +290,7 @@ export class Toride {
       },
     );
 
-    this.fireQueryEvent(actor, action, resourceType, constraintResult);
+    this.fireQueryEvent(a, act, rt, constraintResult);
     return constraintResult;
   }
 
@@ -393,6 +434,6 @@ export class Toride {
 /**
  * Typed factory function for creating a Toride instance.
  */
-export function createToride(options: TorideOptions): Toride {
-  return new Toride(options);
+export function createToride<S extends TorideSchema = DefaultSchema>(options: TorideOptions<S>): Toride<S> {
+  return new Toride<S>(options);
 }

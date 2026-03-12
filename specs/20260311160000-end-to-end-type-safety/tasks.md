@@ -65,15 +65,15 @@
 
 **Independent Test**: `can(actor, "read", { type: "Document", ... })` compiles. `can(actor, "reed", ...)` errors. `explain()` return has typed `grantedPermissions`. `permittedActions()` returns typed array.
 
-- [ ] T014 [US1] Make `Toride<S extends TorideSchema = DefaultSchema>` class generic in `packages/toride/src/engine.ts` — add type parameter, update constructor to accept `TorideOptions<S>`
-- [ ] T015 [US1] Add generic signatures to `can<R>()` and `explain<R>()` in `packages/toride/src/engine.ts` — action narrowed to `S["permissionMap"][R]`, resource typed as `ResourceRef<S, R>`
-- [ ] T016 [US5] Add generic signatures to `canBatch()`, `permittedActions<R>()`, `buildConstraints<R>()` in `packages/toride/src/engine.ts` — batch uses global `S["actions"]`, others narrow per resource
-- [ ] T017 [US5] Add generic signatures to `canField<R>()`, `permittedFields<R>()`, `resolvedRoles<R>()`, `snapshot()` in `packages/toride/src/engine.ts`
-- [ ] T018 [P] [US5] Make `SnapshotEngine` interface generic in `packages/toride/src/snapshot.ts`
-- [ ] T019 [P] [US5] Make `FieldAccessEngine` interface generic in `packages/toride/src/field-access.ts`
-- [ ] T020 [US1] Make `createToride<S>()` factory function generic in `packages/toride/src/engine.ts`
-- [ ] T021 [P] [US1] Write type tests in `packages/toride/src/__typetests__/engine.test-d.ts` — verify can(), explain(), permittedActions() type narrowing, @ts-expect-error on typos
-- [ ] T022 [P] [US2] Write type tests in `packages/toride/src/__typetests__/resolvers.test-d.ts` — verify resolver return type enforcement, resolver key narrowing
+- [X] T014 [US1] Make `Toride<S extends TorideSchema = DefaultSchema>` class generic in `packages/toride/src/engine.ts` — add type parameter, update constructor to accept `TorideOptions<S>`
+- [X] T015 [US1] Add generic signatures to `can<R>()` and `explain<R>()` in `packages/toride/src/engine.ts` — action narrowed to `S["permissionMap"][R]`, resource typed as `ResourceRef<S, R>`
+- [X] T016 [US5] Add generic signatures to `canBatch()`, `permittedActions<R>()`, `buildConstraints<R>()` in `packages/toride/src/engine.ts` — batch uses global `S["actions"]`, others narrow per resource
+- [X] T017 [US5] Add generic signatures to `canField<R>()`, `permittedFields<R>()`, `resolvedRoles<R>()`, `snapshot()` in `packages/toride/src/engine.ts`
+- [X] T018 [P] [US5] Make `SnapshotEngine` interface generic in `packages/toride/src/snapshot.ts`
+- [X] T019 [P] [US5] Make `FieldAccessEngine` interface generic in `packages/toride/src/field-access.ts`
+- [X] T020 [US1] Make `createToride<S>()` factory function generic in `packages/toride/src/engine.ts`
+- [X] T021 [P] [US1] Write type tests in `packages/toride/src/__typetests__/engine.test-d.ts` — verify can(), explain(), permittedActions() type narrowing, @ts-expect-error on typos
+- [X] T022 [P] [US2] Write type tests in `packages/toride/src/__typetests__/resolvers.test-d.ts` — verify resolver return type enforcement, resolver key narrowing
 
 **Checkpoint**: Engine class is fully generic. Type tests pass. All existing runtime tests pass unchanged (`pnpm exec nx run toride:test`).
 

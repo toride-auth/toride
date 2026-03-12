@@ -1,6 +1,6 @@
 // T081: snapshot() - Server-side permission snapshot generation
 
-import type { ActorRef, ResourceRef, CheckOptions } from "./types.js";
+import type { TorideSchema, DefaultSchema, ActorRef, ResourceRef, CheckOptions } from "./types.js";
 
 /**
  * A serializable map of permissions keyed by "Type:id".
@@ -12,11 +12,12 @@ export type PermissionSnapshot = Record<string, string[]>;
 /**
  * Interface for the engine methods needed by snapshot().
  * Keeps snapshot decoupled from the full Toride class.
+ * Generic over TorideSchema for type safety when used with Toride<S>.
  */
-export interface SnapshotEngine {
+export interface SnapshotEngine<S extends TorideSchema = DefaultSchema> {
   permittedActions(
-    actor: ActorRef,
-    resource: ResourceRef,
+    actor: ActorRef<S>,
+    resource: ResourceRef<S>,
     options?: CheckOptions,
   ): Promise<string[]>;
 }
