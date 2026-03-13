@@ -169,6 +169,8 @@ chore: update dependencies
 - N/A (in-process library) (default-resolver)
 - TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test), tsd (type testing) (improve-typesafety)
 - TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), tsd (type testing) (improve-typesafety2)
+- TypeScript (strict mode), Node.js 20+ LTS + valibot ^1.2.0, yaml ^2.3.0, tsup (build), vitest (test) (lint)
+- N/A (file-based: generated JSON Schema artifact) (lint)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

@@ -1,7 +1,7 @@
-name: simple
-description: Lightweight pipeline — implement → review → fix loop → finalize with PR creation
+name: simple-impl
+description: Lightweight pipeline — plan → implement → review → fix loop → finalize with PR creation
 max_movements: 10
-initial_movement: implement
+initial_movement: plan
 
 piece_config:
   provider_options:
@@ -12,23 +12,46 @@ piece_config:
 # --- Section Maps ---
 
 personas:
+  planner: ../facets/personas/planner.md
   coder: ../facets/personas/coder.md
   code-quality-reviewer: ../facets/personas/code-quality-reviewer.md
   finalizer: ../facets/personas/finalizer.md
 
 instructions:
+  plan: ../facets/instructions/plan.md
   implement: ../facets/instructions/implement.md
   review-general: ../facets/instructions/review-general.md
   fix: ../facets/instructions/fix.md
   finalize: ../facets/instructions/finalize.md
 
 report_formats:
+  plan: ../facets/output-contracts/plan-report.md
   implementation: ../facets/output-contracts/implementation-report.md
 
 # --- Movements ---
 
 movements:
-  # 1. Implementation (OpenCode / opencode/minimax-m2.5-free)
+  # 1. Planning (Claude)
+  - name: plan
+    persona: planner
+    instruction: plan
+    edit: false
+    provider: claude
+    output_contracts:
+      report:
+        - name: plan.md
+          format: plan
+    rules:
+      - condition: "Plan is ready"
+        next: implement
+      - condition: "Blocked — unresolved questions"
+        next: ABORT
+        requires_user_input: true
+        appendix: |
+          The planner has identified blockers.
+          Please provide clarification and re-run.
+
+  # 2. Implementation (OpenCode / opencode/minimax-m2.5-free)
   - name: implement
     persona: coder
     instruction: implement
@@ -46,7 +69,7 @@ movements:
       - condition: "Unrecoverable error"
         next: ABORT
 
-  # 2. Review (Codex / gpt-5.4, reasoning_effort=high from ~/.codex/config.toml)
+  # 3. Review (Codex / gpt-5.4, reasoning_effort=high from ~/.codex/config.toml)
   - name: review
     persona: code-quality-reviewer
     instruction: review-general
@@ -59,7 +82,7 @@ movements:
       - condition: "Changes needed"
         next: fix
 
-  # 3. Fix (OpenCode / opencode/minimax-m2.5-free)
+  # 4. Fix (OpenCode / opencode/minimax-m2.5-free)
   - name: fix
     persona: coder
     instruction: fix
@@ -71,7 +94,7 @@ movements:
       - condition: "Fixes applied"
         next: review
 
-  # 4. Finalize (Claude)
+  # 5. Finalize (Claude)
   - name: finalize
     persona: finalizer
     instruction: finalize

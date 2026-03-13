@@ -1,4 +1,4 @@
-name: default
+name: full-impl
 description: Full pipeline — plan → implement → 3-parallel review (code quality, security, performance) → fix loop → finalize with PR creation
 max_movements: 15
 initial_movement: plan
