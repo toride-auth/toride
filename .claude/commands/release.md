@@ -198,18 +198,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Phase 6: Git Commands Output
 
-After file updates are complete, output the exact commands the maintainer should run. Do NOT execute `git tag` or `git push` yourself.
+After file updates are complete, output the exact commands the maintainer should run. Do NOT execute `git tag`, `git push`, or `gh pr create` yourself.
+
+The release uses a **branch + PR flow** to avoid pushing directly to `main` (which is typically protected).
 
 ```bash
+git checkout -b release/vX.Y.Z
 git add CHANGELOG.md package.json packages/*/package.json
 git commit -m "chore: release vX.Y.Z"
+git push -u origin release/vX.Y.Z
+gh pr create --title "chore: release vX.Y.Z" --body "Release vX.Y.Z — see CHANGELOG.md for details."
+```
+
+After the PR is merged to `main`, tag the release from `main`:
+
+```bash
+git checkout main
+git pull origin main
 git tag vX.Y.Z
-git push origin main vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 Replace `X.Y.Z` with the actual approved version.
 
-Tell the maintainer: "Copy and run these commands to finalize the release. The `git push` will trigger the publish workflow (once configured)."
+Tell the maintainer: "Copy and run these commands to finalize the release. After the PR is merged, the tag push will trigger the publish workflow (once configured)."
 
 ---
 
