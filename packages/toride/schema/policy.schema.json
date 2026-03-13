@@ -1,0 +1,1139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://toride-auth.github.io/toride/schema/policy.schema.json",
+  "title": "Toride Policy",
+  "description": "Schema for toride authorization policy files (YAML or JSON)",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": "1",
+      "title": "Policy Version",
+      "description": "The version of the policy format (must be '1')"
+    },
+    "actors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "title": "Attributes",
+            "description": "Attribute definitions for this actor or resource type"
+          }
+        },
+        "required": [
+          "attributes"
+        ],
+        "additionalProperties": false
+      },
+      "title": "Actors",
+      "description": "Define actor types and their attributes that can perform actions"
+    },
+    "global_roles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "actor_type": {
+            "type": "string"
+          },
+          "when": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "any": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ConditionExpression"
+                    }
+                  }
+                },
+                "required": [
+                  "any"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "all": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/ConditionExpression"
+                    }
+                  }
+                },
+                "required": [
+                  "all"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "eq": {}
+                          },
+                          "required": [
+                            "eq"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "neq": {}
+                          },
+                          "required": [
+                            "neq"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "gt": {}
+                          },
+                          "required": [
+                            "gt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "gte": {}
+                          },
+                          "required": [
+                            "gte"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lt": {}
+                          },
+                          "required": [
+                            "lt"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lte": {}
+                          },
+                          "required": [
+                            "lte"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "in": {
+                              "anyOf": [
+                                {
+                                  "type": "array",
+                                  "items": {}
+                                },
+                                {
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "in"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "includes": {}
+                          },
+                          "required": [
+                            "includes"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "exists": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "exists"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "startsWith": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "startsWith"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "endsWith": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "endsWith"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "contains": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "contains"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "custom": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "custom"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ],
+            "title": "Condition",
+            "description": "Condition expression that must evaluate to true for the rule to apply"
+          }
+        },
+        "required": [
+          "actor_type",
+          "when"
+        ],
+        "additionalProperties": false
+      },
+      "title": "Global Roles",
+      "description": "Define roles that apply based on actor attributes without requiring resource context"
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "description": "List of roles defined for this resource"
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "Permissions",
+            "description": "List of permissions available for this resource"
+          },
+          "attributes": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "title": "Attributes",
+            "description": "Attribute definitions for this actor or resource type"
+          },
+          "relations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Relations",
+            "description": "Define relations to other resource types for role derivation"
+          },
+          "grants": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "title": "Grants",
+            "description": "Map roles to permissions (or 'all' for all permissions)"
+          },
+          "derived_roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "title": "Role",
+                  "description": "The role name"
+                },
+                "from_global_role": {
+                  "type": "string"
+                },
+                "from_role": {
+                  "type": "string"
+                },
+                "on_relation": {
+                  "type": "string"
+                },
+                "from_relation": {
+                  "type": "string"
+                },
+                "actor_type": {
+                  "type": "string"
+                },
+                "when": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "any": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/ConditionExpression"
+                          }
+                        }
+                      },
+                      "required": [
+                        "any"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "all": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/ConditionExpression"
+                          }
+                        }
+                      },
+                      "required": [
+                        "all"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "eq": {}
+                                },
+                                "required": [
+                                  "eq"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "neq": {}
+                                },
+                                "required": [
+                                  "neq"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "gt": {}
+                                },
+                                "required": [
+                                  "gt"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "gte": {}
+                                },
+                                "required": [
+                                  "gte"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "lt": {}
+                                },
+                                "required": [
+                                  "lt"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "lte": {}
+                                },
+                                "required": [
+                                  "lte"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "in": {
+                                    "anyOf": [
+                                      {
+                                        "type": "array",
+                                        "items": {}
+                                      },
+                                      {
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "in"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "includes": {}
+                                },
+                                "required": [
+                                  "includes"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "exists": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "exists"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "startsWith": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "startsWith"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "endsWith": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "endsWith"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "contains": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "contains"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "custom": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "custom"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "title": "Condition",
+                  "description": "Condition expression that must evaluate to true for the rule to apply"
+                }
+              },
+              "required": [
+                "role"
+              ],
+              "additionalProperties": false
+            },
+            "title": "Derived Roles",
+            "description": "Define roles derived from global roles, other roles, or relations"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "effect": {
+                  "enum": [
+                    "permit",
+                    "forbid"
+                  ],
+                  "title": "Effect",
+                  "description": "The effect of the rule (allow or forbid)"
+                },
+                "roles": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Roles",
+                  "description": "List of roles defined for this resource"
+                },
+                "permissions": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Permissions",
+                  "description": "List of permissions available for this resource"
+                },
+                "when": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "any": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/ConditionExpression"
+                          }
+                        }
+                      },
+                      "required": [
+                        "any"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "all": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/ConditionExpression"
+                          }
+                        }
+                      },
+                      "required": [
+                        "all"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "eq": {}
+                                },
+                                "required": [
+                                  "eq"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "neq": {}
+                                },
+                                "required": [
+                                  "neq"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "gt": {}
+                                },
+                                "required": [
+                                  "gt"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "gte": {}
+                                },
+                                "required": [
+                                  "gte"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "lt": {}
+                                },
+                                "required": [
+                                  "lt"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "lte": {}
+                                },
+                                "required": [
+                                  "lte"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "in": {
+                                    "anyOf": [
+                                      {
+                                        "type": "array",
+                                        "items": {}
+                                      },
+                                      {
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "in"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "includes": {}
+                                },
+                                "required": [
+                                  "includes"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "exists": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "exists"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "startsWith": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "startsWith"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "endsWith": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "endsWith"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "contains": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "contains"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "custom": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "custom"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "title": "Condition",
+                  "description": "Condition expression that must evaluate to true for the rule to apply"
+                }
+              },
+              "required": [
+                "effect",
+                "permissions",
+                "when"
+              ],
+              "additionalProperties": false
+            },
+            "title": "Rules",
+            "description": "Access rules that can override grants with conditions"
+          },
+          "field_access": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "read": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "update": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "title": "Field Access",
+            "description": "Define field-level access controls"
+          }
+        },
+        "required": [
+          "roles",
+          "permissions"
+        ],
+        "additionalProperties": false
+      },
+      "title": "Resources",
+      "description": "Define resource types, roles, permissions, and access rules"
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name identifier"
+          },
+          "actor": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": {},
+                "title": "Attributes",
+                "description": "Attribute definitions for this actor or resource type"
+              }
+            },
+            "required": [
+              "type",
+              "id",
+              "attributes"
+            ],
+            "additionalProperties": false,
+            "title": "Actor",
+            "description": "The actor performing the action"
+          },
+          "resolvers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {}
+            }
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "The action being performed"
+          },
+          "resource": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": {},
+                "title": "Attributes",
+                "description": "Attribute definitions for this actor or resource type"
+              }
+            },
+            "required": [
+              "type",
+              "id"
+            ],
+            "additionalProperties": false,
+            "title": "Resource",
+            "description": "The resource being accessed"
+          },
+          "expected": {
+            "enum": [
+              "allow",
+              "deny"
+            ],
+            "title": "Expected",
+            "description": "Expected result (allow or deny)"
+          }
+        },
+        "required": [
+          "name",
+          "actor",
+          "action",
+          "resource",
+          "expected"
+        ],
+        "additionalProperties": false
+      },
+      "title": "Tests",
+      "description": "Inline test cases to verify policy behavior"
+    }
+  },
+  "required": [
+    "version",
+    "actors",
+    "resources"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ConditionExpression": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ConditionExpression"
+              }
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ConditionExpression"
+              }
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "eq": {}
+                    },
+                    "required": [
+                      "eq"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "neq": {}
+                    },
+                    "required": [
+                      "neq"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "gt": {}
+                    },
+                    "required": [
+                      "gt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "gte": {}
+                    },
+                    "required": [
+                      "gte"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "lt": {}
+                    },
+                    "required": [
+                      "lt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "lte": {}
+                    },
+                    "required": [
+                      "lte"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "in": {
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {}
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "in"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "includes": {}
+                    },
+                    "required": [
+                      "includes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "exists": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "exists"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "startsWith": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "startsWith"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "endsWith": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "endsWith"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "contains": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "contains"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "custom": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "custom"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

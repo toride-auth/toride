@@ -19,6 +19,7 @@
     },
     "test": {
       "cache": true,
+      "dependsOn": ["build"],
       "inputs": ["default", "^production"]
     },
     "lint": {

@@ -23,6 +23,7 @@ export default defineConfig({
       { text: "Guide", link: "/guide/why-toride" },
       { text: "Concepts", link: "/concepts/policy-format" },
       { text: "Integrations", link: "/integrations/prisma" },
+      { text: "Reference", link: "/reference/cli" },
     ],
 
     sidebar: [
@@ -63,6 +64,13 @@ export default defineConfig({
           { text: "Prisma", link: "/integrations/prisma" },
           { text: "Drizzle", link: "/integrations/drizzle" },
           { text: "Codegen", link: "/integrations/codegen" },
+        ],
+      },
+      {
+        text: "Reference",
+        items: [
+          { text: "CLI", link: "/reference/cli" },
+          { text: "IDE Setup", link: "/reference/ide-setup" },
         ],
       },
     ],

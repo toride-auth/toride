@@ -30,3 +30,7 @@ jobs:
       - uses: nrwl/nx-set-shas@3e9ad7370203c1e93d109be57f3b72eb0eb511b1  # v4
 
       - run: pnpm exec nx affected -t lint test build
+
+      - name: Check schema freshness
+        run: git diff --exit-code packages/toride/schema/policy.schema.json
+        shell: bash
