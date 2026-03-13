@@ -36,15 +36,15 @@
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T003 [P] [US1] Write unit tests for the valibot-to-JSON-Schema converter in `packages/toride/tests/generate-schema.test.ts` — test each valibot construct mapping (object, string, literal, picklist, array, record, optional, union, unknown, lazy) and verify correct JSON Schema output per research.md R1 mapping table
-- [ ] T004 [P] [US1] Write snapshot test in `packages/toride/tests/generate-schema.test.ts` that imports the real `PolicySchema`, runs the converter, and snapshots the full generated JSON Schema output for regression detection
+- [X] T003 [P] [US1] Write unit tests for the valibot-to-JSON-Schema converter in `packages/toride/tests/generate-schema.test.ts` — test each valibot construct mapping (object, string, literal, picklist, array, record, optional, union, unknown, lazy) and verify correct JSON Schema output per research.md R1 mapping table
+- [X] T004 [P] [US1] Write snapshot test in `packages/toride/tests/generate-schema.test.ts` that imports the real `PolicySchema`, runs the converter, and snapshots the full generated JSON Schema output for regression detection
 
 ### Implementation for US1+US2
 
-- [ ] T005 [US1] Implement the hand-written valibot-to-JSON-Schema converter script in `packages/toride/scripts/generate-schema.mjs` — import compiled valibot schemas from `dist/`, pattern-match on valibot types per research.md R1 table, handle recursive `ConditionExpression` via `$defs`/`$ref` (R2), add `title`/`description` metadata (R7), output `schema/policy.schema.json` conforming to the contract in `contracts/json-schema-contract.md`
-- [ ] T006 [US2] Update `packages/toride/tsup.config.ts` to add an `onSuccess` hook that runs `node scripts/generate-schema.mjs` after compilation (R3)
-- [ ] T007 [US2] Add schema drift check step to `.github/workflows/ci.yml` — after the build step, run `git diff --exit-code packages/toride/schema/policy.schema.json` with a clear failure message (R4)
-- [ ] T008 [US1] Run `pnpm exec nx run toride:build` to generate `packages/toride/schema/policy.schema.json` and commit the generated file
+- [X] T005 [US1] Implement the hand-written valibot-to-JSON-Schema converter script in `packages/toride/scripts/generate-schema.mjs` — import compiled valibot schemas from `dist/`, pattern-match on valibot types per research.md R1 table, handle recursive `ConditionExpression` via `$defs`/`$ref` (R2), add `title`/`description` metadata (R7), output `schema/policy.schema.json` conforming to the contract in `contracts/json-schema-contract.md`
+- [X] T006 [US2] Update `packages/toride/tsup.config.ts` to add an `onSuccess` hook that runs `node scripts/generate-schema.mjs` after compilation (R3)
+- [X] T007 [US2] Add schema drift check step to `.github/workflows/ci.yml` — after the build step, run `git diff --exit-code packages/toride/schema/policy.schema.json` with a clear failure message (R4)
+- [X] T008 [US1] Run `pnpm exec nx run toride:build` to generate `packages/toride/schema/policy.schema.json` and commit the generated file
 
 **Checkpoint**: Schema generation works end-to-end — build produces the JSON Schema, tests pass, CI will catch drift
 
@@ -58,8 +58,8 @@
 
 ### Implementation for US3
 
-- [ ] T009 [US3] Create CLI reference docs page at `docs/reference/cli.md` — document `toride validate` (synopsis, `--strict` flag, exit codes, output examples) and `toride test` (synopsis, glob support, inline vs separate test files, exit codes, output examples) per `contracts/cli-reference-contract.md`
-- [ ] T010 [US3] Update VitePress sidebar config in `docs/.vitepress/config.ts` to add a "Reference" top-level section with the CLI reference page link
+- [X] T009 [US3] Create CLI reference docs page at `docs/reference/cli.md` — document `toride validate` (synopsis, `--strict` flag, exit codes, output examples) and `toride test` (synopsis, glob support, inline vs separate test files, exit codes, output examples) per `contracts/cli-reference-contract.md`
+- [X] T010 [US3] Update VitePress sidebar config in `docs/.vitepress/config.ts` to add a "Reference" top-level section with the CLI reference page link
 
 ---
 
@@ -71,8 +71,8 @@
 
 ### Implementation for US4
 
-- [ ] T011 [P] [US4] Create IDE setup guide at `docs/reference/ide-setup.md` — cover VS Code + Red Hat YAML extension setup, per-file schema comment method, workspace settings method (both from `contracts/json-schema-contract.md` integration points), and a general note for other editors supporting YAML language server
-- [ ] T012 [US4] Update VitePress sidebar config in `docs/.vitepress/config.ts` to add the IDE setup guide link under the "Reference" section (alongside CLI reference from T010)
+- [X] T011 [P] [US4] Create IDE setup guide at `docs/reference/ide-setup.md` — cover VS Code + Red Hat YAML extension setup, per-file schema comment method, workspace settings method (both from `contracts/json-schema-contract.md` integration points), and a general note for other editors supporting YAML language server
+- [X] T012 [US4] Update VitePress sidebar config in `docs/.vitepress/config.ts` to add the IDE setup guide link under the "Reference" section (alongside CLI reference from T010)
 
 **Checkpoint**: Both docs pages live, sidebar updated, reference section complete
 
@@ -82,10 +82,10 @@
 
 **Purpose**: Final validation and cleanup
 
-- [ ] T013 Run all tests via `pnpm exec nx run toride:test` and fix any failures
-- [ ] T014 Run full build via `pnpm run build` and verify schema output matches snapshot
-- [ ] T015 Validate quickstart.md workflow end-to-end: install, add schema comment, verify IDE validation works
-- [ ] T016 Run `pnpm run lint` across all affected packages and fix any issues
+- [X] T013 Run all tests via `pnpm exec nx run toride:test` and fix any failures
+- [X] T014 Run full build via `pnpm run build` and verify schema output matches snapshot
+- [X] T015 Validate quickstart.md workflow end-to-end: install, add schema comment, verify IDE validation works
+- [X] T016 Run `pnpm run lint` across all affected packages and fix any issues
 
 ---
 
