@@ -1,5 +1,5 @@
 name: simple-impl
-description: Lightweight pipeline — plan → implement → review → fix loop → finalize with PR creation
+description: Lightweight pipeline — plan → implement → review → replan loop → finalize with squash commit and PR
 max_movements: 10
 initial_movement: plan
 
@@ -19,14 +19,15 @@ personas:
 
 instructions:
   plan: ../facets/instructions/plan.md
+  replan: ../facets/instructions/replan.md
   implement: ../facets/instructions/implement.md
   review-general: ../facets/instructions/review-general.md
-  fix: ../facets/instructions/fix.md
   finalize: ../facets/instructions/finalize.md
 
 report_formats:
   plan: ../facets/output-contracts/plan-report.md
   implementation: ../facets/output-contracts/implementation-report.md
+  review: ../facets/output-contracts/review-report.md
 
 # --- Movements ---
 
@@ -57,6 +58,7 @@ movements:
     instruction: implement
     edit: true
     required_permission_mode: edit
+    session: refresh
     provider: opencode
     model: opencode/minimax-m2.5-free
     output_contracts:
@@ -76,23 +78,36 @@ movements:
     edit: false
     provider: codex
     model: gpt-5.4
+    output_contracts:
+      report:
+        - name: review.md
+          format: review
     rules:
       - condition: "Implementation is acceptable"
         next: finalize
       - condition: "Changes needed"
-        next: fix
+        next: replan
 
-  # 4. Fix (OpenCode / opencode/minimax-m2.5-free)
-  - name: fix
-    persona: coder
-    instruction: fix
-    edit: true
-    required_permission_mode: edit
-    provider: opencode
-    model: opencode/minimax-m2.5-free
+  # 4. Re-plan (Claude) — creates a targeted fix plan from review feedback
+  - name: replan
+    persona: planner
+    instruction: replan
+    edit: false
+    session: refresh
+    provider: claude
+    output_contracts:
+      report:
+        - name: plan.md
+          format: plan
     rules:
-      - condition: "Fixes applied"
-        next: review
+      - condition: "Fix plan is ready"
+        next: implement
+      - condition: "Blocked — fundamental design issues"
+        next: ABORT
+        requires_user_input: true
+        appendix: |
+          The review findings reveal fundamental design issues.
+          Please provide guidance and re-run.
 
   # 5. Finalize (Claude)
   - name: finalize
@@ -110,15 +125,15 @@ movements:
 # --- Loop Monitors ---
 
 loop_monitors:
-  - cycle: [review, fix]
+  - cycle: [review, replan, implement]
     threshold: 3
     judge:
-      persona: coder
+      persona: planner
       instruction: |
-        The review ↔ fix loop has repeated {cycle_count} times.
-        Evaluate whether meaningful progress is being made.
+        The review → replan → implement loop has repeated {cycle_count} times.
+        Evaluate whether meaningful progress is being made toward resolving review findings.
       rules:
         - condition: "Progress is being made, continue"
-          next: fix
+          next: replan
         - condition: "No progress, abort"
           next: ABORT
