@@ -1,6 +1,9 @@
 // toride - Relation-aware authorization engine for TypeScript
 export const VERSION = "0.0.1";
 
+// ─── Policy Schema (for JSON Schema generation) ─────────────────────
+export { PolicySchema, ConditionExpressionSchema } from "./policy/schema.js";
+
 // ─── Policy Loading (T020) ────────────────────────────────────────
 export { loadYaml, loadJson } from "./policy/parser.js";
 

@@ -6,4 +6,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   outDir: "dist",
+  onSuccess: "node scripts/generate-schema.mjs",
 });
