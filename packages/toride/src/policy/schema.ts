@@ -6,10 +6,75 @@ import * as v from "valibot";
 
 export const AttributeTypeSchema = v.picklist(["string", "number", "boolean"]);
 
-// ─── Actor Declaration ────────────────────────────────────────────
+// ─── Attribute Schema Node (recursive, max depth 3) ───────────────
+
+const MAX_ATTRIBUTE_DEPTH = 3;
+
+function getAttributeDepth(schema: unknown, currentDepth = 0): number {
+  if (typeof schema !== "object" || schema === null) {
+    return currentDepth;
+  }
+
+  const obj = schema as Record<string, unknown>;
+
+  if (obj.kind === "primitive") {
+    return currentDepth;
+  }
+
+  if (obj.kind === "object" && typeof obj.fields === "object" && obj.fields !== null) {
+    const fields = obj.fields as Record<string, unknown>;
+    let maxDepth = currentDepth;
+    for (const field of Object.values(fields)) {
+      const fieldDepth = getAttributeDepth(field, currentDepth + 1);
+      if (fieldDepth > maxDepth) {
+        maxDepth = fieldDepth;
+      }
+    }
+    return maxDepth;
+  }
+
+  if (obj.kind === "array" && typeof obj.items === "object" && obj.items !== null) {
+    return getAttributeDepth(obj.items, currentDepth);
+  }
+
+  return currentDepth;
+}
+
+function checkAttributeDepth(input: unknown): boolean {
+  return getAttributeDepth(input) <= MAX_ATTRIBUTE_DEPTH;
+}
+
+const PrimitiveAttributeSchemaNodeSchema = v.object({
+  kind: v.literal("primitive"),
+  type: AttributeTypeSchema,
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ObjectAttributeSchemaNodeSchema: any = v.object({
+  kind: v.literal("object"),
+  fields: v.record(v.string(), v.lazy(() => AttributeSchemaNodeSchema)),
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ArrayAttributeSchemaNodeSchema: any = v.object({
+  kind: v.literal("array"),
+  items: v.lazy(() => AttributeSchemaNodeSchema),
+});
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const AttributeSchemaNodeSchema: any = v.pipe(
+  v.union([
+    PrimitiveAttributeSchemaNodeSchema,
+    ObjectAttributeSchemaNodeSchema,
+    ArrayAttributeSchemaNodeSchema,
+  ]),
+  v.check(checkAttributeDepth, "Attribute schema exceeds maximum depth of 3"),
+);
+
+// ─── Actor Declaration ────────────────────────────────────────────────
 
 export const ActorDeclarationSchema = v.object({
-  attributes: v.record(v.string(), AttributeTypeSchema),
+  attributes: v.record(v.string(), AttributeSchemaNodeSchema),
 });
 
 // ─── Condition Value ──────────────────────────────────────────────
@@ -100,7 +165,7 @@ export const FieldAccessDefSchema = v.object({
 export const ResourceBlockSchema = v.object({
   roles: v.array(v.string()),
   permissions: v.array(v.string()),
-  attributes: v.optional(v.record(v.string(), AttributeTypeSchema)),
+  attributes: v.optional(v.record(v.string(), AttributeSchemaNodeSchema)),
   relations: v.optional(v.record(v.string(), v.string())),
   grants: v.optional(v.record(v.string(), v.array(v.string()))),
   derived_roles: v.optional(v.array(DerivedRoleEntrySchema)),

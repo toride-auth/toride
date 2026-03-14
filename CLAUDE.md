@@ -171,6 +171,7 @@ chore: update dependencies
 - TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), tsd (type testing) (improve-typesafety2)
 - TypeScript (strict mode), Node.js 20+ LTS + valibot ^1.2.0, yaml ^2.3.0, tsup (build), vitest (test) (lint)
 - N/A (file-based: generated JSON Schema artifact) (lint)
+- N/A (in-process library, file-based YAML/JSON policies) (simplify-api)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

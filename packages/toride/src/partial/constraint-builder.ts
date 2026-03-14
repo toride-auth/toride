@@ -54,7 +54,7 @@ export async function buildConstraints(
 ): Promise<ConstraintResult> {
   const resourceBlock = policy.resources[resourceType];
   if (!resourceBlock) {
-    return { forbidden: true };
+    return { ok: false as const };
   }
 
   const env = options?.env ?? {};
@@ -67,7 +67,7 @@ export async function buildConstraints(
       (r) => r.effect === "permit" && r.permissions.includes(action),
     );
     if (permitRules.length === 0) {
-      return { forbidden: true };
+      return { ok: false as const };
     }
   }
 
@@ -140,7 +140,7 @@ export async function buildConstraints(
 
   // If no paths produced constraints, it's forbidden
   if (pathConstraints.length === 0) {
-    return { forbidden: true };
+    return { ok: false as const };
   }
 
   // Step 4: Combine all path constraints with OR
@@ -172,13 +172,13 @@ export async function buildConstraints(
 
   // Step 7: Return result based on simplified constraint
   if (combined.type === "always") {
-    return { unrestricted: true };
+    return { ok: true as const, constraint: null };
   }
   if (combined.type === "never") {
-    return { forbidden: true };
+    return { ok: false as const };
   }
 
-  return { constraints: combined };
+  return { ok: true as const, constraint: combined };
 }
 
 // ─── Role Grant Resolution ────────────────────────────────────────

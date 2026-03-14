@@ -9,6 +9,9 @@ import type {
   TorideOptions,
   BatchCheckItem,
   ExplainResult,
+  ResourceBlock,
+  ActorDeclaration,
+  AttributeSchema,
 } from "../index.js";
 
 // ─── Test Schema ─────────────────────────────────────────────────
@@ -168,3 +171,43 @@ expectType<("read" | "write" | "delete")[]>(explainDoc.grantedPermissions);
 // Default ExplainResult has string[] grantedPermissions (backward compat)
 declare const explainDefault: ExplainResult;
 expectType<string[]>(explainDefault.grantedPermissions);
+
+// ─── T005: ResourceBlock.attributes accepts AttributeSchema ──────────
+// ResourceBlock with AttributeSchema attributes should be assignable
+const resourceBlockWithSchema: ResourceBlock = {
+  roles: ["viewer"],
+  permissions: ["read"],
+  attributes: {
+    status: { kind: "primitive", type: "string" },
+  },
+};
+expectAssignable<ResourceBlock>(resourceBlockWithSchema);
+
+// ResourceBlock with flat string attributes should NOT be assignable
+type ResourceBlockWithFlatString = {
+  roles: string[];
+  permissions: string[];
+  attributes: {
+    status: string;
+  };
+};
+expectNotAssignable<ResourceBlock>({} as ResourceBlockWithFlatString);
+
+// ─── T005: ActorDeclaration.attributes accepts AttributeSchema ───────
+// ActorDeclaration with AttributeSchema attributes should be assignable
+const actorDeclWithSchema: ActorDeclaration = {
+  attributes: {
+    email: { kind: "primitive", type: "string" },
+    is_admin: { kind: "primitive", type: "boolean" },
+  },
+};
+expectAssignable<ActorDeclaration>(actorDeclWithSchema);
+
+// ActorDeclaration with flat string attributes should NOT be assignable
+type ActorDeclWithFlatString = {
+  attributes: {
+    email: string;
+    is_admin: string;
+  };
+};
+expectNotAssignable<ActorDeclaration>({} as ActorDeclWithFlatString);

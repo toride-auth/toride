@@ -169,9 +169,33 @@ export interface TorideOptions<S extends TorideSchema = DefaultSchema> {
 /** Attribute type for actor declarations. */
 export type AttributeType = "string" | "number" | "boolean";
 
+/** Schema for a primitive attribute. */
+export interface PrimitiveAttributeSchema {
+  readonly kind: "primitive";
+  readonly type: AttributeType;
+}
+
+/** Schema for a nested object attribute. */
+export interface ObjectAttributeSchema {
+  readonly kind: "object";
+  readonly fields: Record<string, AttributeSchema>;
+}
+
+/** Schema for an array attribute. */
+export interface ArrayAttributeSchema {
+  readonly kind: "array";
+  readonly items: AttributeSchema;
+}
+
+/** Discriminated union of all attribute schema types. */
+export type AttributeSchema =
+  | PrimitiveAttributeSchema
+  | ObjectAttributeSchema
+  | ArrayAttributeSchema;
+
 /** Actor type declaration with attribute schema. */
 export interface ActorDeclaration {
-  readonly attributes: Record<string, AttributeType>;
+  readonly attributes: Record<string, AttributeSchema>;
 }
 
 /** Global role definition derived from actor attributes. */
@@ -218,7 +242,7 @@ export interface ResourceBlock {
   readonly roles: string[];
   readonly permissions: string[];
   /** Optional typed attribute declarations for this resource type. */
-  readonly attributes?: Record<string, AttributeType>;
+  readonly attributes?: Record<string, AttributeSchema>;
   /** Relations map field names to target resource type names (simplified). */
   readonly relations?: Record<string, string>;
   readonly grants?: Record<string, string[]>;
@@ -379,5 +403,22 @@ export class DepthLimitError extends Error {
     this.name = "DepthLimitError";
     this.limit = limit;
     this.limitType = limitType;
+  }
+}
+
+/** Thrown when an actor is forbidden from performing an action. */
+export class ForbiddenError extends Error {
+  readonly actor: ActorRef;
+  readonly action: string;
+  readonly resourceType: string;
+
+  constructor(actor: ActorRef, action: string, resourceType: string) {
+    super(
+      `Actor "${actor.type}:${actor.id}" is forbidden from performing "${action}" on resource type "${resourceType}"`,
+    );
+    this.name = "ForbiddenError";
+    this.actor = actor;
+    this.action = action;
+    this.resourceType = resourceType;
   }
 }

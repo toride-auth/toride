@@ -8,6 +8,7 @@ import type {
   ActorDeclaration,
   DerivedRoleEntry,
   Rule,
+  AttributeSchema,
 } from "../types.js";
 
 /** Keys that must be rejected to prevent prototype pollution */
@@ -119,6 +120,7 @@ function mergeResourceBlock(
   const derived_roles = appendArrays(base.derived_roles, overlay.derived_roles);
   const rules = appendArrays(base.rules, overlay.rules);
   const field_access = mergeFieldAccess(base.field_access, overlay.field_access);
+  const attributes = mergeAttributes(base.attributes, overlay.attributes);
 
   const result: ResourceBlock = {
     roles,
@@ -128,9 +130,20 @@ function mergeResourceBlock(
     ...(derived_roles && derived_roles.length > 0 ? { derived_roles } : {}),
     ...(rules && rules.length > 0 ? { rules } : {}),
     ...(field_access && Object.keys(field_access).length > 0 ? { field_access } : {}),
+    ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
   };
 
   return result;
+}
+
+function mergeAttributes(
+  base?: Record<string, AttributeSchema>,
+  overlay?: Record<string, AttributeSchema>,
+): Record<string, AttributeSchema> | undefined {
+  if (!base && !overlay) return undefined;
+  if (base) assertNoDangerousKeys(base as Record<string, unknown>, "base attributes");
+  if (overlay) assertNoDangerousKeys(overlay as Record<string, unknown>, "overlay attributes");
+  return { ...(base ?? {}), ...(overlay ?? {}) } as Record<string, AttributeSchema>;
 }
 
 function unionArrays(a: string[], b: string[]): string[] {
