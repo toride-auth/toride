@@ -154,9 +154,8 @@ export type LeafConstraint =
 
 /** Result of partial evaluation, tagged with resource type R (phantom). */
 export type ConstraintResult<R extends string = string> =
-  | { readonly unrestricted: true; readonly __resource?: R }
-  | { readonly forbidden: true; readonly __resource?: R }
-  | { readonly constraints: Constraint; readonly __resource?: R };
+  | { readonly ok: true; readonly constraint: Constraint | null; readonly __resource?: R }
+  | { readonly ok: false; readonly __resource?: R };
 
 // ─── Constraint Adapter ───────────────────────────────────────────
 

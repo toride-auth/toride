@@ -18,10 +18,62 @@
           "attributes": {
             "type": "object",
             "additionalProperties": {
-              "enum": [
-                "string",
-                "number",
-                "boolean"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "primitive"
+                    },
+                    "type": {
+                      "enum": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "object"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/AttributeSchema"
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "fields"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "array"
+                    },
+                    "items": {
+                      "$ref": "#/$defs/AttributeSchema"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
               ]
             },
             "title": "Attributes",
@@ -284,10 +336,62 @@
           "attributes": {
             "type": "object",
             "additionalProperties": {
-              "enum": [
-                "string",
-                "number",
-                "boolean"
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "primitive"
+                    },
+                    "type": {
+                      "enum": [
+                        "string",
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "object"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "$ref": "#/$defs/AttributeSchema"
+                      }
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "fields"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "const": "array"
+                    },
+                    "items": {
+                      "$ref": "#/$defs/AttributeSchema"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
               ]
             },
             "title": "Attributes",
@@ -931,6 +1035,65 @@
   ],
   "additionalProperties": false,
   "$defs": {
+    "AttributeSchema": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "primitive"
+            },
+            "type": {
+              "enum": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "object"
+            },
+            "fields": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/AttributeSchema"
+              }
+            }
+          },
+          "required": [
+            "kind",
+            "fields"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "array"
+            },
+            "items": {
+              "$ref": "#/$defs/AttributeSchema"
+            }
+          },
+          "required": [
+            "kind",
+            "items"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "ConditionExpression": {
       "anyOf": [
         {

@@ -464,4 +464,105 @@ describe("generateTypes", () => {
     const closeBraces = (output.match(/}/g) || []).length;
     expect(openBraces).toBe(closeBraces); // Balanced braces
   });
+
+  // T033: Nested object attributes
+  it("generates nested object attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            address: {
+              kind: "object",
+              fields: {
+                city: { kind: "primitive", type: "string" },
+                zip: { kind: "primitive", type: "string" },
+              },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/address:\s*\{\s*city:\s*string;\s*zip:\s*string;\s*\}/);
+  });
+
+  // T034: Primitive array attributes
+  it("generates primitive array attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            tags: {
+              kind: "array",
+              items: { kind: "primitive", type: "string" },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/tags:\s*string\[\]/);
+  });
+
+  // T035: Array-of-objects attributes
+  it("generates array-of-objects attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Team: {
+          roles: ["member"],
+          permissions: ["read"],
+          attributes: {
+            members: {
+              kind: "array",
+              items: {
+                kind: "object",
+                fields: {
+                  id: { kind: "primitive", type: "string" },
+                  role: { kind: "primitive", type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/members:\s*Array<\{\s*id:\s*string;\s*role:\s*string;\s*\}>/);
+  });
+
+  // T036: Mixed flat + nested attributes
+  it("generates mixed flat and nested attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            name: "string",
+            priority: "number",
+            address: {
+              kind: "object",
+              fields: {
+                city: { kind: "primitive", type: "string" },
+                zip: { kind: "primitive", type: "string" },
+              },
+            },
+            tags: {
+              kind: "array",
+              items: { kind: "primitive", type: "string" },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/name:\s*string/);
+    expect(output).toMatch(/priority:\s*number/);
+    expect(output).toMatch(/address:\s*\{\s*city:\s*string;\s*zip:\s*string;\s*\}/);
+    expect(output).toMatch(/tags:\s*string\[\]/);
+  });
 });

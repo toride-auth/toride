@@ -81,13 +81,13 @@ export function translateConstraints<TQueryMap extends Record<string, unknown>>(
     case "always":
       throw new Error(
         'Constraint node "always" should be simplified out before translation. ' +
-        "Use buildConstraints() which returns ConstraintResult with unrestricted/forbidden sentinels.",
+        "Check result.ok and result.constraint before calling translateConstraints().",
       );
 
     case "never":
       throw new Error(
         'Constraint node "never" should be simplified out before translation. ' +
-        "Use buildConstraints() which returns ConstraintResult with unrestricted/forbidden sentinels.",
+        "Check result.ok and result.constraint before calling translateConstraints().",
       );
 
     default: {

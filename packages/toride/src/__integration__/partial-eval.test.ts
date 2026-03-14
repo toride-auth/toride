@@ -19,7 +19,7 @@ describe("partial evaluation integration", () => {
   let createToride: (options: TorideOptions) => {
     can: (actor: ActorRef, action: string, resource: ResourceRef, options?: { env?: Record<string, unknown> }) => Promise<boolean>;
     buildConstraints: (actor: ActorRef, action: string, resourceType: string, options?: { env?: Record<string, unknown> }) => Promise<ConstraintResult>;
-    translateConstraints: <R extends string, TQueryMap extends Record<string, unknown>>(constraints: ConstraintResult<R>, adapter: ConstraintAdapter<TQueryMap>) => TQueryMap[R];
+    translateConstraints: <R extends string, TQueryMap extends Record<string, unknown>>(constraint: Constraint, adapter: ConstraintAdapter<TQueryMap>) => TQueryMap[R];
   };
   let loadYaml: (input: string) => Promise<Policy>;
 
@@ -93,7 +93,7 @@ resources:
 
   // ---- Acceptance Scenario 1: superadmin = unrestricted ----
 
-  it("returns unrestricted for superadmin", async () => {
+  it("returns ok:true, constraint:null for superadmin", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
     const cache = makeResolver();
     const engine = createToride({ policy });
@@ -105,12 +105,12 @@ resources:
 
     // Superadmin gets viewer via global_role -> grants read on Project
     const result = await engine.buildConstraints(actor, "read", "Project");
-    expect(result).toEqual({ unrestricted: true });
+    expect(result).toEqual({ ok: true, constraint: null });
   });
 
   // ---- Acceptance Scenario 2: no access = forbidden ----
 
-  it("returns forbidden for actor with no access paths", async () => {
+  it("returns ok:false for actor with no access paths", async () => {
     const policy = await loadYaml(FULL_POLICY_YAML);
     const engine = createToride({ policy });
     const actor: ActorRef = {
@@ -121,7 +121,7 @@ resources:
 
     // No roles, no derivation match, no global role
     const result = await engine.buildConstraints(actor, "delete", "Organization");
-    expect(result).toEqual({ forbidden: true });
+    expect(result).toEqual({ ok: false });
   });
 
   // ---- Acceptance Scenario 3: relation-derived role produces has_role ----
@@ -138,11 +138,12 @@ resources:
     const result = await engine.buildConstraints(actor, "read", "Task");
     // Task.viewer can be derived from Project.viewer via project relation
     // Task.editor from assignee relation (identity check)
-    expect(result).toHaveProperty("constraints");
+    expect(result.ok).toBe(true);
+    expect(result.constraint).not.toBeNull();
 
-    const constraints = (result as { constraints: Constraint }).constraints;
+    const constraint = (result as { ok: true; constraint: Constraint }).constraint;
     // Verify structural content -- should contain relation and/or has_role nodes
-    const str = JSON.stringify(constraints);
+    const str = JSON.stringify(constraint);
     expect(str).toContain('"type":"relation"');
   });
 
@@ -181,11 +182,12 @@ resources:
     };
 
     const result = await engine.buildConstraints(actor, "read", "Task");
-    expect(result).toHaveProperty("constraints");
-    const constraints = (result as { constraints: Constraint }).constraints;
+    expect(result.ok).toBe(true);
+    expect(result.constraint).not.toBeNull();
+    const constraint = (result as { ok: true; constraint: Constraint }).constraint;
 
     // Verify exact structure: NOT(field_eq(department, "engineering"))
-    expect(constraints).toEqual({
+    expect(constraint).toEqual({
       type: "not",
       child: {
         type: "field_eq",
@@ -230,9 +232,11 @@ resources:
     const adapter = makeStringAdapter();
 
     const result = await engine.buildConstraints(actor, "read", "Task");
-    expect(result).toHaveProperty("constraints");
+    expect(result.ok).toBe(true);
+    expect(result.constraint).not.toBeNull();
 
-    const translated = engine.translateConstraints(result, adapter);
+    const constraint = (result as { ok: true; constraint: Constraint }).constraint;
+    const translated = engine.translateConstraints(constraint, adapter);
     // Verify exact translation output
     expect(translated).toBe('NOT(deleted = true)');
   });
@@ -275,11 +279,12 @@ resources:
     const result = await engine.buildConstraints(actor, "delete", "Task");
     // The actor has access (editor role) but a forbid rule restricts deletes on archived items
     // Result MUST be constrained (not forbidden)
-    expect(result).toHaveProperty("constraints");
+    expect(result.ok).toBe(true);
+    expect(result.constraint).not.toBeNull();
 
-    const constraints = (result as { constraints: Constraint }).constraints;
+    const constraint = (result as { ok: true; constraint: Constraint }).constraint;
     // Verify exact structure: NOT(field_eq(archived, true))
-    expect(constraints).toEqual({
+    expect(constraint).toEqual({
       type: "not",
       child: {
         type: "field_eq",
@@ -288,7 +293,7 @@ resources:
       },
     });
 
-    const translated = engine.translateConstraints(result, adapter);
+    const translated = engine.translateConstraints(constraint, adapter);
     expect(translated).toBe("NOT(archived = true)");
   });
 
@@ -328,11 +333,12 @@ resources:
     };
 
     const result = await engine.buildConstraints(actor, "read", "Task");
-    expect(result).toHaveProperty("constraints");
+    expect(result.ok).toBe(true);
+    expect(result.constraint).not.toBeNull();
 
-    const constraints = (result as { constraints: Constraint }).constraints;
+    const constraint = (result as { ok: true; constraint: Constraint }).constraint;
     // Verify exact structure: NOT(unknown("businessHours"))
-    expect(constraints).toEqual({
+    expect(constraint).toEqual({
       type: "not",
       child: {
         type: "unknown",
@@ -340,7 +346,7 @@ resources:
       },
     });
 
-    const translated = engine.translateConstraints(result, adapter);
+    const translated = engine.translateConstraints(constraint, adapter);
     expect(translated).toBe("NOT(UNKNOWN(businessHours))");
   });
 });

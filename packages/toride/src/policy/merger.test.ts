@@ -20,36 +20,36 @@ describe("mergePolicies", () => {
   it("merges disjoint actors additively", () => {
     const base = makePolicy({
       actors: {
-        User: { attributes: { email: "string" } },
+        User: { attributes: { email: { kind: "primitive", type: "string" } } },
       },
     });
     const overlay = makePolicy({
       actors: {
-        Bot: { attributes: { name: "string" } },
+        Bot: { attributes: { name: { kind: "primitive", type: "string" } } },
       },
     });
     const merged = mergePolicies(base, overlay);
     expect(merged.actors).toHaveProperty("User");
     expect(merged.actors).toHaveProperty("Bot");
-    expect(merged.actors.User.attributes.email).toBe("string");
-    expect(merged.actors.Bot.attributes.name).toBe("string");
+    expect(merged.actors.User.attributes.email).toEqual({ kind: "primitive", type: "string" });
+    expect(merged.actors.Bot.attributes.name).toEqual({ kind: "primitive", type: "string" });
   });
 
   it("merges overlapping actors by union of attributes", () => {
     const base = makePolicy({
       actors: {
-        User: { attributes: { email: "string" } },
+        User: { attributes: { email: { kind: "primitive", type: "string" } } },
       },
     });
     const overlay = makePolicy({
       actors: {
-        User: { attributes: { name: "string" } },
+        User: { attributes: { name: { kind: "primitive", type: "string" } } },
       },
     });
     const merged = mergePolicies(base, overlay);
     expect(merged.actors.User.attributes).toEqual({
-      email: "string",
-      name: "string",
+      email: { kind: "primitive", type: "string" },
+      name: { kind: "primitive", type: "string" },
     });
   });
 
@@ -293,13 +293,13 @@ describe("mergePolicies", () => {
 
   it("merges global_roles additively", () => {
     const base = makePolicy({
-      actors: { User: { attributes: { isAdmin: "boolean" } } },
+      actors: { User: { attributes: { isAdmin: { kind: "primitive", type: "boolean" } } } },
       global_roles: {
         superadmin: { actor_type: "User", when: { "$actor.isAdmin": true } },
       },
     });
     const overlay = makePolicy({
-      actors: { Bot: { attributes: { isService: "boolean" } } },
+      actors: { Bot: { attributes: { isService: { kind: "primitive", type: "boolean" } } } },
       global_roles: {
         service: { actor_type: "Bot", when: { "$actor.isService": true } },
       },
@@ -413,7 +413,7 @@ describe("setPolicy", () => {
   it("swaps the policy atomically", async () => {
     // Policy1: Task with viewer role derived from actor attribute
     const policy1 = makePolicy({
-      actors: { User: { attributes: { is_viewer: "boolean", is_admin: "boolean" } } },
+      actors: { User: { attributes: { is_viewer: { kind: "primitive", type: "boolean" }, is_admin: { kind: "primitive", type: "boolean" } } } },
       resources: {
         Task: {
           roles: ["viewer"],
@@ -427,7 +427,7 @@ describe("setPolicy", () => {
     });
     // Policy2: Project with admin role derived from actor attribute
     const policy2 = makePolicy({
-      actors: { User: { attributes: { is_viewer: "boolean", is_admin: "boolean" } } },
+      actors: { User: { attributes: { is_viewer: { kind: "primitive", type: "boolean" }, is_admin: { kind: "primitive", type: "boolean" } } } },
       resources: {
         Project: {
           roles: ["admin"],

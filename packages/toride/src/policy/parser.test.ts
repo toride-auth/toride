@@ -59,7 +59,7 @@ resources:
     it("parses a valid YAML policy into a typed Policy object", async () => {
       const policy = await loadYaml(VALID_YAML);
       expect(policy.version).toBe("1");
-      expect(policy.actors.User.attributes.email).toBe("string");
+      expect(policy.actors.User.attributes.email).toEqual({ kind: "primitive", type: "string" });
       expect(policy.resources.Task.roles).toEqual(["viewer", "editor"]);
       expect(policy.resources.Task.permissions).toEqual(["read", "update", "delete"]);
       expect(policy.resources.Task.grants).toEqual({
@@ -261,9 +261,9 @@ resources:
 `;
       const policy = await loadYaml(yaml);
       expect(policy.resources.Document.attributes).toEqual({
-        status: "string",
-        priority: "number",
-        archived: "boolean",
+        status: { kind: "primitive", type: "string" },
+        priority: { kind: "primitive", type: "number" },
+        archived: { kind: "primitive", type: "boolean" },
       });
     });
 
@@ -443,13 +443,270 @@ resources:
       await expect(loadYaml(yaml)).rejects.toThrow(/old object syntax/);
       await expect(loadYaml(yaml)).rejects.toThrow(/project:\s*Project/);
     });
+
+    describe("nested attribute declarations", () => {
+      it("parses string[] shorthand as array schema with string items", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      tags: string[]
+resources:
+  Document:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      labels: string[]
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.tags).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "string" },
+        });
+        expect(policy.resources.Document.attributes!.labels).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "string" },
+        });
+      });
+
+      it("parses number[] shorthand as array schema with number items", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      scores: number[]
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      priority: number[]
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.scores).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "number" },
+        });
+      });
+
+      it("parses boolean[] shorthand as array schema with boolean items", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      flags: boolean[]
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      settings: boolean[]
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.flags).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "boolean" },
+        });
+      });
+
+      it("parses nested object attribute with multiple fields", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      address:
+        city: string
+        zip: string
+        country: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      metadata:
+        createdAt: string
+        version: number
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.address).toEqual({
+          kind: "object",
+          fields: {
+            city: { kind: "primitive", type: "string" },
+            zip: { kind: "primitive", type: "string" },
+            country: { kind: "primitive", type: "string" },
+          },
+        });
+        expect(policy.resources.Task.attributes!.metadata).toEqual({
+          kind: "object",
+          fields: {
+            createdAt: { kind: "primitive", type: "string" },
+            version: { kind: "primitive", type: "number" },
+          },
+        });
+      });
+
+      it("parses array-of-objects using type: array + items syntax", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      collaborators:
+        type: array
+        items:
+          userId: string
+          role: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      assignees:
+        type: array
+        items:
+          id: string
+          name: string
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.collaborators).toEqual({
+          kind: "array",
+          items: {
+            kind: "object",
+            fields: {
+              userId: { kind: "primitive", type: "string" },
+              role: { kind: "primitive", type: "string" },
+            },
+          },
+        });
+      });
+
+      it("disambiguates type field in nested object - not treated as array declaration", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      profile:
+        name: string
+        type: string
+        age: number
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.profile).toEqual({
+          kind: "object",
+          fields: {
+            name: { kind: "primitive", type: "string" },
+            type: { kind: "primitive", type: "string" },
+            age: { kind: "primitive", type: "number" },
+          },
+        });
+      });
+
+      it("rejects depth 5 nested objects (max depth 3)", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      level1:
+        level2:
+          level3:
+            level4:
+              level5: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+        await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
+        await expect(loadYaml(yaml)).rejects.toThrow(/depth.*3/i);
+      });
+
+      it("allows depth 3 nested objects (max allowed)", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      level1:
+        level2:
+          level3: string
+resources:
+  Document:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      a:
+        b:
+          c: string
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.level1).toEqual({
+          kind: "object",
+          fields: {
+            level2: {
+              kind: "object",
+              fields: {
+                level3: { kind: "primitive", type: "string" },
+              },
+            },
+          },
+        });
+      });
+
+      it("handles mixed flat and nested attributes in same resource", async () => {
+        const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      email: string
+      profile:
+        name: string
+        age: number
+      tags: string[]
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+    attributes:
+      status: string
+      metadata:
+        createdAt: string
+        priority: number
+      permissions: string[]
+`;
+        const policy = await loadYaml(yaml);
+        expect(policy.actors.User.attributes.email).toEqual({ kind: "primitive", type: "string" });
+        expect(policy.actors.User.attributes.profile).toEqual({
+          kind: "object",
+          fields: {
+            name: { kind: "primitive", type: "string" },
+            age: { kind: "primitive", type: "number" },
+          },
+        });
+        expect(policy.actors.User.attributes.tags).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "string" },
+        });
+        expect(policy.resources.Task.attributes!.status).toEqual({ kind: "primitive", type: "string" });
+      });
+    });
   });
 
   describe("loadJson", () => {
     it("parses valid JSON policy", async () => {
       const policy = await loadJson(VALID_JSON);
       expect(policy.version).toBe("1");
-      expect(policy.actors.User.attributes.email).toBe("string");
+      expect(policy.actors.User.attributes.email).toEqual({ kind: "primitive", type: "string" });
       expect(policy.resources.Task.roles).toEqual(["viewer", "editor"]);
     });
 
@@ -465,6 +722,293 @@ resources:
         },
       });
       await expect(loadJson(json)).rejects.toThrow(ValidationError);
+    });
+
+    describe("nested attribute declarations", () => {
+      it("normalizes nested object attributes in JSON", async () => {
+        const json = JSON.stringify({
+          version: "1",
+          actors: {
+            User: {
+              attributes: {
+                address: {
+                  city: "string",
+                  zip: "string",
+                },
+              },
+            },
+          },
+          resources: {
+            Task: {
+              roles: ["viewer"],
+              permissions: ["read"],
+              attributes: {
+                metadata: {
+                  createdAt: "string",
+                  version: "number",
+                },
+              },
+            },
+          },
+        });
+        const policy = await loadJson(json);
+        expect(policy.actors.User.attributes.address).toEqual({
+          kind: "object",
+          fields: {
+            city: { kind: "primitive", type: "string" },
+            zip: { kind: "primitive", type: "string" },
+          },
+        });
+        expect(policy.resources.Task.attributes!.metadata).toEqual({
+          kind: "object",
+          fields: {
+            createdAt: { kind: "primitive", type: "string" },
+            version: { kind: "primitive", type: "number" },
+          },
+        });
+      });
+
+      it("normalizes explicit array declaration with type: array + items", async () => {
+        const json = JSON.stringify({
+          version: "1",
+          actors: {
+            User: {
+              attributes: {
+                collaborators: {
+                  type: "array",
+                  items: {
+                    userId: "string",
+                    role: "string",
+                  },
+                },
+              },
+            },
+          },
+          resources: {
+            Task: {
+              roles: ["viewer"],
+              permissions: ["read"],
+            },
+          },
+        });
+        const policy = await loadJson(json);
+        expect(policy.actors.User.attributes.collaborators).toEqual({
+          kind: "array",
+          items: {
+            kind: "object",
+            fields: {
+              userId: { kind: "primitive", type: "string" },
+              role: { kind: "primitive", type: "string" },
+            },
+          },
+        });
+      });
+
+      it("passes through already-canonical AttributeSchema form unchanged", async () => {
+        const json = JSON.stringify({
+          version: "1",
+          actors: {
+            User: {
+              attributes: {
+                profile: {
+                  kind: "object",
+                  fields: {
+                    name: { kind: "primitive", type: "string" },
+                  },
+                },
+                tags: {
+                  kind: "array",
+                  items: { kind: "primitive", type: "string" },
+                },
+              },
+            },
+          },
+          resources: {
+            Task: {
+              roles: ["viewer"],
+              permissions: ["read"],
+            },
+          },
+        });
+        const policy = await loadJson(json);
+        expect(policy.actors.User.attributes.profile).toEqual({
+          kind: "object",
+          fields: {
+            name: { kind: "primitive", type: "string" },
+          },
+        });
+        expect(policy.actors.User.attributes.tags).toEqual({
+          kind: "array",
+          items: { kind: "primitive", type: "string" },
+        });
+      });
+
+      it("rejects string[] shorthand in JSON input", async () => {
+        const json = JSON.stringify({
+          version: "1",
+          actors: {
+            User: {
+              attributes: {
+                tags: "string[]",
+              },
+            },
+          },
+          resources: {
+            Task: {
+              roles: ["viewer"],
+              permissions: ["read"],
+            },
+          },
+        });
+        await expect(loadJson(json)).rejects.toThrow(ValidationError);
+      });
+
+      it("normalizes object with user field named 'kind' as nested object", async () => {
+        const json = JSON.stringify({
+          version: "1",
+          actors: {
+            User: {
+              attributes: {
+                profile: {
+                  kind: "string",
+                  name: "string",
+                },
+              },
+            },
+          },
+          resources: {
+            Task: {
+              roles: ["viewer"],
+              permissions: ["read"],
+            },
+          },
+        });
+        const policy = await loadJson(json);
+        expect(policy.actors.User.attributes.profile).toEqual({
+          kind: "object",
+          fields: {
+            kind: { kind: "primitive", type: "string" },
+            name: { kind: "primitive", type: "string" },
+          },
+        });
+      });
+    });
+  });
+
+  describe("loadYaml > nested attribute declarations", () => {
+    it("normalizes object with user field named 'kind' as nested object", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      profile:
+        kind: string
+        name: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+      const policy = await loadYaml(yaml);
+      expect(policy.actors.User.attributes.profile).toEqual({
+        kind: "object",
+        fields: {
+          kind: { kind: "primitive", type: "string" },
+          name: { kind: "primitive", type: "string" },
+        },
+      });
+    });
+
+    it("accepts array of objects at depth 2 with nested fields", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      teams:
+        type: array
+        items:
+          name: string
+          role: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+      const policy = await loadYaml(yaml);
+      expect(policy.actors.User.attributes.teams).toEqual({
+        kind: "array",
+        items: {
+          kind: "object",
+          fields: {
+            name: { kind: "primitive", type: "string" },
+            role: { kind: "primitive", type: "string" },
+          },
+        },
+      });
+    });
+
+    it("accepts array items with deeply nested object path at depth 3", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      members:
+        type: array
+        items:
+          org:
+            address:
+              city: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+      const policy = await loadYaml(yaml);
+      expect(policy.actors.User.attributes.members).toEqual({
+        kind: "array",
+        items: {
+          kind: "object",
+          fields: {
+            org: {
+              kind: "object",
+              fields: {
+                address: {
+                  kind: "object",
+                  fields: {
+                    city: { kind: "primitive", type: "string" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    it("rejects depth 5 through array items", async () => {
+      const yaml = `
+version: "1"
+actors:
+  User:
+    attributes:
+      deepArray:
+        type: array
+        items:
+          level1:
+            level2:
+              level3:
+                level4:
+                  level5: string
+resources:
+  Task:
+    roles: [viewer]
+    permissions: [read]
+`;
+      await expect(loadYaml(yaml)).rejects.toThrow(ValidationError);
+      await expect(loadYaml(yaml)).rejects.toThrow(/depth.*3/i);
     });
   });
 });
