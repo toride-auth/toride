@@ -4,6 +4,7 @@ import { serve } from "@hono/node-server";
 import { userMiddleware } from "./middleware.js";
 import type { AppEnv } from "./types.js";
 import projectRoutes from "./routes/projects.js";
+import taskRoutes from "./routes/tasks.js";
 
 const app = new Hono<AppEnv>();
 
@@ -12,6 +13,7 @@ app.use("*", userMiddleware);
 
 // Mount route modules
 app.route("/projects", projectRoutes);
+app.route("/", taskRoutes);
 
 // Redirect root to project list
 app.get("/", (c) => c.redirect("/projects"));
