@@ -171,7 +171,12 @@ app.get("/:id", async (c) => {
           />
         ))}
         {tasksWithActions.length === 0 && (
-          <li class="empty">No tasks in this project.</li>
+          <li class="empty">
+            No tasks in this project.
+            {projectActions.includes("create_task") && (
+              <span> Use the form above to create one.</span>
+            )}
+          </li>
         )}
       </ProjectDetail>
     </Layout>,

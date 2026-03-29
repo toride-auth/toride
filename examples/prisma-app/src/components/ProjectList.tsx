@@ -18,6 +18,7 @@ export const ProjectList: FC<ProjectListProps> = ({ projects }) => {
     return (
       <div class="empty">
         <p>No accessible projects. Your current role does not grant read access to any projects.</p>
+        <p style="margin-top: 0.5rem;">Try switching to a different user using the dropdown above.</p>
       </div>
     );
   }

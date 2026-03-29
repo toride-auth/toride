@@ -74,6 +74,9 @@ export const Layout: FC<LayoutProps> = ({ children, currentUser, users }) => {
                 ))}
               </select>
             </form>
+            <div class="user-info">
+              {currentUser.department} dept{currentUser.isSuperAdmin ? " · Superadmin" : ""}
+            </div>
           </div>
         </header>
         <main>
