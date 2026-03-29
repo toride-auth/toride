@@ -1,28 +1,38 @@
 # =============================================================================
-# Per-worktree app service (minimum mode).
+# Per-worktree app service (slim mode — no Traefik, no shared network).
 #
-# No Traefik routing, no shared network. Each worktree container is independent.
-# Access your app via VS Code's automatic port forwarding.
+# Usage (from .worktree/ directory):
+#   docker compose up -d --build
+#   docker compose exec app zsh
+#   docker compose down
 #
-# To upgrade to full mode (Traefik subdomain routing, shared infra, custom
-# network), re-run the installer without --minimum.
-#
-# DO NOT EDIT the volume mounts — they are part of the devcontainer-wt
-# template engine (git worktree fix).
-#
+# CUSTOMIZE: Change the published port (default 3000) to match your app.
 # CUSTOMIZE: Add shared build cache volumes (see commented examples at bottom).
 # =============================================================================
 
+name: ${PROJECT_NAME}-${BRANCH_NAME}
+
 services:
-  app:
+  base:
+    image: "${PROJECT_NAME}-dev-base:local"
     build:
       context: ..
-      dockerfile: .devcontainer/Dockerfile
+      dockerfile: .worktree/Dockerfile.base
+
+  app:
+    depends_on:
+      - base
+    build:
+      context: ..
+      dockerfile: .worktree/Dockerfile.app
+      args:
+        BASE_IMAGE: "${PROJECT_NAME}-dev-base:local"
     tty: true
+    stdin_open: true
     container_name: "app-${PROJECT_NAME}-${WORKTREE_NAME}"
 
     # -------------------------------------------------------------------------
-    # DO NOT EDIT — devcontainer-wt core volume mounts
+    # DO NOT EDIT — container-wt core volume mounts
     # -------------------------------------------------------------------------
     volumes:
       # Mount the worktree at the conventional /workspaces path
@@ -32,17 +42,13 @@ services:
       - ${GIT_COMMON_DIR}:${GIT_COMMON_DIR}:cached
 
     # -------------------------------------------------------------------------
-    # DO NOT EDIT — devcontainer-wt metadata labels (used by orphan detection)
+    # CUSTOMIZE — Expose your app port directly (no Traefik in slim mode)
     # -------------------------------------------------------------------------
-    labels:
-      - "devcontainer-wt=true"
-      - "devcontainer-wt.project=${PROJECT_NAME}"
-      - "devcontainer-wt.worktree=${WORKTREE_NAME}"
-      - "devcontainer-wt.worktree-dir=${LOCAL_WORKSPACE_FOLDER}"
-      - "devcontainer-wt.branch=${BRANCH_NAME}"
+    ports:
+      - "3000:3000"
 
     # -------------------------------------------------------------------------
-    # DO NOT EDIT — devcontainer-wt core environment
+    # DO NOT EDIT — container-wt core environment
     # -------------------------------------------------------------------------
     env_file:
       - .env.app
@@ -51,6 +57,7 @@ services:
       - BRANCH_NAME=${BRANCH_NAME}
       - PROJECT_NAME=${PROJECT_NAME}
       - MAIN_REPO_NAME=${MAIN_REPO_NAME}
+    working_dir: /workspaces/${WORKTREE_NAME}
 
 # =============================================================================
 # CUSTOMIZE — Shared build caches (uncomment and adapt for your stack).
