@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # =============================================================================
 # Worktree creation hook — runs on the HOST after a new worktree is created.
-# Copies gitignored files listed in .worktreeinclude to the new worktree.
+# Copies gitignored files listed in .worktreeinclude to the new worktree,
+# then runs init.sh to generate .env files.
 #
 # Wire this into your worktree tool:
 #   git-wt: git config --add wt.hook ".worktree/hooks/on-create.sh"
@@ -77,7 +78,7 @@ copy_from_include_file() {
         _is_excluded "$f" && continue
         mkdir -p "${target_root}/$(dirname "$f")"
         cp "$f" "${target_root}/${f}"
-        echo "[devcontainer-wt] Copied: ${f}"
+        echo "[container-wt] Copied: ${f}"
       done
     )
   done < "$include_file"
@@ -86,4 +87,11 @@ copy_from_include_file() {
 copy_from_include_file "${MAIN_REPO_DIR}/.worktreeinclude" "$PWD"
 copy_from_include_file "${MAIN_REPO_DIR}/.worktreeinclude.local" "$PWD"
 
-echo "[devcontainer-wt] on-create complete."
+# --- Run init.sh to generate .env files ---
+
+if [ -f ".worktree/init.sh" ]; then
+  echo "[container-wt] Running init.sh..."
+  .worktree/init.sh
+fi
+
+echo "[container-wt] on-create complete."
