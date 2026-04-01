@@ -169,4 +169,39 @@ describe("PrismaConstraintAdapter", () => {
         .toEqual({ memberships: { some: { memberId: "u1", memberRole: "editor" } } });
     });
   });
+
+  describe("createPrismaAdapter with virtualFields", () => {
+    const adapter = createPrismaAdapter({
+      virtualFields: {
+        viewer_ids: {
+          relation: "roleAssignments",
+          matchField: "userId",
+        },
+      },
+    });
+
+    it("intercepts field_includes on virtual field as relation query", () => {
+      expect(adapter.translate({ type: "field_includes", field: "viewer_ids", value: "user-1" }))
+        .toEqual({ roleAssignments: { some: { userId: "user-1" } } });
+    });
+
+    it("virtual field with filter adds filter to relation query", () => {
+      const adapterWithFilter = createPrismaAdapter({
+        virtualFields: {
+          viewer_ids: {
+            relation: "roleAssignments",
+            matchField: "userId",
+            filter: { role: "viewer" },
+          },
+        },
+      });
+      expect(adapterWithFilter.translate({ type: "field_includes", field: "viewer_ids", value: "user-1" }))
+        .toEqual({ roleAssignments: { some: { userId: "user-1", role: "viewer" } } });
+    });
+
+    it("non-virtual field_includes still uses has", () => {
+      expect(adapter.translate({ type: "field_includes", field: "tags", value: "urgent" }))
+        .toEqual({ tags: { has: "urgent" } });
+    });
+  });
 });

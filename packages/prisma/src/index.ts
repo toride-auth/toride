@@ -8,6 +8,12 @@ import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, Defa
 /** Prisma WHERE clause type (plain object). */
 export type PrismaWhere = Record<string, unknown>;
 
+export interface VirtualFieldMapping {
+  relation: string;
+  matchField: string;
+  filter?: Record<string, unknown>;
+}
+
 /** Options for createPrismaAdapter. */
 export interface PrismaAdapterOptions {
   /** Maps constraint relation fields to Prisma relation names. */
@@ -19,6 +25,8 @@ export interface PrismaAdapterOptions {
     userId?: string;
     role?: string;
   };
+  /** Maps virtual fields to their relation queries for field_includes constraints. */
+  virtualFields?: Record<string, VirtualFieldMapping>;
 }
 
 /**
@@ -40,11 +48,23 @@ export function createPrismaAdapter<
   const roleTable = options?.roleAssignmentTable ?? "roleAssignments";
   const userIdField = options?.roleAssignmentFields?.userId ?? "userId";
   const roleField = options?.roleAssignmentFields?.role ?? "role";
+  const virtualFields = options?.virtualFields ?? {};
 
   // Internal implementation uses PrismaWhere (the base type).
   // Cast to ConstraintAdapter<TQueryMap> since TQueryMap values extend PrismaWhere.
   return {
     translate(constraint: LeafConstraint): PrismaWhere {
+      const vf = virtualFields[constraint.field];
+      if (vf && constraint.type === "field_includes") {
+        return {
+          [vf.relation]: {
+            some: {
+              [vf.matchField]: constraint.value,
+              ...vf.filter,
+            },
+          },
+        };
+      }
       switch (constraint.type) {
         case "field_eq":
           return { [constraint.field]: constraint.value };
