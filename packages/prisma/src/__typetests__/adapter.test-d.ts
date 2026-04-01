@@ -26,7 +26,7 @@ type TestQueryMap = {
 // ─── T024: Typed adapter creation ───────────────────────────────
 
 // Typed adapter returns ConstraintAdapter<TestQueryMap>
-const typedAdapter = createPrismaAdapter<DefaultSchema, TestQueryMap>();
+const typedAdapter = createPrismaAdapter<DefaultSchema, never, TestQueryMap>();
 expectType<ConstraintAdapter<TestQueryMap>>(typedAdapter);
 
 // ─── T024: Untyped adapter (backward compatibility) ──────────────
@@ -40,7 +40,7 @@ expectAssignable<ConstraintAdapter<Record<string, PrismaWhere>>>(untypedAdapter)
 
 // ─── T024: Typed adapter with options ───────────────────────────
 
-const typedAdapterWithOpts = createPrismaAdapter<DefaultSchema, TestQueryMap>({
+const typedAdapterWithOpts = createPrismaAdapter<DefaultSchema, never, TestQueryMap>({
   relationMapping: { org: "organization" },
 });
 expectType<ConstraintAdapter<TestQueryMap>>(typedAdapterWithOpts);
@@ -121,20 +121,6 @@ createPrismaAdapter<TestSchema>({
   },
 });
 
-// Invalid role string in filter
-createPrismaAdapter<TestSchema>({
-  virtualFields: {
-    Document: {
-      viewer_ids: {
-        relation: "roleAssignments",
-        matchField: "userId",
-        // @ts-expect-error - "veiwer" is not a valid role
-        filter: { role: "veiwer" },
-      },
-    },
-  },
-});
-
 // Valid: array field "tag_ids" (number[]) can be used as virtual field key
 createPrismaAdapter<TestSchema>({
   virtualFields: {
@@ -149,6 +135,82 @@ createPrismaAdapter<TestSchema>({
   virtualFields: {
     Organization: {
       member_ids: { relation: "memberships", matchField: "userId" },
+    },
+  },
+});
+
+// ─── TModelMap-aware virtualFields type tests ────────────────────
+
+// Model map that defines actual database model fields
+type TestModelMap = {
+  Document: {
+    status: string;
+    ownerId: string;
+    createdAt: Date;
+  };
+  Organization: {
+    name: string;
+    plan: string;
+  };
+};
+
+// With TModelMap, only virtual fields (not in model) are accepted
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+    },
+  },
+});
+
+// TModelMap: non-model field tag_ids is accepted
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      tag_ids: { relation: "tags", matchField: "id" },
+    },
+  },
+});
+
+// TModelMap: model field "status" should be rejected
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      // @ts-expect-error - "status" is a model field, not a virtual field
+      status: { relation: "roleAssignments", matchField: "userId" },
+    },
+  },
+});
+
+// TModelMap: model field "ownerId" should be rejected
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      // @ts-expect-error - "ownerId" is a model field, not a virtual field
+      ownerId: { relation: "roleAssignments", matchField: "userId" },
+    },
+  },
+});
+
+// TModelMap: Organization model field "name" should be rejected
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Organization: {
+      // @ts-expect-error - "name" is a model field, not a virtual field
+      name: { relation: "memberships", matchField: "userId" },
+    },
+  },
+});
+
+// Generic filter (Record<string, unknown>) is accepted
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "roleAssignments",
+        matchField: "userId",
+        filter: { role: "viewer", customField: "anyValue" },
+      },
     },
   },
 });
