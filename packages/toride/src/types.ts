@@ -167,7 +167,7 @@ export interface TorideOptions<S extends TorideSchema = DefaultSchema> {
 // ─── Policy Model Types ───────────────────────────────────────────
 
 /** Attribute type for actor declarations. */
-export type AttributeType = "string" | "number" | "boolean";
+export type AttributeType = "string" | "number" | "boolean" | "string[]" | "number[]" | "boolean[]";
 
 /** Schema for a primitive attribute. */
 export interface PrimitiveAttributeSchema {

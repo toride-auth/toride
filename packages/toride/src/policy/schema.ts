@@ -4,7 +4,7 @@ import * as v from "valibot";
 
 // ─── Attribute Type ───────────────────────────────────────────────
 
-export const AttributeTypeSchema = v.picklist(["string", "number", "boolean"]);
+export const AttributeTypeSchema = v.picklist(["string", "number", "boolean", "string[]", "number[]", "boolean[]"]);
 
 // ─── Attribute Schema Node (recursive, max depth 3) ───────────────
 
