@@ -36,8 +36,18 @@ const policy = await loadYaml(policyYaml);
 // used in policy conditions to their underlying roleAssignments relation,
 // translating { field_includes: { field: "viewer_ids", value: actorId } } into
 // { roleAssignments: { some: { userId: actorId, role: "viewer" } } }.
+//
+// TModelMap provides the ORM model scalar fields to enable compile-time
+// virtual field detection: fields in the policy but not in the model are
+// treated as virtual fields.
 // ---------------------------------------------------------------------------
-export const adapter = createPrismaAdapter<AppSchema>({
+
+// ORM model scalar fields (matches Prisma schema — relations excluded)
+type ProjectModel = { id: string; name: string; department: string; status: string; archived: boolean };
+type TaskModel = { id: string; title: string; description: string; status: string };
+type ModelMap = { Project: ProjectModel; Task: TaskModel };
+
+export const adapter = createPrismaAdapter<AppSchema, ModelMap>({
   virtualFields: {
     Project: {
       viewer_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "viewer" } },
