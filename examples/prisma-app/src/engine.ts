@@ -31,8 +31,19 @@ const policy = await loadYaml(policyYaml);
 // the adapter turns them into { department: "engineering", archived: { not: true } }.
 //
 // The adapter is stateless and reusable across all resource types.
+//
+// virtualFields maps the virtual array fields (viewer_ids, editor_ids, admin_ids)
+// used in policy conditions to their underlying roleAssignments relation,
+// translating { field_includes: { field: "viewer_ids", value: actorId } } into
+// { roleAssignments: { some: { userId: actorId, role: "viewer" } } }.
 // ---------------------------------------------------------------------------
-export const adapter = createPrismaAdapter();
+export const adapter = createPrismaAdapter({
+  virtualFields: {
+    viewer_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "viewer" } },
+    editor_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "editor" } },
+    admin_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "admin" } },
+  },
+});
 
 // ---------------------------------------------------------------------------
 // 3. RESOURCE RESOLVERS
