@@ -57,18 +57,18 @@ importers:
         specifier: ^6.4.0
         version: 6.19.2(prisma@6.19.2(typescript@5.9.3))(typescript@5.9.3)
       '@toride/prisma':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/prisma
       hono:
         specifier: ^4.7.0
         version: 4.12.9
       toride:
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/toride
     devDependencies:
       '@toride/codegen':
-        specifier: ^0.3.0
-        version: 0.3.0(typescript@5.9.3)
+        specifier: workspace:*
+        version: link:../../packages/codegen
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.37
@@ -1463,13 +1463,6 @@ packages:
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
-
-  '@toride/codegen@0.3.0':
-    resolution: {integrity: sha512-bG52XCg6mO+yQh9vzbBM8EEMj/eLcXKN5VADEs4A/swVLI82T4bO0QjqOVafho8ehACX43Yn42VaR8aSeTt4+g==}
-    hasBin: true
-
-  '@toride/prisma@0.3.0':
-    resolution: {integrity: sha512-vdbCm6X4jeq/5tplgvPzCiYHr1zqbG/zpJSiHAKEoBln0M97Rmks5VrlXA8/b3wbdhJGHtPUzU5/sHcuiI7dHQ==}
 
   '@tsd/typescript@5.9.3':
     resolution: {integrity: sha512-JSSdNiS0wgd8GHhBwnMAI18Y8XPhLVN+dNelPfZCXFhy9Lb3NbnFyp9JKxxr54jSUkEJPk3cidvCoHducSaRMQ==}
@@ -3471,10 +3464,6 @@ packages:
   tokenx@1.3.0:
     resolution: {integrity: sha512-NLdXTEZkKiO0gZuLtMoZKjCXTREXeZZt8nnnNeyoXtNZAfG/GKGSbQtLU5STspc0rMSwcA+UJfWZkbNU01iKmQ==}
 
-  toride@0.3.0:
-    resolution: {integrity: sha512-XH7WbfZ3C/PyAgFTQ3fC0z4dxvhe6yGBf3JIHEEyMmNuTGFEMh5VJ7ViIoCPihFcRTx7lPXGbM/Zuqj79skGeg==}
-    hasBin: true
-
   tree-kill@1.2.2:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
@@ -5189,18 +5178,6 @@ snapshots:
   '@sinclair/typebox@0.34.48': {}
 
   '@standard-schema/spec@1.1.0': {}
-
-  '@toride/codegen@0.3.0(typescript@5.9.3)':
-    dependencies:
-      toride: 0.3.0(typescript@5.9.3)
-    transitivePeerDependencies:
-      - typescript
-
-  '@toride/prisma@0.3.0(typescript@5.9.3)':
-    dependencies:
-      toride: 0.3.0(typescript@5.9.3)
-    transitivePeerDependencies:
-      - typescript
 
   '@tsd/typescript@5.9.3': {}
 
@@ -7260,13 +7237,6 @@ snapshots:
       is-number: 7.0.0
 
   tokenx@1.3.0: {}
-
-  toride@0.3.0(typescript@5.9.3):
-    dependencies:
-      valibot: 1.2.0(typescript@5.9.3)
-      yaml: 2.8.2
-    transitivePeerDependencies:
-      - typescript
 
   tree-kill@1.2.2: {}
 

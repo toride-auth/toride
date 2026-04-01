@@ -16,6 +16,14 @@ global_roles:
 
 resources:
   Project:
+    attributes:
+      name: string
+      department: string
+      status: string
+      archived: boolean
+      viewer_ids: string[]
+      editor_ids: string[]
+      admin_ids: string[]
     roles: [viewer, editor, admin]
     permissions: [read, update, delete, create_task]
 
@@ -62,6 +70,10 @@ resources:
           $resource.archived: true
 
   Task:
+    attributes:
+      title: string
+      description: string
+      status: string
     roles: [viewer, editor]
     permissions: [read, update, delete]
 
