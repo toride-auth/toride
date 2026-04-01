@@ -37,11 +37,13 @@ const policy = await loadYaml(policyYaml);
 // translating { field_includes: { field: "viewer_ids", value: actorId } } into
 // { roleAssignments: { some: { userId: actorId, role: "viewer" } } }.
 // ---------------------------------------------------------------------------
-export const adapter = createPrismaAdapter({
+export const adapter = createPrismaAdapter<AppSchema>({
   virtualFields: {
-    viewer_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "viewer" } },
-    editor_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "editor" } },
-    admin_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "admin" } },
+    Project: {
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "viewer" } },
+      editor_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "editor" } },
+      admin_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "admin" } },
+    },
   },
 });
 
