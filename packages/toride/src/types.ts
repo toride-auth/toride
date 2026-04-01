@@ -43,6 +43,54 @@ export interface DefaultSchema extends TorideSchema {
   relationMap: Record<string, Record<string, string>>;
 }
 
+/**
+ * Virtual field mapping configuration.
+ * Describes how a virtual field maps to a related resource query.
+ */
+export interface VirtualFieldMapping {
+  /** The relation name to query */
+  readonly relation: string;
+  /** The field in the related resource to match against */
+  readonly matchField: string;
+  /** Optional filter to apply to the relation query */
+  readonly filter?: Record<string, unknown>;
+}
+
+/**
+ * Extracts keys from T whose values are arrays.
+ */
+type ArrayKeys<T> = { [K in keyof T]: T[K] extends unknown[] ? K : never }[keyof T];
+
+/**
+ * Conditional type that uses model-aware detection when TModelMap is provided,
+ * falls back to ArrayKeys otherwise.
+ */
+type VirtualFieldKeysFor<
+  S extends TorideSchema,
+  R extends string,
+  TModelMap,
+> = [TModelMap] extends [never]
+  ? // Fallback: array keys from resource attributes (backward compat)
+    S["resourceAttributeMap"][R] extends Record<string, unknown>
+      ? Record<string, unknown> extends S["resourceAttributeMap"][R]
+        ? string  // untyped schema → any string
+        : ArrayKeys<S["resourceAttributeMap"][R]>
+      : never
+  : // Model-aware: Exclude model fields from policy attributes
+    R extends keyof TModelMap
+      ? Exclude<keyof S["resourceAttributeMap"][R] & string, keyof TModelMap[R] & string>
+      : string;
+
+/**
+ * Per-resource mapping of virtual field keys to VirtualFieldMapping.
+ * When TModelMap is provided, uses model-aware detection for virtual field keys.
+ */
+export type VirtualFieldsConfig<S extends TorideSchema, TModelMap = never> = {
+  [R in S["resources"]]?: {
+    [K in VirtualFieldKeysFor<S, R & string, TModelMap>]?: VirtualFieldMapping;
+  };
+};
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 
 /**
