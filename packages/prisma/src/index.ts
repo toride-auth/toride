@@ -8,14 +8,26 @@ import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, Defa
 /** Prisma WHERE clause type (plain object). */
 export type PrismaWhere = Record<string, unknown>;
 
-export interface VirtualFieldMapping {
+type ArrayKeys<T> = { [K in keyof T]: T[K] extends unknown[] ? K : never }[keyof T];
+
+type VirtualFieldKeys<T> = string extends keyof T ? string : ArrayKeys<T>;
+
+export interface VirtualFieldMapping<TRoles extends string = string> {
   relation: string;
   matchField: string;
-  filter?: Record<string, unknown>;
+  filter?: { role: TRoles } & Record<string, unknown>;
 }
 
+type VirtualFieldsConfig<S extends TorideSchema> = {
+  [R in S["resources"]]?: S["resourceAttributeMap"][R] extends Record<string, unknown>
+    ? Record<string, unknown> extends S["resourceAttributeMap"][R]
+      ? Record<string, VirtualFieldMapping<S["roleMap"][R] & string>>
+      : { [K in VirtualFieldKeys<S["resourceAttributeMap"][R]>]?: VirtualFieldMapping<S["roleMap"][R] & string> }
+    : never;
+};
+
 /** Options for createPrismaAdapter. */
-export interface PrismaAdapterOptions {
+export interface PrismaAdapterOptions<S extends TorideSchema = DefaultSchema> {
   /** Maps constraint relation fields to Prisma relation names. */
   relationMapping?: Record<string, string>;
   /** Prisma table name for role assignments. Default: "roleAssignments". */
@@ -26,7 +38,7 @@ export interface PrismaAdapterOptions {
     role?: string;
   };
   /** Maps virtual fields to their relation queries for field_includes constraints. */
-  virtualFields?: Record<string, VirtualFieldMapping>;
+  virtualFields?: VirtualFieldsConfig<S>;
 }
 
 /**
@@ -36,25 +48,44 @@ export interface PrismaAdapterOptions {
  * No Prisma dependency required - produces plain JS objects matching
  * Prisma's WHERE clause structure.
  *
+ * @typeParam S - The Toride schema type. Defaults to `DefaultSchema` for backward compatibility.
  * @typeParam TQueryMap - Maps resource type names to their Prisma WHERE clause types.
  *   Defaults to `Record<string, PrismaWhere>` for backward compatibility.
  */
 export function createPrismaAdapter<
+  S extends TorideSchema = DefaultSchema,
   TQueryMap extends Record<string, PrismaWhere> = Record<string, PrismaWhere>,
 >(
-  options?: PrismaAdapterOptions,
+  options?: PrismaAdapterOptions<S>,
 ): ConstraintAdapter<TQueryMap> {
   const relationMapping = options?.relationMapping ?? {};
   const roleTable = options?.roleAssignmentTable ?? "roleAssignments";
   const userIdField = options?.roleAssignmentFields?.userId ?? "userId";
   const roleField = options?.roleAssignmentFields?.role ?? "role";
-  const virtualFields = options?.virtualFields ?? {};
+
+  const flatVirtualFields: Record<string, VirtualFieldMapping> = {};
+  if (options?.virtualFields) {
+    for (const [_resource, resourceFields] of Object.entries(options.virtualFields)) {
+      if (resourceFields) {
+        for (const field of Object.keys(resourceFields)) {
+          if (flatVirtualFields[field]) {
+            throw new Error(
+              `Virtual field "${field}" is defined in multiple resources. ` +
+              `The adapter cannot disambiguate at translation time. ` +
+              `Use unique field names per resource.`
+            );
+          }
+          flatVirtualFields[field] = (resourceFields as Record<string, VirtualFieldMapping>)[field];
+        }
+      }
+    }
+  }
 
   // Internal implementation uses PrismaWhere (the base type).
   // Cast to ConstraintAdapter<TQueryMap> since TQueryMap values extend PrismaWhere.
   return {
     translate(constraint: LeafConstraint): PrismaWhere {
-      const vf = virtualFields[constraint.field];
+      const vf = flatVirtualFields[constraint.field];
       if (vf && constraint.type === "field_includes") {
         return {
           [vf.relation]: {

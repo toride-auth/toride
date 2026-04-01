@@ -173,9 +173,11 @@ describe("PrismaConstraintAdapter", () => {
   describe("createPrismaAdapter with virtualFields", () => {
     const adapter = createPrismaAdapter({
       virtualFields: {
-        viewer_ids: {
-          relation: "roleAssignments",
-          matchField: "userId",
+        Document: {
+          viewer_ids: {
+            relation: "roleAssignments",
+            matchField: "userId",
+          },
         },
       },
     });
@@ -188,10 +190,12 @@ describe("PrismaConstraintAdapter", () => {
     it("virtual field with filter adds filter to relation query", () => {
       const adapterWithFilter = createPrismaAdapter({
         virtualFields: {
-          viewer_ids: {
-            relation: "roleAssignments",
-            matchField: "userId",
-            filter: { role: "viewer" },
+          Document: {
+            viewer_ids: {
+              relation: "roleAssignments",
+              matchField: "userId",
+              filter: { role: "viewer" },
+            },
           },
         },
       });
@@ -202,6 +206,21 @@ describe("PrismaConstraintAdapter", () => {
     it("non-virtual field_includes still uses has", () => {
       expect(adapter.translate({ type: "field_includes", field: "tags", value: "urgent" }))
         .toEqual({ tags: { has: "urgent" } });
+    });
+
+    it("throws on duplicate virtual field names across resources", () => {
+      expect(() =>
+        createPrismaAdapter({
+          virtualFields: {
+            Project: {
+              viewer_ids: { relation: "roleAssignments", matchField: "userId", filter: { role: "viewer" } },
+            },
+            Task: {
+              viewer_ids: { relation: "taskAssignments", matchField: "userId", filter: { role: "viewer" } },
+            },
+          },
+        })
+      ).toThrow(/Virtual field "viewer_ids" is defined in multiple resources/);
     });
   });
 });
