@@ -29,7 +29,10 @@
                       "enum": [
                         "string",
                         "number",
-                        "boolean"
+                        "boolean",
+                        "string[]",
+                        "number[]",
+                        "boolean[]"
                       ]
                     }
                   },
@@ -347,7 +350,10 @@
                       "enum": [
                         "string",
                         "number",
-                        "boolean"
+                        "boolean",
+                        "string[]",
+                        "number[]",
+                        "boolean[]"
                       ]
                     }
                   },
