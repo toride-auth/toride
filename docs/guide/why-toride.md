@@ -88,13 +88,16 @@ If you rename a role in your YAML and forget to update a resolver, the TypeScrip
 Resolvers are functions. They take a resource reference and return attributes. Where the data comes from is entirely up to you — in-memory objects, a REST API, a GraphQL endpoint, a file, or a database.
 
 ```typescript
+import { Toride, loadYaml } from "toride";
+import { readFileSync } from "node:fs";
+
 // Plain objects — no database, no ORM, no infrastructure
 const projects: Record<string, any> = {
   "proj-1": { status: "active", department: "engineering" },
 };
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Project: async (ref) => {
       const project = projects[ref.id];
@@ -189,16 +192,16 @@ When your data source is a database, you often need to answer "which resources c
 ```typescript
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("forbidden" in result) {
+if (!result.ok) {
   return []; // no access
 }
 
-if ("unrestricted" in result) {
+if (result.constraint === null) {
   return await db.project.findMany(); // full access
 }
 
 // Translate constraints to a database query
-const where = adapter.translate(result.constraints);
+const where = adapter.translate(result.constraint);
 return await db.project.findMany({ where });
 ```
 

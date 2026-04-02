@@ -124,7 +124,7 @@ import { loadYaml } from "toride";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const content = readFileSync("policy.yaml", "utf-8");
-const policy = loadYaml(content);
+const policy = await loadYaml(content);
 const types = generateTypes(policy);
 
 writeFileSync("src/generated/policy-types.ts", types, "utf-8");

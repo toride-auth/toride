@@ -98,6 +98,7 @@ Bring the policy and resolvers together to create the engine. Each resolver is a
 
 ```typescript
 import { Toride, loadYaml } from "toride";
+import { readFileSync } from "node:fs";
 
 // In-memory data — no database needed
 const projects: Record<string, any> = {
@@ -113,7 +114,7 @@ const tasks: Record<string, any> = {
 };
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Task: async (ref) => {
       const task = tasks[ref.id];
@@ -180,9 +181,12 @@ The engine will:
 In production, your resolvers will typically query a database. The resolver interface is the same — only the data source changes:
 
 ```typescript
+import { Toride, loadYaml } from "toride";
+import { readFileSync } from "node:fs";
+
 // When your data source is a database, resolvers look like this:
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Task: async (ref) => {
       const task = await db.task.findById(ref.id);

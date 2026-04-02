@@ -133,12 +133,12 @@ Relations define typed connections between resources, enabling cross-resource ro
     permissions: [read, update, delete]
 
     relations:
-      project: { resource: Project, cardinality: one }
-      assignee: { resource: User, cardinality: one }
-      watchers: { resource: User, cardinality: many }
+      project: Project
+      assignee: User
+      watchers: User
 ```
 
-Each relation specifies the target resource type and cardinality (`one` or `many`). Relations are used in two ways:
+Each relation value is a plain type name string referencing another resource or actor type. Relations are used in two ways:
 
 1. **Derived roles** -- propagate roles from a parent resource (see [Roles & Relations](/concepts/roles-and-relations))
 2. **Conditions** -- reference related resource attributes in rules (see [Conditions & Rules](/concepts/conditions-and-rules))
@@ -234,7 +234,7 @@ resources:
     permissions: [read, update, delete, create_task]
 
     relations:
-      org: { resource: Organization, cardinality: one }
+      org: Organization
 
     grants:
       viewer: [read]
@@ -251,8 +251,8 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      project: { resource: Project, cardinality: one }
-      assignee: { resource: User, cardinality: one }
+      project: Project
+      assignee: User
 
     grants:
       viewer: [read]
@@ -277,12 +277,13 @@ resources:
 
 ## Loading a Policy
 
-Use `loadYaml()` or `loadJson()` to parse and validate a policy file:
+Use `loadYaml()` or `loadJson()` to parse and validate a policy string:
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 
-const policy = await loadYaml("./policy.yaml");
+const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
 const engine = new Toride({ policy });
 ```
 
@@ -297,10 +298,11 @@ ValidationError: resources.Task.grants references undeclared role "edtor"
 You can split policies across multiple files and merge them at load time with `mergePolicies()`:
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { loadYaml, mergePolicies } from "toride";
 
-const base = await loadYaml("./base-policy.yaml");
-const extension = await loadYaml("./team-policy.yaml");
+const base = await loadYaml(readFileSync("./base-policy.yaml", "utf-8"));
+const extension = await loadYaml(readFileSync("./team-policy.yaml", "utf-8"));
 
 const combined = mergePolicies(base, extension);
 ```

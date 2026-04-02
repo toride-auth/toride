@@ -355,13 +355,13 @@ This ensures a fail-closed security model: missing data never accidentally grant
 
 ## Cardinality: Many and ANY Semantics
 
-When a condition references a `many` relation, Toride applies **ANY semantics**: the condition is true if **any** item in the array satisfies it.
+When a condition references a relation whose resolver returns an array (a "many" relation), Toride applies **ANY semantics**: the condition is true if **any** item in the array satisfies it.
 
 ```yaml
 resources:
   Project:
     relations:
-      members: { resource: User, cardinality: many }
+      members: User
     rules:
       - effect: permit
         permissions: [read]
@@ -369,7 +369,7 @@ resources:
           $resource.members.department: engineering
 ```
 
-If the Project has three members and at least one has `department: "engineering"`, the condition matches.
+The YAML syntax for relations is always a plain type name. Whether a relation is "one" or "many" is determined at runtime by the resolver -- if it returns an array, Toride treats it as a many relation. If the Project has three members and at least one has `department: "engineering"`, the condition matches.
 
 ## Complete Example
 
@@ -382,8 +382,8 @@ resources:
     permissions: [read, update, delete, publish, archive]
 
     relations:
-      project: { resource: Project, cardinality: one }
-      author: { resource: User, cardinality: one }
+      project: Project
+      author: User
 
     grants:
       viewer: [read]
@@ -426,10 +426,11 @@ resources:
 ```
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Document: async (ref) => {
       const doc = await db.document.findById(ref.id);

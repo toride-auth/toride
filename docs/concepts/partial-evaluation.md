@@ -35,33 +35,33 @@ The result is one of three outcomes:
 
 | Result | Meaning | Action |
 |--------|---------|--------|
-| `{ unrestricted: true }` | Actor can access **all** resources of this type | No WHERE clause needed |
-| `{ forbidden: true }` | Actor cannot access **any** resources of this type | Return empty result |
-| `{ constraints: Constraint }` | Actor can access resources matching the constraint | Translate to WHERE clause |
+| `{ ok: true, constraint: null }` | Actor can access **all** resources of this type | No WHERE clause needed |
+| `{ ok: false }` | Actor cannot access **any** resources of this type | Return empty result |
+| `{ ok: true, constraint: Constraint }` | Actor can access resources matching the constraint | Translate to WHERE clause |
 
 ### Handling the Result
 
 ```typescript
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("forbidden" in result) {
+if (!result.ok) {
   // Actor has no access at all
   return [];
 }
 
-if ("unrestricted" in result) {
+if (result.constraint === null) {
   // Actor can see everything
   return await db.project.findMany();
 }
 
 // Translate constraints to a database query
-const where = engine.translateConstraints(result.constraints, adapter);
+const where = engine.translateConstraints(result.constraint, adapter);
 return await db.project.findMany({ where });
 ```
 
 ## The Constraint AST
 
-When the result contains `constraints`, it is a tree of constraint nodes. Each node describes a condition that resources must satisfy:
+When the result contains a non-null `constraint`, it is a tree of constraint nodes. Each node describes a condition that resources must satisfy:
 
 ### Leaf Nodes
 
@@ -110,14 +110,14 @@ A **constraint adapter** translates the constraint AST into your data store's qu
 ### The Adapter Interface
 
 ```typescript
-interface ConstraintAdapter<TQuery> {
-  translate(constraint: LeafConstraint): TQuery;
-  relation(field: string, resourceType: string, childQuery: TQuery): TQuery;
-  hasRole(actorId: string, actorType: string, role: string): TQuery;
-  unknown(name: string): TQuery;
-  and(queries: TQuery[]): TQuery;
-  or(queries: TQuery[]): TQuery;
-  not(query: TQuery): TQuery;
+interface ConstraintAdapter<TQueryMap extends Record<string, unknown>> {
+  translate(constraint: LeafConstraint): TQueryMap[string];
+  relation(field: string, resourceType: string, childQuery: TQueryMap[string]): TQueryMap[string];
+  hasRole(actorId: string, actorType: string, role: string): TQueryMap[string];
+  unknown(name: string): TQueryMap[string];
+  and(queries: TQueryMap[string][]): TQueryMap[string];
+  or(queries: TQueryMap[string][]): TQueryMap[string];
+  not(query: TQueryMap[string]): TQueryMap[string];
 }
 ```
 
@@ -142,8 +142,8 @@ const adapter = createPrismaAdapter();
 
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("constraints" in result) {
-  const where = engine.translateConstraints(result.constraints, adapter);
+if (result.ok && result.constraint !== null) {
+  const where = engine.translateConstraints(result.constraint, adapter);
   const projects = await prisma.project.findMany({ where });
 }
 ```
@@ -153,11 +153,12 @@ if ("constraints" in result) {
 The `@toride/prisma` package provides a ready-to-use adapter:
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createPrismaAdapter } from "@toride/prisma";
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: { /* ... */ },
 });
 
@@ -176,15 +177,15 @@ const actor = {
 
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("forbidden" in result) {
+if (!result.ok) {
   return [];
 }
 
-if ("unrestricted" in result) {
+if (result.constraint === null) {
   return await prisma.project.findMany();
 }
 
-const where = engine.translateConstraints(result.constraints, adapter);
+const where = engine.translateConstraints(result.constraint, adapter);
 const projects = await prisma.project.findMany({ where });
 // Prisma generates SQL with the authorization constraints baked in
 ```
@@ -207,8 +208,8 @@ const adapter = createDrizzleAdapter(projects, {
 
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("constraints" in result) {
-  const where = engine.translateConstraints(result.constraints, adapter);
+if (result.ok && result.constraint !== null) {
+  const where = engine.translateConstraints(result.constraint, adapter);
   // Use the where clause with Drizzle's query builder
 }
 ```
@@ -223,8 +224,9 @@ For other databases or ORMs, implement the `ConstraintAdapter` interface:
 import type { ConstraintAdapter, LeafConstraint } from "toride";
 
 type MongoQuery = Record<string, unknown>;
+type MongoQueryMap = Record<string, MongoQuery>;
 
-const mongoAdapter: ConstraintAdapter<MongoQuery> = {
+const mongoAdapter: ConstraintAdapter<MongoQueryMap> = {
   translate(constraint: LeafConstraint): MongoQuery {
     switch (constraint.type) {
       case "field_eq":
@@ -312,7 +314,7 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      org: { resource: Organization, cardinality: one }
+      org: Organization
 
     grants:
       viewer: [read]
@@ -338,11 +340,12 @@ resources:
 ```
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createPrismaAdapter } from "@toride/prisma";
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Project: async (ref) => {
       const project = await prisma.project.findUnique({
@@ -358,15 +361,15 @@ const adapter = createPrismaAdapter();
 async function listProjects(actor) {
   const result = await engine.buildConstraints(actor, "read", "Project");
 
-  if ("forbidden" in result) {
+  if (!result.ok) {
     return [];
   }
 
-  if ("unrestricted" in result) {
+  if (result.constraint === null) {
     return await prisma.project.findMany();
   }
 
-  const where = engine.translateConstraints(result.constraints, adapter);
+  const where = engine.translateConstraints(result.constraint, adapter);
   return await prisma.project.findMany({ where });
 }
 

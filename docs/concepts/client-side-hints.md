@@ -26,10 +26,11 @@ Toride provides a two-part system:
 Use `engine.snapshot()` to build a permission map for a set of resources:
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: { /* ... */ },
 });
 

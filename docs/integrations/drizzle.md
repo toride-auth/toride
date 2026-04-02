@@ -42,6 +42,7 @@ const adapter = createDrizzleAdapter(projects);
 ### 2. Build Constraints and Query
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createDrizzleAdapter } from "@toride/drizzle";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -50,8 +51,10 @@ import { projects } from "./schema";
 
 const db = drizzle(pool);
 
+const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
+
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy,
   resolvers: {
     Project: async (ref) => {
       const rows = await db
@@ -73,16 +76,16 @@ const actor = {
 
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("forbidden" in result) {
+if (!result.ok) {
   return [];
 }
 
-if ("unrestricted" in result) {
+if (result.constraint === null) {
   return await db.select().from(projects);
 }
 
 // Translate constraints into a Drizzle query description
-const where = engine.translateConstraints(result.constraints, adapter);
+const where = engine.translateConstraints(result.constraint, adapter);
 // Use the where description with your Drizzle query builder
 ```
 
@@ -190,14 +193,17 @@ This produces:
 `@toride/drizzle` provides `createDrizzleResolver()`, a helper that wraps a Drizzle `select` query into the resolver signature that Toride expects:
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { createDrizzleResolver } from "@toride/drizzle";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { projects, tasks } from "./schema";
 
 const db = drizzle(pool);
 
+const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
+
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy,
   resolvers: {
     Project: createDrizzleResolver(db, projects),
     Task: createDrizzleResolver(db, tasks),
@@ -236,7 +242,7 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      org: { resource: Organization, cardinality: one }
+      org: Organization
 
     grants:
       viewer: [read]
@@ -260,6 +266,7 @@ resources:
 ```
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createDrizzleAdapter, createDrizzleResolver } from "@toride/drizzle";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -267,8 +274,10 @@ import { projects, organizations } from "./schema";
 
 const db = drizzle(pool);
 
+const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
+
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy,
   resolvers: {
     Project: createDrizzleResolver(db, projects),
   },
@@ -287,15 +296,15 @@ async function listProjects(actor: {
 }) {
   const result = await engine.buildConstraints(actor, "read", "Project");
 
-  if ("forbidden" in result) {
+  if (!result.ok) {
     return [];
   }
 
-  if ("unrestricted" in result) {
+  if (result.constraint === null) {
     return await db.select().from(projects);
   }
 
-  const where = engine.translateConstraints(result.constraints, adapter);
+  const where = engine.translateConstraints(result.constraint, adapter);
   // Process the `where` description object with your Drizzle query builder
   return where;
 }

@@ -39,6 +39,7 @@ const adapter = createPrismaAdapter();
 ### 2. Build Constraints and Query
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createPrismaAdapter } from "@toride/prisma";
 import { PrismaClient } from "@prisma/client";
@@ -46,7 +47,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Project: async (ref) => {
       const project = await prisma.project.findUnique({
@@ -67,18 +68,18 @@ const actor = {
 
 const result = await engine.buildConstraints(actor, "read", "Project");
 
-if ("forbidden" in result) {
+if (!result.ok) {
   // Actor has no access at all
   return [];
 }
 
-if ("unrestricted" in result) {
+if (result.constraint === null) {
   // Actor can see everything
   return await prisma.project.findMany();
 }
 
 // Translate constraints into a Prisma WHERE clause
-const where = engine.translateConstraints(result.constraints, adapter);
+const where = engine.translateConstraints(result.constraint, adapter);
 const projects = await prisma.project.findMany({ where });
 ```
 
@@ -163,13 +164,15 @@ Composite nodes (`and`, `or`, `not`) map to Prisma's `AND`, `OR`, and `NOT` oper
 `@toride/prisma` also provides `createPrismaResolver()`, a helper that wraps a Prisma `findUnique` call into the resolver signature that Toride expects:
 
 ```typescript
+import { readFileSync } from "node:fs";
+import { Toride, loadYaml } from "toride";
 import { createPrismaResolver } from "@toride/prisma";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Project: createPrismaResolver(prisma, "project"),
     Task: createPrismaResolver(prisma, "task"),
@@ -218,7 +221,7 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      org: { resource: Organization, cardinality: one }
+      org: Organization
 
     grants:
       viewer: [read]
@@ -244,6 +247,7 @@ resources:
 ```
 
 ```typescript
+import { readFileSync } from "node:fs";
 import { Toride, loadYaml } from "toride";
 import { createPrismaAdapter, createPrismaResolver } from "@toride/prisma";
 import { PrismaClient } from "@prisma/client";
@@ -251,7 +255,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Project: createPrismaResolver(prisma, "project"),
   },
@@ -270,15 +274,15 @@ async function listProjects(actor: {
 }) {
   const result = await engine.buildConstraints(actor, "read", "Project");
 
-  if ("forbidden" in result) {
+  if (!result.ok) {
     return [];
   }
 
-  if ("unrestricted" in result) {
+  if (result.constraint === null) {
     return await prisma.project.findMany();
   }
 
-  const where = engine.translateConstraints(result.constraints, adapter);
+  const where = engine.translateConstraints(result.constraint, adapter);
   return await prisma.project.findMany({ where });
 }
 

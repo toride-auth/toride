@@ -39,17 +39,12 @@ resources:
     permissions: [read, update, delete]
 
     relations:
-      project: { resource: Project, cardinality: one }
-      assignee: { resource: User, cardinality: one }
-      watchers: { resource: User, cardinality: many }
+      project: Project
+      assignee: User
+      watchers: User
 ```
 
-Each relation specifies:
-
-| Field | Description |
-|-------|-------------|
-| `resource` | The target resource type |
-| `cardinality` | `one` (single reference) or `many` (array of references) |
+Each relation value is a plain type name string referencing another resource defined in the policy.
 
 Relations serve two purposes:
 
@@ -61,6 +56,8 @@ Relations serve two purposes:
 At runtime, the engine resolves relations through your **resolver** -- a plain function that returns attributes from any data source. When Toride needs to follow a relation, it calls your resolver to fetch the related resource reference:
 
 ```typescript
+import { readFileSync } from "node:fs";
+
 // In-memory data — no database required
 const tasks = {
   "task-42": {
@@ -76,7 +73,7 @@ const projects = {
 };
 
 const engine = new Toride({
-  policy: await loadYaml("./policy.yaml"),
+  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
   resolvers: {
     Task: async (ref) => {
       const task = tasks[ref.id];
@@ -151,7 +148,7 @@ resources:
     roles: [viewer, editor]
     # ...
     relations:
-      project: { resource: Project, cardinality: one }
+      project: Project
 
     derived_roles:
       - role: editor
@@ -182,7 +179,7 @@ resources:
   Project:
     roles: [viewer, editor, admin]
     relations:
-      org: { resource: Organization, cardinality: one }
+      org: Organization
     derived_roles:
       - role: admin
         from_role: admin
@@ -191,7 +188,7 @@ resources:
   Task:
     roles: [viewer, editor]
     relations:
-      project: { resource: Project, cardinality: one }
+      project: Project
     derived_roles:
       - role: editor
         from_role: admin
@@ -209,7 +206,7 @@ resources:
   Task:
     roles: [viewer, editor]
     relations:
-      assignee: { resource: User, cardinality: one }
+      assignee: User
     derived_roles:
       - role: editor
         from_relation: assignee
@@ -232,7 +229,7 @@ This also works with `many` relations. If any item in the array matches the acto
 
 ```yaml
     relations:
-      watchers: { resource: User, cardinality: many }
+      watchers: User
     derived_roles:
       - role: viewer
         from_relation: watchers
