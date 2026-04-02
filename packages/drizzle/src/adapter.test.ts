@@ -221,4 +221,79 @@ describe("DrizzleConstraintAdapter", () => {
       });
     });
   });
+
+  describe("with virtualFields", () => {
+    it("translates virtual field field_includes to relation-based op", () => {
+      const projectsTable = mockTable("projects", ["id", "status"]);
+      const customAdapter = createDrizzleAdapter(tasksTable, {
+        relations: {
+          project: { table: projectsTable, foreignKey: "projectId" },
+        },
+        virtualFields: {
+          Task: {
+            projectTags: { relation: "project", matchField: "tags", filter: { status: "active" } },
+          },
+        },
+      });
+      const result = customAdapter.translate({ type: "field_includes", field: "projectTags", value: "urgent" });
+      expect(result).toEqual({
+        _op: "relation",
+        field: "project",
+        matchField: "tags",
+        value: "urgent",
+        filter: { status: "active" },
+        table: tasksTable,
+      });
+    });
+
+    it("translates non-virtual field field_includes to arrayContains", () => {
+      const customAdapter = createDrizzleAdapter(tasksTable, {
+        virtualFields: {
+          Task: {
+            projectTags: { relation: "project", matchField: "tags", filter: { status: "active" } },
+          },
+        },
+      });
+      const result = customAdapter.translate({ type: "field_includes", field: "tags", value: "urgent" });
+      expect(result).toEqual({ _op: "arrayContains", field: "tags", value: "urgent", table: tasksTable });
+    });
+
+    it("translates virtual field with no filter", () => {
+      const customAdapter = createDrizzleAdapter(tasksTable, {
+        virtualFields: {
+          Task: {
+            projectTags: { relation: "project", matchField: "tags" },
+          },
+        },
+      });
+      const result = customAdapter.translate({ type: "field_includes", field: "projectTags", value: "urgent" });
+      expect(result).toEqual({
+        _op: "relation",
+        field: "project",
+        matchField: "tags",
+        value: "urgent",
+        filter: undefined,
+        table: tasksTable,
+      });
+    });
+
+    it("throws error for duplicate virtual field across resources", () => {
+      expect(() => {
+        createDrizzleAdapter(tasksTable, {
+          virtualFields: {
+            Task: {
+              projectTags: { relation: "project", matchField: "tags" },
+            },
+            Document: {
+              projectTags: { relation: "project", matchField: "name" },
+            },
+          },
+        });
+      }).toThrow(
+        'Virtual field "projectTags" is defined in multiple resources. ' +
+        'The adapter cannot disambiguate at translation time. ' +
+        'Use unique field names per resource.'
+      );
+    });
+  });
 });

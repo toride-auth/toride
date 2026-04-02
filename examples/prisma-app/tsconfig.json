@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "outDir": "./dist",
+    "rootDir": "."
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "prisma/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

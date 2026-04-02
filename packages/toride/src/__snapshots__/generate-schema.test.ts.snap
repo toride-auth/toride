@@ -32,7 +32,10 @@ exports[`generate-schema > full PolicySchema snapshot > matches generated schema
                       "enum": [
                         "string",
                         "number",
-                        "boolean"
+                        "boolean",
+                        "string[]",
+                        "number[]",
+                        "boolean[]"
                       ]
                     }
                   },
@@ -350,7 +353,10 @@ exports[`generate-schema > full PolicySchema snapshot > matches generated schema
                       "enum": [
                         "string",
                         "number",
-                        "boolean"
+                        "boolean",
+                        "string[]",
+                        "number[]",
+                        "boolean[]"
                       ]
                     }
                   },

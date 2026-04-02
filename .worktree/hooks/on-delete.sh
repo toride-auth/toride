@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # =============================================================================
@@ -30,7 +30,7 @@ CONTAINER_NAME="app-${PROJECT_NAME}-${WORKTREE_NAME}"
 # --- Stop and remove container ---
 
 if docker inspect "$CONTAINER_NAME" > /dev/null 2>&1; then
-  echo "[devcontainer-wt] Removing container ${CONTAINER_NAME}..."
+  echo "[container-wt] Removing container ${CONTAINER_NAME}..."
   docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 fi
 
@@ -42,22 +42,24 @@ fi
 #   # Drop per-worktree PostgreSQL database
 #   docker exec "postgres-${PROJECT_NAME}" dropdb -U dev --if-exists "${PROJECT_NAME}_${WORKTREE_NAME}" 2>/dev/null || true
 
-# --- Prune orphaned containers ---
+# --- Prune orphaned containers (full mode only — labels are not set in slim mode) ---
 
-echo "[devcontainer-wt] Checking for orphaned containers..."
-containers=$(docker ps -a --filter "label=devcontainer-wt.project=${PROJECT_NAME}" \
-  --format '{{.Names}}\t{{.Label "devcontainer-wt.worktree-dir"}}' 2>/dev/null) || true
+if docker ps -a --filter "label=container-wt.project=${PROJECT_NAME}" --format '{{.Names}}' 2>/dev/null | grep -q .; then
+  echo "[container-wt] Checking for orphaned containers..."
+  containers=$(docker ps -a --filter "label=container-wt.project=${PROJECT_NAME}" \
+    --format '{{.Names}}\t{{.Label "container-wt.worktree-dir"}}' 2>/dev/null) || true
 
-if [[ -n "$containers" ]]; then
-  while IFS=$'\t' read -r name worktree_dir; do
-    [[ -z "$name" ]] && continue
-    if [[ ! -d "$worktree_dir" ]]; then
-      echo "[devcontainer-wt] Removing orphaned container: ${name}"
-      docker rm -f "$name" 2>/dev/null || true
-    fi
-  done <<< "$containers"
+  if [[ -n "$containers" ]]; then
+    while IFS=$'\t' read -r name worktree_dir; do
+      [[ -z "$name" ]] && continue
+      if [[ ! -d "$worktree_dir" ]]; then
+        echo "[container-wt] Removing orphaned container: ${name}"
+        docker rm -f "$name" 2>/dev/null || true
+      fi
+    done <<< "$containers"
+  fi
 fi
 
 git worktree prune 2>/dev/null || true
 
-echo "[devcontainer-wt] on-delete complete."
+echo "[container-wt] on-delete complete."

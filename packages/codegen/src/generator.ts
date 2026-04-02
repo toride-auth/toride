@@ -207,7 +207,7 @@ export function generateTypes(policy: Policy): string {
 
   // RoleMap
   lines.push(`/** Per-resource role types */`);
-  lines.push(`export interface RoleMap {`);
+  lines.push(`export type RoleMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.roles.length > 0) {
       const roleUnion = block.roles.map((r: string) => `"${r}"`).join(" | ");
@@ -221,7 +221,7 @@ export function generateTypes(policy: Policy): string {
 
   // PermissionMap
   lines.push(`/** Per-resource permission types */`);
-  lines.push(`export interface PermissionMap {`);
+  lines.push(`export type PermissionMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.permissions.length > 0) {
       const permUnion = block.permissions.map((p: string) => `"${p}"`).join(" | ");
@@ -235,7 +235,7 @@ export function generateTypes(policy: Policy): string {
 
   // ResourceAttributeMap
   lines.push(`/** Per-resource attribute types */`);
-  lines.push(`export interface ResourceAttributeMap {`);
+  lines.push(`export type ResourceAttributeMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.attributes && Object.keys(block.attributes).length > 0) {
       lines.push(`  ${name}: ${generateAttributeFields(block.attributes, "resource", name)};`);
@@ -248,7 +248,7 @@ export function generateTypes(policy: Policy): string {
 
   // ActorAttributeMap
   lines.push(`/** Per-actor attribute types */`);
-  lines.push(`export interface ActorAttributeMap {`);
+  lines.push(`export type ActorAttributeMap = {`);
   for (const [name, actorDecl] of actorEntries) {
     const attrKeys = Object.keys(actorDecl.attributes);
     if (attrKeys.length > 0) {
@@ -262,7 +262,7 @@ export function generateTypes(policy: Policy): string {
 
   // RelationMap
   lines.push(`/** Relation map — resource type -> relation name -> target resource type */`);
-  lines.push(`export interface RelationMap {`);
+  lines.push(`export type RelationMap = {`);
   for (const [name, block] of resourceEntries) {
     const relations = block.relations ?? {};
     const relEntries = Object.entries(relations);
