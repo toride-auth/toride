@@ -1,8 +1,8 @@
 name: Update Docs
 description: >
-  Analyzes fdsx source code against the README.md and updates it
-  to reflect the current codebase.
-version: "1.0"
+  Analyzes toride source code against the docs site and updates
+  documentation to reflect the current codebase with user-friendly examples.
+version: "2.0"
 start_at: collect_data
 max_loop: 3
 
@@ -33,30 +33,32 @@ states:
       - variable: $.analyze_decision
         operator: equals
         value: CHANGES_NEEDED
-        next: update_readme
+        next: update_docs
     default: done_no_changes
 
-  update_readme:
+  update_docs:
     type: task
     profile: smarty
-    prompt_file: update_readme.md
-    result_path: $.updated_readme
-    result_file: $.readme_file
-    next: apply_updates
+    prompt_file: update_docs.md
+    result_path: $.updated_docs
+    next: done_with_changes
 
-  apply_updates:
+  done_with_changes:
     type: task
     provider: system
     command: |
-      cp "{readme_file}" "README.md"
-      echo "Updated README.md from {readme_file}"
-      echo "DONE"
-    result_path: $.apply_result
+      echo "Documentation updated successfully."
+      echo "Changed files:"
+      git diff --name-only -- docs/
+      echo ""
+      echo "Summary of changes:"
+      git diff --stat -- docs/
+    result_path: $.final_message
     end: true
 
   done_no_changes:
     type: task
     provider: system
-    command: "echo 'README.md is already up to date. No changes needed.'"
+    command: "echo 'Documentation is already up to date. No changes needed.'"
     result_path: $.final_message
     end: true

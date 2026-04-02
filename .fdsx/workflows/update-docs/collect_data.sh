@@ -1,89 +1,217 @@
 #!/usr/bin/env bash
-# Collect fdsx source code + current README.md for analysis.
+# Collect toride source code + current docs for analysis.
 # Outputs a structured dump that an LLM can compare against the docs.
 set -euo pipefail
 
-SRC_DIR="src/fdsx"
+DOCS_DIR="docs"
+PACKAGES_DIR="packages"
 
-echo "===== CURRENT README.md ====="
-cat "README.md"
+echo "=========================================="
+echo "TORIDE DOCS SITE UPDATE - DATA COLLECTION"
+echo "=========================================="
+
+# ─── Current Docs Content ───────────────────────────────────────────
+echo ""
+echo "===== DOCS: index.md (homepage) ====="
+cat "$DOCS_DIR/index.md"
 
 echo ""
-echo "===== SOURCE: models/flow.py ====="
-cat "$SRC_DIR/models/flow.py"
+echo "===== DOCS: guide/why-toride.md ====="
+cat "$DOCS_DIR/guide/why-toride.md"
 
 echo ""
-echo "===== SOURCE: models/task.py ====="
-cat "$SRC_DIR/models/task.py"
+echo "===== DOCS: guide/getting-started.md ====="
+cat "$DOCS_DIR/guide/getting-started.md"
 
 echo ""
-echo "===== SOURCE: providers/base.py ====="
-cat "$SRC_DIR/providers/base.py"
+echo "===== DOCS: guide/quickstart.md ====="
+cat "$DOCS_DIR/guide/quickstart.md"
 
 echo ""
-echo "===== SOURCE: providers/claude.py ====="
-cat "$SRC_DIR/providers/claude.py"
+echo "===== DOCS: concepts/policy-format.md ====="
+cat "$DOCS_DIR/concepts/policy-format.md"
 
 echo ""
-echo "===== SOURCE: providers/codex.py ====="
-cat "$SRC_DIR/providers/codex.py"
+echo "===== DOCS: concepts/roles-and-relations.md ====="
+cat "$DOCS_DIR/concepts/roles-and-relations.md"
 
 echo ""
-echo "===== SOURCE: providers/opencode.py ====="
-cat "$SRC_DIR/providers/opencode.py"
+echo "===== DOCS: concepts/resolvers.md ====="
+cat "$DOCS_DIR/concepts/resolvers.md"
 
 echo ""
-echo "===== SOURCE: providers/gemini.py ====="
-cat "$SRC_DIR/providers/gemini.py"
+echo "===== DOCS: concepts/conditions-and-rules.md ====="
+cat "$DOCS_DIR/concepts/conditions-and-rules.md"
 
 echo ""
-echo "===== SOURCE: providers/system.py ====="
-cat "$SRC_DIR/providers/system.py"
+echo "===== DOCS: concepts/partial-evaluation.md ====="
+cat "$DOCS_DIR/concepts/partial-evaluation.md"
 
 echo ""
-echo "===== SOURCE: providers/__init__.py ====="
-cat "$SRC_DIR/providers/__init__.py"
+echo "===== DOCS: concepts/client-side-hints.md ====="
+cat "$DOCS_DIR/concepts/client-side-hints.md"
 
 echo ""
-echo "===== SOURCE: cli/main.py ====="
-cat "$SRC_DIR/cli/main.py"
+echo "===== DOCS: integrations/prisma.md ====="
+cat "$DOCS_DIR/integrations/prisma.md"
 
 echo ""
-echo "===== SOURCE: core/loader.py ====="
-cat "$SRC_DIR/core/loader.py"
+echo "===== DOCS: integrations/drizzle.md ====="
+cat "$DOCS_DIR/integrations/drizzle.md"
 
 echo ""
-echo "===== SOURCE: core/extraction.py ====="
-cat "$SRC_DIR/core/extraction.py"
+echo "===== DOCS: integrations/codegen.md ====="
+cat "$DOCS_DIR/integrations/codegen.md"
 
 echo ""
-echo "===== SOURCE: core/engine/run.py ====="
-cat "$SRC_DIR/core/engine/run.py"
+echo "===== DOCS: reference/cli.md ====="
+cat "$DOCS_DIR/reference/cli.md"
 
 echo ""
-echo "===== SOURCE: core/engine/batch.py ====="
-cat "$SRC_DIR/core/engine/batch.py"
+echo "===== DOCS: reference/ide-setup.md ====="
+cat "$DOCS_DIR/reference/ide-setup.md"
 
 echo ""
-echo "===== SOURCE: core/engine/tasks_dir.py ====="
-cat "$SRC_DIR/core/engine/tasks_dir.py"
+echo "===== DOCS: VitePress config ====="
+cat "$DOCS_DIR/.vitepress/config.ts"
+
+# ─── Core Package Source ────────────────────────────────────────────
+echo ""
+echo "===== SOURCE: packages/toride/package.json ====="
+cat "$PACKAGES_DIR/toride/package.json"
 
 echo ""
-echo "===== SOURCE: core/profiles.py ====="
-cat "$SRC_DIR/core/profiles.py"
+echo "===== SOURCE: packages/toride/src/index.ts (public API) ====="
+cat "$PACKAGES_DIR/toride/src/index.ts"
 
 echo ""
-echo "===== SOURCE: core/config.py ====="
-cat "$SRC_DIR/core/config.py"
+echo "===== SOURCE: packages/toride/src/engine.ts ====="
+cat "$PACKAGES_DIR/toride/src/engine.ts"
 
 echo ""
-echo "===== SOURCE: core/selector.py ====="
-cat "$SRC_DIR/core/selector.py"
+echo "===== SOURCE: packages/toride/src/types.ts ====="
+cat "$PACKAGES_DIR/toride/src/types.ts"
+
+# Client module
+if [ -f "$PACKAGES_DIR/toride/src/client.ts" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/client.ts ====="
+  cat "$PACKAGES_DIR/toride/src/client.ts"
+fi
+
+# Snapshot module
+if [ -f "$PACKAGES_DIR/toride/src/snapshot.ts" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/snapshot.ts ====="
+  cat "$PACKAGES_DIR/toride/src/snapshot.ts"
+fi
+
+# Policy modules
+echo ""
+echo "===== SOURCE: packages/toride/src/policy/parser.ts ====="
+cat "$PACKAGES_DIR/toride/src/policy/parser.ts"
 
 echo ""
-echo "===== PYPROJECT.TOML (metadata) ====="
-cat "pyproject.toml"
+echo "===== SOURCE: packages/toride/src/policy/validator.ts ====="
+cat "$PACKAGES_DIR/toride/src/policy/validator.ts"
 
+if [ -f "$PACKAGES_DIR/toride/src/policy/merger.ts" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/policy/merger.ts ====="
+  cat "$PACKAGES_DIR/toride/src/policy/merger.ts"
+fi
+
+# Partial evaluation
+if [ -f "$PACKAGES_DIR/toride/src/partial/constraint-types.ts" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/partial/constraint-types.ts ====="
+  cat "$PACKAGES_DIR/toride/src/partial/constraint-types.ts"
+fi
+
+# Testing utilities
+if [ -d "$PACKAGES_DIR/toride/src/testing" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/testing/ (files) ====="
+  for f in "$PACKAGES_DIR/toride/src/testing/"*.ts; do
+    echo "--- $f ---"
+    cat "$f"
+  done
+fi
+
+# CLI
+if [ -d "$PACKAGES_DIR/toride/src/cli" ]; then
+  echo ""
+  echo "===== SOURCE: packages/toride/src/cli/ (files) ====="
+  for f in "$PACKAGES_DIR/toride/src/cli/"*.ts; do
+    echo "--- $f ---"
+    cat "$f"
+  done
+fi
+
+# ─── Codegen Package ───────────────────────────────────────────────
+echo ""
+echo "===== SOURCE: packages/codegen/package.json ====="
+cat "$PACKAGES_DIR/codegen/package.json"
+
+echo ""
+echo "===== SOURCE: packages/codegen/src/index.ts ====="
+cat "$PACKAGES_DIR/codegen/src/index.ts"
+
+# Codegen CLI
+if [ -f "$PACKAGES_DIR/codegen/src/cli.ts" ]; then
+  echo ""
+  echo "===== SOURCE: packages/codegen/src/cli.ts ====="
+  cat "$PACKAGES_DIR/codegen/src/cli.ts"
+fi
+
+# ─── Prisma Package ────────────────────────────────────────────────
+echo ""
+echo "===== SOURCE: packages/prisma/package.json ====="
+cat "$PACKAGES_DIR/prisma/package.json"
+
+echo ""
+echo "===== SOURCE: packages/prisma/src/index.ts ====="
+cat "$PACKAGES_DIR/prisma/src/index.ts"
+
+# Prisma adapter and resolver
+for f in "$PACKAGES_DIR/prisma/src/"*.ts; do
+  if [ "$f" != "$PACKAGES_DIR/prisma/src/index.ts" ]; then
+    echo ""
+    echo "===== SOURCE: $f ====="
+    cat "$f"
+  fi
+done
+
+# ─── Drizzle Package ───────────────────────────────────────────────
+echo ""
+echo "===== SOURCE: packages/drizzle/package.json ====="
+cat "$PACKAGES_DIR/drizzle/package.json"
+
+echo ""
+echo "===== SOURCE: packages/drizzle/src/index.ts ====="
+cat "$PACKAGES_DIR/drizzle/src/index.ts"
+
+# Drizzle adapter and resolver
+for f in "$PACKAGES_DIR/drizzle/src/"*.ts; do
+  if [ "$f" != "$PACKAGES_DIR/drizzle/src/index.ts" ]; then
+    echo ""
+    echo "===== SOURCE: $f ====="
+    cat "$f"
+  fi
+done
+
+# ─── Example Projects ──────────────────────────────────────────────
+if [ -d "examples" ]; then
+  echo ""
+  echo "===== EXAMPLES DIRECTORY LISTING ====="
+  find examples -type f -name '*.ts' -o -name '*.yaml' -o -name '*.yml' | head -50
+fi
+
+# ─── Git Context ────────────────────────────────────────────────────
 echo ""
 echo "===== RECENT GIT LOG (last 30 commits) ====="
 git log --oneline -30
+
+echo ""
+echo "===== ROOT package.json (version info) ====="
+cat package.json
