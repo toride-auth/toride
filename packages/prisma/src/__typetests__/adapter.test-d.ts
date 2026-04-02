@@ -214,3 +214,135 @@ createPrismaAdapter<TestSchema, TestModelMap>({
     },
   },
 });
+
+// ─── Payload-typed VirtualFieldsConfig type tests ────────────────────
+
+// Mock payload types matching TestSchema's relation names
+type MockRoleAssignmentPayload = { scalars: { userId: string; role: string }; objects: {} };
+type MockTagPayload = { scalars: { id: number; name: string }; objects: {} };
+type MockDocumentPayload = {
+  scalars: { status: string; ownerId: string; createdAt: Date };
+  objects: { roleAssignments: MockRoleAssignmentPayload[]; tags: MockTagPayload[] };
+};
+type MockMembershipPayload = { scalars: { userId: string; orgId: string }; objects: {} };
+type MockOrganizationPayload = {
+  scalars: { name: string; plan: string };
+  objects: { memberships: MockMembershipPayload[] };
+};
+type PayloadModelMap = { Document: MockDocumentPayload; Organization: MockOrganizationPayload };
+
+// Payload-typed: valid relation compiles (roleAssignments is a key in Document.objects)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+    },
+  },
+});
+
+// Payload-typed: invalid relation is rejected (nonExistent not in Document.objects)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        // @ts-expect-error - "nonExistent" is not a valid relation in Document.objects
+        relation: "nonExistent",
+        matchField: "userId",
+      },
+    },
+  },
+});
+
+// Payload-typed: valid matchField compiles (userId is a scalar in MockRoleAssignmentPayload)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+    },
+  },
+});
+
+// Payload-typed: invalid matchField is rejected (badField not in MockRoleAssignmentPayload.scalars)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "roleAssignments",
+        // @ts-expect-error - "badField" is not a scalar in MockRoleAssignmentPayload
+        matchField: "badField",
+      },
+    },
+  },
+});
+
+// Payload-typed: valid filter compiles (role is a scalar in MockRoleAssignmentPayload)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "roleAssignments",
+        matchField: "userId",
+        filter: { role: "viewer" },
+      },
+    },
+  },
+});
+
+// Payload-typed: invalid filter key is rejected (badKey not in MockRoleAssignmentPayload.scalars)
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "roleAssignments",
+        matchField: "userId",
+        // @ts-expect-error - "badKey" is not a scalar in MockRoleAssignmentPayload
+        filter: { badKey: "x" },
+      },
+    },
+  },
+});
+
+// Payload-typed: tags relation uses id (number) as matchField
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      tag_ids: { relation: "tags", matchField: "id" },
+    },
+  },
+});
+
+// Payload-typed: Organization memberships relation
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Organization: {
+      member_ids: { relation: "memberships", matchField: "userId" },
+    },
+  },
+});
+
+// Payload-typed: filter with correct scalar type
+createPrismaAdapter<TestSchema, PayloadModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "roleAssignments",
+        matchField: "userId",
+        filter: { role: "editor", userId: "user123" },
+      },
+    },
+  },
+});
+
+// Backward compat: plain model TModelMap (no objects property) still accepts arbitrary strings
+// This uses VirtualFieldMapping (untyped) which accepts any string for relation/matchField
+createPrismaAdapter<TestSchema, TestModelMap>({
+  virtualFields: {
+    Document: {
+      viewer_ids: {
+        relation: "anyString",
+        matchField: "anyField",
+        filter: { anyKey: "anyValue" },
+      },
+    },
+  },
+});
