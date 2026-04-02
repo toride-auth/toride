@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-02
+
+### Added
+- Simplified constraint API with ok-based results returning ForbiddenError on denial, providing structured error context
+- Nested attribute schema types (object/array) with recursive validation and depth-limiting in policy parser
+- Policy JSON Schema generation for IDE integration (autocomplete and validation in YAML policies)
+- Array attribute types (string[], number[], boolean[]) in policy definitions
+- Shared VirtualFieldMapping and VirtualFieldsConfig types in toride core for ORM-agnostic virtual field support
+- Prisma payload type utilities (ModelScalars, PayloadRelations, VirtualFieldMappingFor) for compile-time virtual field validation
+- virtualFields support in createPrismaAdapter with schema-aware typed configuration
+- virtualFields support in createDrizzleAdapter mirroring the Prisma adapter pattern
+- prisma-app example project demonstrating end-to-end authorization with Hono, Prisma, and HTMX
+
+### Changed
+- Migrated dev container from .devcontainer to .worktree with multi-stage builds
+- Adapted update-docs workflow for toride docs site
+- Migrated orchestration to takt and improved review pipeline
+
 ## [0.3.0] - 2026-03-13
 
 ### Added
