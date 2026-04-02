@@ -24,7 +24,7 @@ export type {
 
 // ─── Schema Types ─────────────────────────────────────────────────
 export type { TorideSchema, DefaultSchema } from "./types.js";
-export type { VirtualFieldMapping, VirtualFieldsConfig } from "./types.js";
+export type { VirtualFieldMapping, VirtualFieldsConfig, VirtualFieldMappingFor, PayloadRelations } from "./types.js";
 
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 export type {

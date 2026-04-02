@@ -61,6 +61,26 @@ export interface VirtualFieldMapping {
  */
 type ArrayKeys<T> = { [K in keyof T]: T[K] extends unknown[] ? K : never }[keyof T];
 
+type ModelScalars<T> = T extends { scalars: infer S extends Record<string, unknown> }
+  ? S
+  : T extends Record<string, unknown>
+    ? T
+    : never;
+
+type UnwrapRelation<T> = T extends readonly (infer U)[] ? U : NonNullable<T>;
+
+export type PayloadRelations<T> = T extends { objects: infer O extends Record<string, unknown> }
+  ? { [K in keyof O & string]: ModelScalars<UnwrapRelation<O[K]>> }
+  : Record<string, never>;
+
+export type VirtualFieldMappingFor<TRelations extends Record<string, Record<string, unknown>>> = {
+  [R in keyof TRelations & string]: {
+    readonly relation: R;
+    readonly matchField: keyof TRelations[R] & string;
+    readonly filter?: { readonly [F in keyof TRelations[R]]?: TRelations[R][F] };
+  };
+}[keyof TRelations & string];
+
 /**
  * Conditional type that uses model-aware detection when TModelMap is provided,
  * falls back to ArrayKeys otherwise.
@@ -78,7 +98,7 @@ type VirtualFieldKeysFor<
       : never
   : // Model-aware: Exclude model fields from policy attributes
     R extends keyof TModelMap
-      ? Exclude<keyof S["resourceAttributeMap"][R] & string, keyof TModelMap[R] & string>
+      ? Exclude<keyof S["resourceAttributeMap"][R] & string, keyof ModelScalars<TModelMap[R]> & string>
       : string;
 
 /**
@@ -87,7 +107,12 @@ type VirtualFieldKeysFor<
  */
 export type VirtualFieldsConfig<S extends TorideSchema, TModelMap = never> = {
   [R in S["resources"]]?: {
-    [K in VirtualFieldKeysFor<S, R & string, TModelMap>]?: VirtualFieldMapping;
+    [K in VirtualFieldKeysFor<S, R & string, TModelMap>]?:
+      R extends keyof TModelMap
+        ? TModelMap[R] extends { objects: Record<string, unknown> }
+          ? VirtualFieldMappingFor<PayloadRelations<TModelMap[R]>>
+          : VirtualFieldMapping
+        : VirtualFieldMapping;
   };
 };
 
