@@ -5,6 +5,7 @@ import { Toride, loadYaml } from "toride";
 import { createPrismaAdapter } from "@toride/prisma";
 import { prisma } from "./db.js";
 import type { AppSchema } from "./types.js";
+import type { Project, Task } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // 1. POLICY LOADING
@@ -42,10 +43,7 @@ const policy = await loadYaml(policyYaml);
 // treated as virtual fields.
 // ---------------------------------------------------------------------------
 
-// ORM model scalar fields (matches Prisma schema — relations excluded)
-type ProjectModel = { id: string; name: string; department: string; status: string; archived: boolean };
-type TaskModel = { id: string; title: string; description: string; status: string };
-type ModelMap = { Project: ProjectModel; Task: TaskModel };
+type ModelMap = { Project: Project; Task: Task };
 
 export const adapter = createPrismaAdapter<AppSchema, ModelMap>({
   virtualFields: {
