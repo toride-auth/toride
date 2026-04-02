@@ -84,12 +84,29 @@ async () => {
   expectType<ConstraintResult<"Organization">>(result);
 };
 
-// ─── Test: translateConstraints returns TQueryMap[R] ─────────────
+// ─── Test: ok-based result discrimination ─────────────────────────
 
 async () => {
   const result = await typedEngine.buildConstraints(actor, "read", "Document");
-  if ("constraints" in result) {
-    const where = typedEngine.translateConstraints(result, typedAdapter);
+  // After checking result.ok, the constraint property is accessible
+  if (result.ok === true) {
+    // When ok: true, constraint can be Constraint | null
+    expectAssignable<Constraint | null>(result.constraint);
+  } else {
+    // When ok: false, there is no constraint property
+    // @ts-expect-error - ok: false results don't have constraint
+    result.constraint;
+  }
+};
+
+// ─── Test: translateConstraints accepts Constraint directly ────────
+
+async () => {
+  const result = await typedEngine.buildConstraints(actor, "read", "Document");
+  if (result.ok === true && result.constraint !== null) {
+    // translateConstraints now accepts Constraint directly, not ConstraintResult
+    // R must be explicitly provided since Constraint doesn't carry the phantom type
+    const where = typedEngine.translateConstraints<"Document", TestQueryMap>(result.constraint, typedAdapter);
     // Should be DocumentWhereInput (i.e., TQueryMap["Document"])
     expectType<DocumentWhereInput>(where);
   }
@@ -97,11 +114,22 @@ async () => {
 
 async () => {
   const result = await typedEngine.buildConstraints(actor, "manage", "Organization");
-  if ("constraints" in result) {
-    const where = typedEngine.translateConstraints(result, typedAdapter);
+  if (result.ok === true && result.constraint !== null) {
+    // translateConstraints now accepts Constraint directly, not ConstraintResult
+    // R must be explicitly provided since Constraint doesn't carry the phantom type
+    const where = typedEngine.translateConstraints<"Organization", TestQueryMap>(result.constraint, typedAdapter);
     // Should be OrganizationWhereInput (i.e., TQueryMap["Organization"])
     expectType<OrganizationWhereInput>(where);
   }
+};
+
+// ─── Test: translateConstraints rejects ConstraintResult ──────────
+
+async () => {
+  const result = await typedEngine.buildConstraints(actor, "read", "Document");
+  // Passing the full ConstraintResult should be rejected — translateConstraints accepts Constraint, not ConstraintResult
+  // @ts-expect-error - ConstraintResult is not assignable to Constraint
+  typedEngine.translateConstraints<"Document", TestQueryMap>(result, typedAdapter);
 };
 
 // ─── Test: Invalid resource/action combos produce errors ─────────
@@ -136,8 +164,8 @@ async () => {
     "Document",
   );
   // With default adapter (untyped)
-  if ("constraints" in result) {
-    const where = defaultEngine.translateConstraints(result, untypedAdapter);
+  if (result.ok === true && result.constraint !== null) {
+    const where = defaultEngine.translateConstraints(result.constraint, untypedAdapter);
     // Default: unknown (TQueryMap[string] where TQueryMap = Record<string, unknown>)
     expectType<unknown>(where);
   }

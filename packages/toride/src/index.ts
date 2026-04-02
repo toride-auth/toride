@@ -37,6 +37,10 @@ export type {
   BatchCheckItem,
   EvaluatorFn,
   AttributeType,
+  AttributeSchema,
+  PrimitiveAttributeSchema,
+  ObjectAttributeSchema,
+  ArrayAttributeSchema,
   ActorDeclaration,
   GlobalRole,
   DerivedRoleEntry,
@@ -61,7 +65,7 @@ export type {
 } from "./types.js";
 
 // ─── Error Types (T018) ──────────────────────────────────────────
-export { ValidationError, CycleError, DepthLimitError } from "./types.js";
+export { ValidationError, CycleError, DepthLimitError, ForbiddenError } from "./types.js";
 
 // ─── Engine (T030/T031) ──────────────────────────────────────────
 export { Toride, createToride } from "./engine.js";

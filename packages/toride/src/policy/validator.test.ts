@@ -21,9 +21,9 @@ describe("cross-reference validator", () => {
       actors: {
         User: {
           attributes: {
-            email: "string",
-            department: "string",
-            isSuperAdmin: "boolean",
+            email: { kind: "primitive", type: "string" },
+            department: { kind: "primitive", type: "string" },
+            isSuperAdmin: { kind: "primitive", type: "boolean" },
           },
         },
       },
@@ -376,9 +376,9 @@ describe("cross-reference validator", () => {
       actors: {
         User: {
           attributes: {
-            email: "string",
-            department: "string",
-            isSuperAdmin: "boolean",
+            email: { kind: "primitive", type: "string" },
+            department: { kind: "primitive", type: "string" },
+            isSuperAdmin: { kind: "primitive", type: "boolean" },
           },
         },
       },
@@ -443,9 +443,9 @@ describe("cross-reference validator", () => {
               editor: ["read", "update"],
             },
             attributes: {
-              status: "string",
-              priority: "number",
-              archived: "boolean",
+              status: { kind: "primitive", type: "string" },
+              priority: { kind: "primitive", type: "number" },
+              archived: { kind: "primitive", type: "boolean" },
             },
           },
         },
@@ -461,7 +461,7 @@ describe("cross-reference validator", () => {
             permissions: ["read"],
             grants: { viewer: ["read"] },
             attributes: {
-              status: "string",
+              status: { kind: "primitive", type: "string" },
             },
           },
           Task: {
@@ -483,9 +483,9 @@ describe("cross-reference validator", () => {
             permissions: ["read"],
             grants: { viewer: ["read"] },
             attributes: {
-              title: "string",
-              wordCount: "number",
-              isPublished: "boolean",
+              title: { kind: "primitive", type: "string" },
+              wordCount: { kind: "primitive", type: "number" },
+              isPublished: { kind: "primitive", type: "boolean" },
             },
           },
         },
@@ -501,8 +501,8 @@ describe("cross-reference validator", () => {
             permissions: ["read"],
             grants: { viewer: ["read"] },
             attributes: {
-              status: "string",
-              priority: "number",
+              status: { kind: "primitive", type: "string" },
+              priority: { kind: "primitive", type: "number" },
             },
           },
         },
@@ -511,8 +511,8 @@ describe("cross-reference validator", () => {
       expect(result.errors).toHaveLength(0);
       // Verify attributes are present on the resource block
       expect(policy.resources.Document.attributes).toEqual({
-        status: "string",
-        priority: "number",
+        status: { kind: "primitive", type: "string" },
+        priority: { kind: "primitive", type: "number" },
       });
     });
   });
@@ -608,10 +608,10 @@ describe("cross-reference validator", () => {
         version: "1",
         actors: {
           User: {
-            attributes: { email: "string" },
+            attributes: { email: { kind: "primitive", type: "string" } },
           },
           ServiceAccount: {
-            attributes: { scope: "string" },
+            attributes: { scope: { kind: "primitive", type: "string" } },
           },
         },
         resources: {
@@ -815,6 +815,62 @@ describe("cross-reference validator", () => {
         },
       });
       expect(() => validatePolicy(policy)).toThrow(ValidationError);
+    });
+  });
+
+  describe("attribute schema validation", () => {
+    it("accepts flat primitive attributes (regression)", () => {
+      const policy = makePolicy({
+        actors: {
+          User: {
+            attributes: {
+              email: { kind: "primitive", type: "string" },
+              priority: { kind: "primitive", type: "number" },
+              isActive: { kind: "primitive", type: "boolean" },
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
+    });
+
+    it("accepts nested AttributeSchema attributes", () => {
+      const policy = makePolicy({
+        actors: {
+          User: {
+            attributes: {
+              email: { kind: "primitive", type: "string" },
+              profile: {
+                kind: "object",
+                fields: {
+                  name: { kind: "primitive", type: "string" },
+                  age: { kind: "primitive", type: "number" },
+                },
+              },
+              tags: {
+                kind: "array",
+                items: { kind: "primitive", type: "string" },
+              },
+            },
+          },
+        },
+        resources: {
+          Task: {
+            roles: ["viewer"],
+            permissions: ["read"],
+            grants: { viewer: ["read"] },
+            attributes: {
+              metadata: {
+                kind: "object",
+                fields: {
+                  createdAt: { kind: "primitive", type: "string" },
+                },
+              },
+            },
+          },
+        },
+      });
+      expect(() => validatePolicy(policy)).not.toThrow();
     });
   });
 });
