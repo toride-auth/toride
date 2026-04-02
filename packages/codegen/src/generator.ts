@@ -1,7 +1,7 @@
 // T098: @toride/codegen generator
 // Generates TypeScript type declarations from a toride Policy
 
-import type { ActorDeclaration, AttributeType, Policy, ResourceBlock } from "toride";
+import type { ActorDeclaration, AttributeSchema, Policy, ResourceBlock } from "toride";
 
 /**
  * Generate TypeScript type declarations from a toride policy.
@@ -22,12 +22,22 @@ import type { ActorDeclaration, AttributeType, Policy, ResourceBlock } from "tor
 /** Safe identifier pattern: alphanumeric + underscore, starting with a letter or underscore */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Supported attribute type mappings */
-const ATTRIBUTE_TYPE_MAP: Record<AttributeType, string> = {
-  string: "string",
-  number: "number",
-  boolean: "boolean",
-};
+/** Map an AttributeSchema to its TypeScript type string */
+function mapAttributeType(attrType: string, context: string): string {
+  const primitiveMap: Record<string, string> = {
+    string: "string",
+    number: "number",
+    boolean: "boolean",
+  };
+  const mapped = primitiveMap[attrType];
+  if (!mapped) {
+    throw new Error(
+      `Unknown attribute type "${escapeStringLiteral(attrType)}" in ${context}. ` +
+      `Supported types: ${Object.keys(primitiveMap).join(", ")}`,
+    );
+  }
+  return mapped;
+}
 
 /** Escape quotes and backslashes for safe string interpolation into TypeScript string literals */
 function escapeStringLiteral(s: string): string {
@@ -44,26 +54,71 @@ function assertSafeIdentifier(s: string, context: string): void {
   }
 }
 
-/** Map an AttributeType to its TypeScript type string */
-function mapAttributeType(attrType: string, context: string): string {
-  const mapped = ATTRIBUTE_TYPE_MAP[attrType as AttributeType];
-  if (!mapped) {
-    throw new Error(
-      `Unknown attribute type "${escapeStringLiteral(attrType)}" in ${context}. ` +
-      `Supported types: ${Object.keys(ATTRIBUTE_TYPE_MAP).join(", ")}`,
-    );
+/** Map an AttributeSchema to its TypeScript type string (recursive) */
+function generateAttributeType(schema: AttributeSchema | string, context: string): string {
+  if (typeof schema === "string") {
+    const primitiveMap: Record<string, string> = {
+      string: "string",
+      number: "number",
+      boolean: "boolean",
+    };
+    const mapped = primitiveMap[schema];
+    if (!mapped) {
+      throw new Error(
+        `Unknown attribute type "${escapeStringLiteral(schema)}" in ${context}. ` +
+        `Supported types: ${Object.keys(primitiveMap).join(", ")}`,
+      );
+    }
+    return mapped;
   }
-  return mapped;
+  if (schema.kind === "primitive") {
+    const primitiveMap: Record<string, string> = {
+      string: "string",
+      number: "number",
+      boolean: "boolean",
+    };
+    const mapped = primitiveMap[schema.type];
+    if (!mapped) {
+      throw new Error(
+        `Unknown attribute type "${escapeStringLiteral(schema.type)}" in ${context}. ` +
+        `Supported types: ${Object.keys(primitiveMap).join(", ")}`,
+      );
+    }
+    return mapped;
+  }
+  if (schema.kind === "object") {
+    const fieldEntries = Object.entries(schema.fields);
+    if (fieldEntries.length === 0) {
+      return "{ }";
+    }
+    const fields = fieldEntries
+      .map(([fieldName, fieldSchema]) => {
+        assertSafeIdentifier(fieldName, `field "${fieldName}" in ${context}`);
+        return `${fieldName}: ${generateAttributeType(fieldSchema, `field "${fieldName}" in ${context}`)}`;
+      })
+      .join("; ");
+    return `{ ${fields}; }`;
+  }
+  if (schema.kind === "array") {
+    const itemType = generateAttributeType(schema.items, `array items in ${context}`);
+    if (itemType === "string" || itemType === "number" || itemType === "boolean") {
+      return `${itemType}[]`;
+    }
+    return `Array<${itemType}>`;
+  }
+  throw new Error(
+    `Unknown attribute schema kind in ${context}. Expected "primitive", "object", or "array".`,
+  );
 }
 
 /** Generate attribute type literal for a record of attribute declarations */
 function generateAttributeFields(
-  attrs: Record<string, AttributeType>,
+  attrs: Record<string, AttributeSchema | string>,
   entityType: string,
   entityName: string,
 ): string {
   const fields = Object.entries(attrs)
-    .map(([k, v]) => `${k}: ${mapAttributeType(v, `attribute "${k}" in ${entityType} "${entityName}"`)}`)
+    .map(([k, v]) => `${k}: ${generateAttributeType(v, `attribute "${k}" in ${entityType} "${entityName}"`)}`)
     .join("; ");
   return `{ ${fields}; }`;
 }
@@ -98,17 +153,17 @@ export function generateTypes(policy: Policy): string {
       }
     }
     if (block.attributes) {
-      for (const [attrName, attrType] of Object.entries(block.attributes) as [string, string][]) {
+      for (const [attrName, attrSchema] of Object.entries(block.attributes) as [string, AttributeSchema][]) {
         assertSafeIdentifier(attrName, `attribute name in resource "${rName}"`);
-        mapAttributeType(attrType, `attribute "${attrName}" in resource "${rName}"`);
+        generateAttributeType(attrSchema, `attribute "${attrName}" in resource "${rName}"`);
       }
     }
   }
   for (const [actorName, actorDecl] of actorEntries) {
     assertSafeIdentifier(actorName, "actor type name");
-    for (const [attrName, attrType] of Object.entries(actorDecl.attributes) as [string, string][]) {
+    for (const [attrName, attrSchema] of Object.entries(actorDecl.attributes) as [string, AttributeSchema][]) {
       assertSafeIdentifier(attrName, `attribute name in actor "${actorName}"`);
-      mapAttributeType(attrType, `attribute "${attrName}" in actor "${actorName}"`);
+      generateAttributeType(attrSchema, `attribute "${attrName}" in actor "${actorName}"`);
     }
   }
 
@@ -152,7 +207,7 @@ export function generateTypes(policy: Policy): string {
 
   // RoleMap
   lines.push(`/** Per-resource role types */`);
-  lines.push(`export interface RoleMap {`);
+  lines.push(`export type RoleMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.roles.length > 0) {
       const roleUnion = block.roles.map((r: string) => `"${r}"`).join(" | ");
@@ -166,7 +221,7 @@ export function generateTypes(policy: Policy): string {
 
   // PermissionMap
   lines.push(`/** Per-resource permission types */`);
-  lines.push(`export interface PermissionMap {`);
+  lines.push(`export type PermissionMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.permissions.length > 0) {
       const permUnion = block.permissions.map((p: string) => `"${p}"`).join(" | ");
@@ -180,7 +235,7 @@ export function generateTypes(policy: Policy): string {
 
   // ResourceAttributeMap
   lines.push(`/** Per-resource attribute types */`);
-  lines.push(`export interface ResourceAttributeMap {`);
+  lines.push(`export type ResourceAttributeMap = {`);
   for (const [name, block] of resourceEntries) {
     if (block.attributes && Object.keys(block.attributes).length > 0) {
       lines.push(`  ${name}: ${generateAttributeFields(block.attributes, "resource", name)};`);
@@ -193,7 +248,7 @@ export function generateTypes(policy: Policy): string {
 
   // ActorAttributeMap
   lines.push(`/** Per-actor attribute types */`);
-  lines.push(`export interface ActorAttributeMap {`);
+  lines.push(`export type ActorAttributeMap = {`);
   for (const [name, actorDecl] of actorEntries) {
     const attrKeys = Object.keys(actorDecl.attributes);
     if (attrKeys.length > 0) {
@@ -207,7 +262,7 @@ export function generateTypes(policy: Policy): string {
 
   // RelationMap
   lines.push(`/** Relation map — resource type -> relation name -> target resource type */`);
-  lines.push(`export interface RelationMap {`);
+  lines.push(`export type RelationMap = {`);
   for (const [name, block] of resourceEntries) {
     const relations = block.relations ?? {};
     const relEntries = Object.entries(relations);

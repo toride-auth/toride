@@ -30,6 +30,88 @@ const METADATA = {
   expected: { title: "Expected", description: "Expected result (allow or deny)" },
 };
 
+const CONDITION_EXPRESSION_SCHEMA = {
+  anyOf: [
+    {
+      type: "object",
+      properties: {
+        any: {
+          type: "array",
+          items: { $ref: "#/$defs/ConditionExpression" },
+        },
+      },
+      required: ["any"],
+      additionalProperties: false,
+    },
+    {
+      type: "object",
+      properties: {
+        all: {
+          type: "array",
+          items: { $ref: "#/$defs/ConditionExpression" },
+        },
+      },
+      required: ["all"],
+      additionalProperties: false,
+    },
+    {
+      type: "object",
+      additionalProperties: {
+        anyOf: [
+          { type: "string" },
+          { type: "number" },
+          { type: "boolean" },
+          {
+            anyOf: [
+              { type: "object", properties: { eq: {} }, required: ["eq"], additionalProperties: false },
+              { type: "object", properties: { neq: {} }, required: ["neq"], additionalProperties: false },
+              { type: "object", properties: { gt: {} }, required: ["gt"], additionalProperties: false },
+              { type: "object", properties: { gte: {} }, required: ["gte"], additionalProperties: false },
+              { type: "object", properties: { lt: {} }, required: ["lt"], additionalProperties: false },
+              { type: "object", properties: { lte: {} }, required: ["lte"], additionalProperties: false },
+              { type: "object", properties: { in: { anyOf: [{ type: "array", items: {} }, { type: "string" }] } }, required: ["in"], additionalProperties: false },
+              { type: "object", properties: { includes: {} }, required: ["includes"], additionalProperties: false },
+              { type: "object", properties: { exists: { type: "boolean" } }, required: ["exists"], additionalProperties: false },
+              { type: "object", properties: { startsWith: { type: "string" } }, required: ["startsWith"], additionalProperties: false },
+              { type: "object", properties: { endsWith: { type: "string" } }, required: ["endsWith"], additionalProperties: false },
+              { type: "object", properties: { contains: { type: "string" } }, required: ["contains"], additionalProperties: false },
+              { type: "object", properties: { custom: { type: "string" } }, required: ["custom"], additionalProperties: false },
+            ],
+          },
+        ],
+      },
+    },
+  ],
+};
+
+const ATTRIBUTE_SCHEMA_SCHEMA = {
+  anyOf: [
+    { type: "object", properties: { kind: { const: "primitive" }, type: { enum: ["string", "number", "boolean"] } }, required: ["kind", "type"], additionalProperties: false },
+    { type: "object", properties: { kind: { const: "object" }, fields: { type: "object", additionalProperties: { $ref: "#/$defs/AttributeSchema" } } }, required: ["kind", "fields"], additionalProperties: false },
+    { type: "object", properties: { kind: { const: "array" }, items: { $ref: "#/$defs/AttributeSchema" } }, required: ["kind", "items"], additionalProperties: false },
+  ],
+};
+
+function detectLazyType(lazySchema) {
+  try {
+    if (typeof lazySchema.getter !== "function") {
+      return "ConditionExpression";
+    }
+    const schema = lazySchema.getter();
+    if (schema && schema.type === "union" && schema.options && schema.options.length > 0) {
+      const firstOption = schema.options[0];
+      if (firstOption && firstOption.type === "object" && firstOption.entries) {
+        const kindEntry = firstOption.entries.kind;
+        if (kindEntry && kindEntry.type === "literal" && kindEntry.literal === "primitive") {
+          return "AttributeSchema";
+        }
+      }
+    }
+  } catch (e) {
+  }
+  return "ConditionExpression";
+}
+
 export function convertSchema(schema, name = "", defs = {}, processed = new Set()) {
   if (!schema || typeof schema !== "object") {
     return {};
@@ -107,61 +189,13 @@ export function convertSchema(schema, name = "", defs = {}, processed = new Set(
         }
 
         if (actualSchema && actualSchema.type === "lazy") {
-          const lazyDefName = "ConditionExpression";
+          const lazyDefName = detectLazyType(actualSchema);
           if (!defs[lazyDefName]) {
-            defs[lazyDefName] = {
-              anyOf: [
-                {
-                  type: "object",
-                  properties: {
-                    any: {
-                      type: "array",
-                      items: { $ref: `#/$defs/${lazyDefName}` },
-                    },
-                  },
-                  required: ["any"],
-                  additionalProperties: false,
-                },
-                {
-                  type: "object",
-                  properties: {
-                    all: {
-                      type: "array",
-                      items: { $ref: `#/$defs/${lazyDefName}` },
-                    },
-                  },
-                  required: ["all"],
-                  additionalProperties: false,
-                },
-                {
-                  type: "object",
-                  additionalProperties: {
-                    anyOf: [
-                      { type: "string" },
-                      { type: "number" },
-                      { type: "boolean" },
-                      {
-                        anyOf: [
-                          { type: "object", properties: { eq: {} }, required: ["eq"], additionalProperties: false },
-                          { type: "object", properties: { neq: {} }, required: ["neq"], additionalProperties: false },
-                          { type: "object", properties: { gt: {} }, required: ["gt"], additionalProperties: false },
-                          { type: "object", properties: { gte: {} }, required: ["gte"], additionalProperties: false },
-                          { type: "object", properties: { lt: {} }, required: ["lt"], additionalProperties: false },
-                          { type: "object", properties: { lte: {} }, required: ["lte"], additionalProperties: false },
-                          { type: "object", properties: { in: { anyOf: [{ type: "array", items: {} }, { type: "string" }] } }, required: ["in"], additionalProperties: false },
-                          { type: "object", properties: { includes: {} }, required: ["includes"], additionalProperties: false },
-                          { type: "object", properties: { exists: { type: "boolean" } }, required: ["exists"], additionalProperties: false },
-                          { type: "object", properties: { startsWith: { type: "string" } }, required: ["startsWith"], additionalProperties: false },
-                          { type: "object", properties: { endsWith: { type: "string" } }, required: ["endsWith"], additionalProperties: false },
-                          { type: "object", properties: { contains: { type: "string" } }, required: ["contains"], additionalProperties: false },
-                          { type: "object", properties: { custom: { type: "string" } }, required: ["custom"], additionalProperties: false },
-                        ],
-                      },
-                    ],
-                  },
-                },
-              ],
-            };
+            if (lazyDefName === "AttributeSchema") {
+              defs[lazyDefName] = ATTRIBUTE_SCHEMA_SCHEMA;
+            } else {
+              defs[lazyDefName] = CONDITION_EXPRESSION_SCHEMA;
+            }
           }
           properties[keyName] = { $ref: `#/$defs/${lazyDefName}` };
         } else {
@@ -198,61 +232,13 @@ export function convertSchema(schema, name = "", defs = {}, processed = new Set(
     }
 
     case "lazy": {
-      const lazyDefName = "ConditionExpression";
+      const lazyDefName = detectLazyType(schema);
       if (!defs[lazyDefName]) {
-        defs[lazyDefName] = {
-          anyOf: [
-            {
-              type: "object",
-              properties: {
-                any: {
-                  type: "array",
-                  items: { $ref: `#/$defs/${lazyDefName}` },
-                },
-              },
-              required: ["any"],
-              additionalProperties: false,
-            },
-            {
-              type: "object",
-              properties: {
-                all: {
-                  type: "array",
-                  items: { $ref: `#/$defs/${lazyDefName}` },
-                },
-              },
-              required: ["all"],
-              additionalProperties: false,
-            },
-            {
-              type: "object",
-              additionalProperties: {
-                anyOf: [
-                  { type: "string" },
-                  { type: "number" },
-                  { type: "boolean" },
-                  {
-                    anyOf: [
-                      { type: "object", properties: { eq: {} }, required: ["eq"], additionalProperties: false },
-                      { type: "object", properties: { neq: {} }, required: ["neq"], additionalProperties: false },
-                      { type: "object", properties: { gt: {} }, required: ["gt"], additionalProperties: false },
-                      { type: "object", properties: { gte: {} }, required: ["gte"], additionalProperties: false },
-                      { type: "object", properties: { lt: {} }, required: ["lt"], additionalProperties: false },
-                      { type: "object", properties: { lte: {} }, required: ["lte"], additionalProperties: false },
-                      { type: "object", properties: { in: { anyOf: [{ type: "array", items: {} }, { type: "string" }] } }, required: ["in"], additionalProperties: false },
-                      { type: "object", properties: { includes: {} }, required: ["includes"], additionalProperties: false },
-                      { type: "object", properties: { exists: { type: "boolean" } }, required: ["exists"], additionalProperties: false },
-                      { type: "object", properties: { startsWith: { type: "string" } }, required: ["startsWith"], additionalProperties: false },
-                      { type: "object", properties: { endsWith: { type: "string" } }, required: ["endsWith"], additionalProperties: false },
-                      { type: "object", properties: { contains: { type: "string" } }, required: ["contains"], additionalProperties: false },
-                      { type: "object", properties: { custom: { type: "string" } }, required: ["custom"], additionalProperties: false },
-                    ],
-                  },
-                ],
-              },
-            },
-          ],
-        };
+        if (lazyDefName === "AttributeSchema") {
+          defs[lazyDefName] = ATTRIBUTE_SCHEMA_SCHEMA;
+        } else {
+          defs[lazyDefName] = CONDITION_EXPRESSION_SCHEMA;
+        }
       }
       return { $ref: `#/$defs/${lazyDefName}` };
     }

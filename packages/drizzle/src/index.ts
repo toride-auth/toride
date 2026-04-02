@@ -3,7 +3,7 @@
 
 export const VERSION = "0.0.1";
 
-import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, DefaultSchema } from "toride";
+import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, DefaultSchema, VirtualFieldMapping, VirtualFieldsConfig } from "toride";
 
 /**
  * Drizzle query representation.
@@ -31,11 +31,16 @@ export interface RoleAssignmentConfig {
 }
 
 /** Options for createDrizzleAdapter. */
-export interface DrizzleAdapterOptions {
+export interface DrizzleAdapterOptions<
+  S extends TorideSchema = DefaultSchema,
+  TModelMap = never,
+> {
   /** Maps relation fields to Drizzle table references and foreign keys. */
   relations?: Record<string, RelationConfig>;
   /** Role assignment table configuration. */
   roleAssignments?: RoleAssignmentConfig;
+  /** Maps virtual fields to their relation queries for field_includes constraints. */
+  virtualFields?: VirtualFieldsConfig<S, TModelMap>;
 }
 
 /**
@@ -45,20 +50,47 @@ export interface DrizzleAdapterOptions {
  * operation type, field, and value. These can be used with drizzle-orm
  * operators or processed by custom query builders.
  *
+ * @typeParam S - The Toride schema type. Defaults to `DefaultSchema` for backward compatibility.
+ * @typeParam TModelMap - Maps resource type names to their model field shapes. Used for model-aware
+ *   virtual field detection. Defaults to `never` for backward compatibility.
  * @typeParam TQueryMap - Maps resource type names to their Drizzle query types.
  *   Defaults to `Record<string, DrizzleQuery>` for backward compatibility.
  */
 export function createDrizzleAdapter<
+  S extends TorideSchema = DefaultSchema,
+  TModelMap = never,
   TQueryMap extends Record<string, DrizzleQuery> = Record<string, DrizzleQuery>,
 >(
   table: AnyTable,
-  options?: DrizzleAdapterOptions,
+  options?: DrizzleAdapterOptions<S, TModelMap>,
 ): ConstraintAdapter<TQueryMap> {
   const relations = options?.relations ?? {};
   const roleAssignments = options?.roleAssignments;
 
+  const flatVirtualFields: Record<string, VirtualFieldMapping> = {};
+  if (options?.virtualFields) {
+    for (const [_resource, resourceFields] of Object.entries(options.virtualFields)) {
+      if (resourceFields) {
+        for (const field of Object.keys(resourceFields)) {
+          if (flatVirtualFields[field]) {
+            throw new Error(
+              `Virtual field "${field}" is defined in multiple resources. ` +
+              `The adapter cannot disambiguate at translation time. ` +
+              `Use unique field names per resource.`
+            );
+          }
+          flatVirtualFields[field] = (resourceFields as Record<string, VirtualFieldMapping>)[field];
+        }
+      }
+    }
+  }
+
   return {
     translate(constraint: LeafConstraint): DrizzleQuery {
+      const vf = flatVirtualFields[constraint.field];
+      if (vf && constraint.type === "field_includes") {
+        return { _op: "relation", field: vf.relation, matchField: vf.matchField, value: constraint.value, filter: vf.filter, table };
+      }
       switch (constraint.type) {
         case "field_eq":
           return { _op: "eq", field: constraint.field, value: constraint.value, table };

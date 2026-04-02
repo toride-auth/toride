@@ -22,6 +22,7 @@ import type {
 import type {
   ConstraintResult,
   ConstraintAdapter,
+  Constraint,
 } from "./partial/constraint-types.js";
 import { evaluate } from "./evaluation/rule-engine.js";
 import { AttributeCache } from "./evaluation/cache.js";
@@ -297,24 +298,18 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
    *
-   * Accepts ConstraintResult<R> from buildConstraints() and returns
+   * Accepts Constraint (the AST) from buildConstraints() and returns
    * TQueryMap[R] — the adapter's mapped output type for resource R.
-   * The resource type R is inferred from the ConstraintResult phantom type.
+   * Callers must check result.ok and result.constraint before calling this method.
    */
   translateConstraints<
     R extends string,
     TQueryMap extends Record<string, unknown>,
   >(
-    constraints: ConstraintResult<R>,
+    constraint: Constraint,
     adapter: ConstraintAdapter<TQueryMap>,
   ): TQueryMap[R] {
-    if ("unrestricted" in constraints || "forbidden" in constraints) {
-      throw new Error(
-        "Cannot translate unrestricted or forbidden ConstraintResult. " +
-        "Check for 'constraints' property before calling translateConstraints().",
-      );
-    }
-    return translateConstraintsImpl(constraints.constraints, adapter) as TQueryMap[R];
+    return translateConstraintsImpl(constraint, adapter) as TQueryMap[R];
   }
 
   /**
@@ -370,10 +365,10 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     if (!callback) return;
 
     let resultType: "unrestricted" | "forbidden" | "constrained";
-    if ("unrestricted" in constraintResult && constraintResult.unrestricted) {
-      resultType = "unrestricted";
-    } else if ("forbidden" in constraintResult && constraintResult.forbidden) {
+    if (!constraintResult.ok) {
       resultType = "forbidden";
+    } else if (constraintResult.constraint === null) {
+      resultType = "unrestricted";
     } else {
       resultType = "constrained";
     }

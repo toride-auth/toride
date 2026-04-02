@@ -64,21 +64,21 @@ describe("generateTypes", () => {
 
   it("generates RoleMap interface with per-resource role unions", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface RoleMap");
+    expect(output).toContain("export type RoleMap = {");
     expect(output).toMatch(/Project:\s*"viewer"\s*\|\s*"editor"\s*\|\s*"admin"/);
     expect(output).toMatch(/Task:\s*"viewer"\s*\|\s*"editor"/);
   });
 
   it("generates PermissionMap interface with per-resource permission unions", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface PermissionMap");
+    expect(output).toContain("export type PermissionMap = {");
     expect(output).toMatch(/Project:\s*"read"\s*\|\s*"update"\s*\|\s*"delete"\s*\|\s*"create_task"/);
     expect(output).toMatch(/Task:\s*"read"\s*\|\s*"update"\s*\|\s*"delete"/);
   });
 
   it("generates RelationMap interface with relation details", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface RelationMap");
+    expect(output).toContain("export type RelationMap = {");
     expect(output).toMatch(/Project:/);
     expect(output).toMatch(/org.*"Organization"/s);
     expect(output).toMatch(/Task:/);
@@ -97,7 +97,7 @@ describe("generateTypes", () => {
       },
     });
     const output = generateTypes(policy);
-    expect(output).toContain("export interface RelationMap");
+    expect(output).toContain("export type RelationMap = {");
     // Simple should have an empty or Record<string, never> entry
     expect(output).toMatch(/Simple:/);
   });
@@ -138,27 +138,27 @@ describe("generateTypes", () => {
 
   it("generates ActorAttributeMap with typed attributes per actor", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface ActorAttributeMap");
+    expect(output).toContain("export type ActorAttributeMap = {");
     expect(output).toMatch(/User:\s*\{\s*email:\s*string;\s*department:\s*string;\s*\}/);
   });
 
   it("generates empty ActorAttributeMap when no actors", () => {
     const policy = makePolicy({ actors: {} });
     const output = generateTypes(policy);
-    expect(output).toContain("export interface ActorAttributeMap {");
-    // Should be an empty interface (just opening and closing braces)
-    expect(output).toMatch(/export interface ActorAttributeMap \{\s*\}/);
+    expect(output).toContain("export type ActorAttributeMap = {");
+    // Should be an empty type (just opening and closing braces)
+    expect(output).toMatch(/export type ActorAttributeMap = \{\s*\}/);
   });
 
   it("generates ResourceAttributeMap with typed attributes per resource", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface ResourceAttributeMap");
+    expect(output).toContain("export type ResourceAttributeMap = {");
     expect(output).toMatch(/Project:\s*\{\s*status:\s*string;\s*priority:\s*number;\s*\}/);
   });
 
   it("generates ResourceAttributeMap with Record<string, unknown> for resources without attributes", () => {
     const output = generateTypes(makePolicy());
-    expect(output).toContain("export interface ResourceAttributeMap");
+    expect(output).toContain("export type ResourceAttributeMap = {");
     // Task has no attributes, should fall back to Record<string, unknown>
     expect(output).toMatch(/Task:\s*Record<string, unknown>/);
   });
@@ -182,11 +182,11 @@ describe("generateTypes", () => {
     const actionsPos = output.indexOf("export type Actions");
     const resourcesPos = output.indexOf("export type Resources");
     const actorTypesPos = output.indexOf("export type ActorTypes");
-    const roleMapPos = output.indexOf("export interface RoleMap");
-    const permissionMapPos = output.indexOf("export interface PermissionMap");
-    const resourceAttrPos = output.indexOf("export interface ResourceAttributeMap");
-    const actorAttrPos = output.indexOf("export interface ActorAttributeMap");
-    const relationMapPos = output.indexOf("export interface RelationMap");
+    const roleMapPos = output.indexOf("export type RoleMap = {");
+    const permissionMapPos = output.indexOf("export type PermissionMap = {");
+    const resourceAttrPos = output.indexOf("export type ResourceAttributeMap = {");
+    const actorAttrPos = output.indexOf("export type ActorAttributeMap = {");
+    const relationMapPos = output.indexOf("export type RelationMap = {");
     const resolverMapPos = output.indexOf("export type ResolverMap");
     const generatedSchemaPos = output.indexOf("export interface GeneratedSchema");
 
@@ -329,8 +329,8 @@ describe("generateTypes", () => {
     expect(output).toMatch(/Webhook:\s*never;/);
     // Verify it's inside the RoleMap block
     const roleMapBlock = output.slice(
-      output.indexOf("export interface RoleMap"),
-      output.indexOf("}", output.indexOf("export interface RoleMap")) + 1,
+      output.indexOf("export type RoleMap = {"),
+      output.indexOf("}", output.indexOf("export type RoleMap = {")) + 1,
     );
     expect(roleMapBlock).toContain("Webhook: never;");
   });
@@ -347,8 +347,8 @@ describe("generateTypes", () => {
     });
     const output = generateTypes(policy);
     const permMapBlock = output.slice(
-      output.indexOf("export interface PermissionMap"),
-      output.indexOf("}", output.indexOf("export interface PermissionMap")) + 1,
+      output.indexOf("export type PermissionMap = {"),
+      output.indexOf("}", output.indexOf("export type PermissionMap = {")) + 1,
     );
     expect(permMapBlock).toContain("Config: never;");
   });
@@ -408,14 +408,14 @@ describe("generateTypes", () => {
     expect(output).toMatch(/Organization:\s*"owner"\s*\|\s*"member"/);
     expect(output).toMatch(/Document:\s*"viewer"\s*\|\s*"editor"/);
     // AuditLog and EmptyResource have no roles
-    const roleMapStart = output.indexOf("export interface RoleMap");
+    const roleMapStart = output.indexOf("export type RoleMap = {");
     const roleMapEnd = output.indexOf("}", roleMapStart) + 1;
     const roleMap = output.slice(roleMapStart, roleMapEnd);
     expect(roleMap).toMatch(/AuditLog:\s*never/);
     expect(roleMap).toMatch(/EmptyResource:\s*never/);
 
     // PermissionMap: permissions per resource, never for empty
-    const permMapStart = output.indexOf("export interface PermissionMap");
+    const permMapStart = output.indexOf("export type PermissionMap = {");
     const permMapEnd = output.indexOf("}", permMapStart) + 1;
     const permMap = output.slice(permMapStart, permMapEnd);
     expect(permMap).toMatch(/Organization:\s*"read"\s*\|\s*"manage"/);
@@ -435,7 +435,7 @@ describe("generateTypes", () => {
     expect(output).toMatch(/org:\s*"Organization"/);
     expect(output).toMatch(/author:\s*"User"/);
     // Extract the full RelationMap block (contains nested braces, so find the matching closing line)
-    const relationMapStart = output.indexOf("export interface RelationMap");
+    const relationMapStart = output.indexOf("export type RelationMap = {");
     const relationMapSection = output.slice(relationMapStart, output.indexOf("export type ResolverMap"));
     expect(relationMapSection).toMatch(/EmptyResource:\s*Record<string, never>/);
 
@@ -463,5 +463,106 @@ describe("generateTypes", () => {
     const openBraces = (output.match(/{/g) || []).length;
     const closeBraces = (output.match(/}/g) || []).length;
     expect(openBraces).toBe(closeBraces); // Balanced braces
+  });
+
+  // T033: Nested object attributes
+  it("generates nested object attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            address: {
+              kind: "object",
+              fields: {
+                city: { kind: "primitive", type: "string" },
+                zip: { kind: "primitive", type: "string" },
+              },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/address:\s*\{\s*city:\s*string;\s*zip:\s*string;\s*\}/);
+  });
+
+  // T034: Primitive array attributes
+  it("generates primitive array attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            tags: {
+              kind: "array",
+              items: { kind: "primitive", type: "string" },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/tags:\s*string\[\]/);
+  });
+
+  // T035: Array-of-objects attributes
+  it("generates array-of-objects attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Team: {
+          roles: ["member"],
+          permissions: ["read"],
+          attributes: {
+            members: {
+              kind: "array",
+              items: {
+                kind: "object",
+                fields: {
+                  id: { kind: "primitive", type: "string" },
+                  role: { kind: "primitive", type: "string" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/members:\s*Array<\{\s*id:\s*string;\s*role:\s*string;\s*\}>/);
+  });
+
+  // T036: Mixed flat + nested attributes
+  it("generates mixed flat and nested attribute types", () => {
+    const policy = makePolicy({
+      resources: {
+        Project: {
+          roles: ["viewer"],
+          permissions: ["read"],
+          attributes: {
+            name: "string",
+            priority: "number",
+            address: {
+              kind: "object",
+              fields: {
+                city: { kind: "primitive", type: "string" },
+                zip: { kind: "primitive", type: "string" },
+              },
+            },
+            tags: {
+              kind: "array",
+              items: { kind: "primitive", type: "string" },
+            },
+          },
+        },
+      },
+    });
+    const output = generateTypes(policy);
+    expect(output).toMatch(/name:\s*string/);
+    expect(output).toMatch(/priority:\s*number/);
+    expect(output).toMatch(/address:\s*\{\s*city:\s*string;\s*zip:\s*string;\s*\}/);
+    expect(output).toMatch(/tags:\s*string\[\]/);
   });
 });

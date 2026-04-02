@@ -443,10 +443,11 @@ describe("US4: Declarative Role Derivation Without getRoles", () => {
       const result = await engine.buildConstraints(owner, "read", "Document");
 
       // Should emit a field constraint, not "always" or "forbidden"
-      expect("constraints" in result).toBe(true);
-      if ("constraints" in result) {
+      expect(result.ok).toBe(true);
+      expect(result.constraint).not.toBeNull();
+      if (result.ok === true && result.constraint !== null) {
         // Should contain a field_eq constraint for owner_id = "user1"
-        expect(result.constraints).toEqual(
+        expect(result.constraint).toEqual(
           expect.objectContaining({ type: "field_eq", field: "owner_id", value: "user1" }),
         );
       }
@@ -476,10 +477,11 @@ describe("US4: Declarative Role Derivation Without getRoles", () => {
       const engine = createToride({ policy: simplePolicy });
       const result = await engine.buildConstraints(editor, "update", "Document");
 
-      expect("constraints" in result).toBe(true);
-      if ("constraints" in result) {
+      expect(result.ok).toBe(true);
+      expect(result.constraint).not.toBeNull();
+      if (result.ok === true && result.constraint !== null) {
         // Should contain a field_includes constraint for editor_ids includes "user2"
-        expect(result.constraints).toEqual(
+        expect(result.constraint).toEqual(
           expect.objectContaining({ type: "field_includes", field: "editor_ids", value: "user2" }),
         );
       }
@@ -510,9 +512,10 @@ describe("US4: Declarative Role Derivation Without getRoles", () => {
       const engine = createToride({ policy: simplePolicy });
       const result = await engine.buildConstraints(owner, "read", "Document");
 
-      expect("constraints" in result).toBe(true);
-      if ("constraints" in result) {
-        expect(result.constraints).toEqual(
+      expect(result.ok).toBe(true);
+      expect(result.constraint).not.toBeNull();
+      if (result.ok === true && result.constraint !== null) {
+        expect(result.constraint).toEqual(
           expect.objectContaining({ type: "field_eq", field: "visibility", value: "public" }),
         );
       }
@@ -547,7 +550,7 @@ describe("US4: Declarative Role Derivation Without getRoles", () => {
       const engine = createToride({ policy: simplePolicy });
       const result = await engine.buildConstraints(serviceActor, "read", "Document");
 
-      expect("forbidden" in result && result.forbidden).toBe(true);
+      expect(result.ok).toBe(false);
     });
   });
 });

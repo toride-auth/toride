@@ -171,6 +171,9 @@ chore: update dependencies
 - TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), tsd (type testing) (improve-typesafety2)
 - TypeScript (strict mode), Node.js 20+ LTS + valibot ^1.2.0, yaml ^2.3.0, tsup (build), vitest (test) (lint)
 - N/A (file-based: generated JSON Schema artifact) (lint)
+- N/A (in-process library, file-based YAML/JSON policies) (simplify-api)
+- TypeScript (strict mode), Node.js 20+ LTS + hono ^4.7.0, @hono/node-server ^1.13.0, @prisma/client ^6.4.0, toride ^0.3.0, @toride/prisma ^0.3.0, htmx 2.x (CDN) (prisma-example)
+- SQLite via Prisma (file:./prisma/dev.db) (prisma-example)
 
 ## Recent Changes
 - improve-resolvers: Added TypeScript (strict mode), Node.js 20+ LTS + valibot (schema validation), yaml (policy parsing), tsup (build), vitest (test)

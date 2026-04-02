@@ -7,10 +7,6 @@ handoffs:
     agent: speckit.analyze
     prompt: Run a project analysis for consistency
     send: true
-  - label: Run with takt
-    agent: taktist
-    prompt: run
-    send: true
 ---
 
 ## User Input
@@ -89,7 +85,6 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Independent test criteria for each story
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
-   - Suggested takt usage: For each phase, show the `takt run <piece> "phase description"` command the user would run
 
 Context for task generation: $ARGUMENTS
 

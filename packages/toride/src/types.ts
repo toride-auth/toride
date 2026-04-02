@@ -43,6 +43,79 @@ export interface DefaultSchema extends TorideSchema {
   relationMap: Record<string, Record<string, string>>;
 }
 
+/**
+ * Virtual field mapping configuration.
+ * Describes how a virtual field maps to a related resource query.
+ */
+export interface VirtualFieldMapping {
+  /** The relation name to query */
+  readonly relation: string;
+  /** The field in the related resource to match against */
+  readonly matchField: string;
+  /** Optional filter to apply to the relation query */
+  readonly filter?: Record<string, unknown>;
+}
+
+/**
+ * Extracts keys from T whose values are arrays.
+ */
+type ArrayKeys<T> = { [K in keyof T]: T[K] extends unknown[] ? K : never }[keyof T];
+
+type ModelScalars<T> = T extends { scalars: infer S extends Record<string, unknown> }
+  ? S
+  : T extends Record<string, unknown>
+    ? T
+    : never;
+
+type UnwrapRelation<T> = T extends readonly (infer U)[] ? U : NonNullable<T>;
+
+export type PayloadRelations<T> = T extends { objects: infer O extends Record<string, unknown> }
+  ? { [K in keyof O & string]: ModelScalars<UnwrapRelation<O[K]>> }
+  : Record<string, never>;
+
+export type VirtualFieldMappingFor<TRelations extends Record<string, Record<string, unknown>>> = {
+  [R in keyof TRelations & string]: {
+    readonly relation: R;
+    readonly matchField: keyof TRelations[R] & string;
+    readonly filter?: { readonly [F in keyof TRelations[R]]?: TRelations[R][F] };
+  };
+}[keyof TRelations & string];
+
+/**
+ * Conditional type that uses model-aware detection when TModelMap is provided,
+ * falls back to ArrayKeys otherwise.
+ */
+type VirtualFieldKeysFor<
+  S extends TorideSchema,
+  R extends string,
+  TModelMap,
+> = [TModelMap] extends [never]
+  ? // Fallback: array keys from resource attributes (backward compat)
+    S["resourceAttributeMap"][R] extends Record<string, unknown>
+      ? Record<string, unknown> extends S["resourceAttributeMap"][R]
+        ? string  // untyped schema → any string
+        : ArrayKeys<S["resourceAttributeMap"][R]>
+      : never
+  : // Model-aware: Exclude model fields from policy attributes
+    R extends keyof TModelMap
+      ? Exclude<keyof S["resourceAttributeMap"][R] & string, keyof ModelScalars<TModelMap[R]> & string>
+      : string;
+
+/**
+ * Per-resource mapping of virtual field keys to VirtualFieldMapping.
+ * When TModelMap is provided, uses model-aware detection for virtual field keys.
+ */
+export type VirtualFieldsConfig<S extends TorideSchema, TModelMap = never> = {
+  [R in S["resources"]]?: {
+    [K in VirtualFieldKeysFor<S, R & string, TModelMap>]?:
+      R extends keyof TModelMap
+        ? TModelMap[R] extends { objects: Record<string, unknown> }
+          ? VirtualFieldMappingFor<PayloadRelations<TModelMap[R]>>
+          : VirtualFieldMapping
+        : VirtualFieldMapping;
+  };
+};
+
 // ─── Core Runtime Types (T015) ────────────────────────────────────
 
 /**
@@ -167,11 +240,35 @@ export interface TorideOptions<S extends TorideSchema = DefaultSchema> {
 // ─── Policy Model Types ───────────────────────────────────────────
 
 /** Attribute type for actor declarations. */
-export type AttributeType = "string" | "number" | "boolean";
+export type AttributeType = "string" | "number" | "boolean" | "string[]" | "number[]" | "boolean[]";
+
+/** Schema for a primitive attribute. */
+export interface PrimitiveAttributeSchema {
+  readonly kind: "primitive";
+  readonly type: AttributeType;
+}
+
+/** Schema for a nested object attribute. */
+export interface ObjectAttributeSchema {
+  readonly kind: "object";
+  readonly fields: Record<string, AttributeSchema>;
+}
+
+/** Schema for an array attribute. */
+export interface ArrayAttributeSchema {
+  readonly kind: "array";
+  readonly items: AttributeSchema;
+}
+
+/** Discriminated union of all attribute schema types. */
+export type AttributeSchema =
+  | PrimitiveAttributeSchema
+  | ObjectAttributeSchema
+  | ArrayAttributeSchema;
 
 /** Actor type declaration with attribute schema. */
 export interface ActorDeclaration {
-  readonly attributes: Record<string, AttributeType>;
+  readonly attributes: Record<string, AttributeSchema>;
 }
 
 /** Global role definition derived from actor attributes. */
@@ -218,7 +315,7 @@ export interface ResourceBlock {
   readonly roles: string[];
   readonly permissions: string[];
   /** Optional typed attribute declarations for this resource type. */
-  readonly attributes?: Record<string, AttributeType>;
+  readonly attributes?: Record<string, AttributeSchema>;
   /** Relations map field names to target resource type names (simplified). */
   readonly relations?: Record<string, string>;
   readonly grants?: Record<string, string[]>;
@@ -379,5 +476,22 @@ export class DepthLimitError extends Error {
     this.name = "DepthLimitError";
     this.limit = limit;
     this.limitType = limitType;
+  }
+}
+
+/** Thrown when an actor is forbidden from performing an action. */
+export class ForbiddenError extends Error {
+  readonly actor: ActorRef;
+  readonly action: string;
+  readonly resourceType: string;
+
+  constructor(actor: ActorRef, action: string, resourceType: string) {
+    super(
+      `Actor "${actor.type}:${actor.id}" is forbidden from performing "${action}" on resource type "${resourceType}"`,
+    );
+    this.name = "ForbiddenError";
+    this.actor = actor;
+    this.action = action;
+    this.resourceType = resourceType;
   }
 }

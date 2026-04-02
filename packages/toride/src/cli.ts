@@ -14,6 +14,104 @@ import { parseInlineTests, parseTestFile } from "./testing/test-parser.js";
 import { runTestCases } from "./testing/test-runner.js";
 import type { TestResult } from "./testing/test-runner.js";
 
+// Normalize a single attribute value to canonical AttributeSchema form
+function normalizeAttributeValue(raw: unknown): unknown {
+  if (raw === null || raw === undefined) return raw;
+
+  if (typeof raw === "string" && ["string", "number", "boolean"].includes(raw)) {
+    return { kind: "primitive" as const, type: raw };
+  }
+
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    if ("kind" in obj && obj.kind !== undefined) {
+      if (obj.kind === "object" && typeof obj.fields === "object" && obj.fields !== null) {
+        const normalizedFields: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(obj.fields as Record<string, unknown>)) {
+          normalizedFields[key] = normalizeAttributeValue(value);
+        }
+        return { ...obj, fields: normalizedFields };
+      }
+      if (obj.kind === "array" && "items" in obj) {
+        return { ...obj, items: normalizeAttributeValue(obj.items) };
+      }
+      return obj;
+    }
+  }
+
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    const normalized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      normalized[key] = normalizeAttributeValue(value);
+    }
+    return normalized;
+  }
+
+  if (Array.isArray(raw)) {
+    return raw.map((item) => normalizeAttributeValue(item));
+  }
+
+  return raw;
+}
+
+// Normalize an attribute record
+function normalizeAttributeRecord(attrs: Record<string, unknown>): Record<string, unknown> {
+  const normalizedAttrs: Record<string, unknown> = {};
+  for (const [attrKey, attrValue] of Object.entries(attrs)) {
+    normalizedAttrs[attrKey] = normalizeAttributeValue(attrValue);
+  }
+  return normalizedAttrs;
+}
+
+// Normalize attributes to canonical form - only target actors/resources attributes
+function normalizeAttributes(raw: unknown): unknown {
+  if (raw === null || raw === undefined || typeof raw !== "object" || Array.isArray(raw)) {
+    return raw;
+  }
+
+  const obj = raw as Record<string, unknown>;
+  const normalized: Record<string, unknown> = { ...obj };
+
+  if ("actors" in normalized && typeof normalized.actors === "object" && normalized.actors !== null) {
+    const actors = normalized.actors as Record<string, unknown>;
+    const normalizedActors: Record<string, unknown> = {};
+    for (const [actorName, actorDef] of Object.entries(actors)) {
+      if (typeof actorDef === "object" && actorDef !== null) {
+        const actor = actorDef as Record<string, unknown>;
+        const normalizedActor: Record<string, unknown> = { ...actor };
+        if ("attributes" in normalizedActor && typeof normalizedActor.attributes === "object" && normalizedActor.attributes !== null) {
+          normalizedActor.attributes = normalizeAttributeRecord(normalizedActor.attributes as Record<string, unknown>);
+        }
+        normalizedActors[actorName] = normalizedActor;
+      } else {
+        normalizedActors[actorName] = actorDef;
+      }
+    }
+    normalized.actors = normalizedActors;
+  }
+
+  if ("resources" in normalized && typeof normalized.resources === "object" && normalized.resources !== null) {
+    const resources = normalized.resources as Record<string, unknown>;
+    const normalizedResources: Record<string, unknown> = {};
+    for (const [resName, resDef] of Object.entries(resources)) {
+      if (typeof resDef === "object" && resDef !== null) {
+        const resource = resDef as Record<string, unknown>;
+        const normalizedResource: Record<string, unknown> = { ...resource };
+        if ("attributes" in normalizedResource && typeof normalizedResource.attributes === "object" && normalizedResource.attributes !== null) {
+          normalizedResource.attributes = normalizeAttributeRecord(normalizedResource.attributes as Record<string, unknown>);
+        }
+        normalizedResources[resName] = normalizedResource;
+      } else {
+        normalizedResources[resName] = resDef;
+      }
+    }
+    normalized.resources = normalizedResources;
+  }
+
+  return normalized;
+}
+
 /** Parse a policy file (YAML or JSON) into a raw Policy object. */
 function loadPolicyFile(filePath: string): Policy {
   const absPath = resolve(filePath);
@@ -45,12 +143,15 @@ function loadPolicyFile(filePath: string): Policy {
     }
   }
 
+  // Normalize attributes to canonical form
+  const normalizedRaw = normalizeAttributes(raw);
+
   // Structural validation via Valibot
-  const result = v.safeParse(PolicySchema, raw);
+  const result = v.safeParse(PolicySchema, normalizedRaw);
   if (!result.success) {
     const issue = result.issues[0];
     const path =
-      issue?.path?.map((p) => String(p.key)).join(".") ?? "";
+      issue?.path?.map((p: { key: string | number }) => String(p.key)).join(".") ?? "";
     throw new ValidationError(
       `Policy validation failed: ${issue?.message ?? "unknown error"}${path ? ` at ${path}` : ""}`,
       path,

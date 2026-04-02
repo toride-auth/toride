@@ -11,6 +11,10 @@
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
-# Examples:
-#   RUN sudo apt-get update && sudo apt-get install -y postgresql-client && sudo rm -rf /var/lib/apt/lists/*
-#   RUN curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash - && sudo apt-get install -y nodejs
+# Node.js 20 LTS
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash - \
+  && sudo apt-get install -y nodejs \
+  && sudo rm -rf /var/lib/apt/lists/*
+
+# pnpm (version pinned to match packageManager in package.json)
+RUN sudo corepack enable --install-directory /usr/local/bin && corepack prepare pnpm@10.30.3 --activate

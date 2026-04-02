@@ -38,7 +38,7 @@ function makePolicy(overrides: Partial<Policy> = {}): Policy {
 
 describe("buildConstraints", () => {
   describe("unrestricted result", () => {
-    it("returns unrestricted:true for superadmin with global role granting all", async () => {
+    it("returns ok:true, constraint:null for superadmin with global role granting all", async () => {
       const policy = makePolicy({
         global_roles: {
           superadmin: { actor_type: "User", when: { "$actor.isSuperAdmin": true } },
@@ -60,10 +60,10 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
-      expect(result).toEqual({ unrestricted: true });
+      expect(result).toEqual({ ok: true, constraint: null });
     });
 
-    it("returns unrestricted:true when when-only derived role matches", async () => {
+    it("returns ok:true, constraint:null when when-only derived role matches", async () => {
       const policyWithAlwaysAdmin = makePolicy({
         resources: {
           Task: {
@@ -80,20 +80,20 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policyWithAlwaysAdmin);
-      expect(result).toEqual({ unrestricted: true });
+      expect(result).toEqual({ ok: true, constraint: null });
     });
   });
 
   describe("forbidden result", () => {
-    it("returns forbidden:true for unknown resource type", async () => {
+    it("returns ok:false for unknown resource type", async () => {
       const policy = makePolicy();
       const resolver = makeResolver();
 
       const result = await buildConstraints(baseActor, "read", "Unknown", resolver, policy);
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
 
-    it("returns forbidden:true when no derivation paths and no direct roles grant the action", async () => {
+    it("returns ok:false when no derivation paths and no direct roles grant the action", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -107,10 +107,10 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(baseActor, "read", "Task", resolver, policy);
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
 
-    it("returns forbidden:true when action is not in any grant", async () => {
+    it("returns ok:false when action is not in any grant", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -128,7 +128,7 @@ describe("buildConstraints", () => {
 
       // "delete" is not granted to any role
       const result = await buildConstraints(actor, "delete", "Task", resolver, policy);
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
   });
 
@@ -159,13 +159,13 @@ describe("buildConstraints", () => {
       const result = await buildConstraints(baseActor, "read", "Task", resolver, policy);
 
       // Verify full tree structure, not just node type presence
-      expect(result).not.toHaveProperty("unrestricted");
-      expect(result).not.toHaveProperty("forbidden");
-      expect(result).toHaveProperty("constraints");
+      expect(result).toHaveProperty("ok", true);
+      expect(result).not.toHaveProperty("ok", false);
+      expect(result).not.toHaveProperty("constraint", null);
 
-      const constraints = (result as { constraints: Constraint }).constraints;
+      const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Should be a relation constraint wrapping a has_role constraint
-      expect(constraints).toEqual({
+      expect(constraint).toEqual({
         type: "relation",
         field: "project",
         resourceType: "Project",
@@ -208,11 +208,12 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
-      expect(result).toHaveProperty("constraints");
+      expect(result).toHaveProperty("ok", true);
+      expect(result).not.toHaveProperty("constraint", null);
 
-      const constraints = (result as { constraints: Constraint }).constraints;
+      const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(field_eq(department, "engineering"))
-      expect(constraints).toEqual({
+      expect(constraint).toEqual({
         type: "not",
         child: {
           type: "field_eq",
@@ -257,11 +258,12 @@ describe("buildConstraints", () => {
         policy,
         { env: { cutoff: "2024-01-01" } },
       );
-      expect(result).toHaveProperty("constraints");
+      expect(result).toHaveProperty("ok", true);
+      expect(result).not.toHaveProperty("constraint", null);
 
-      const constraints = (result as { constraints: Constraint }).constraints;
+      const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(field_gt(createdAt, "2024-01-01"))
-      expect(constraints).toEqual({
+      expect(constraint).toEqual({
         type: "not",
         child: {
           type: "field_gt",
@@ -301,12 +303,13 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "delete", "Task", resolver, policy);
-      expect(result).toHaveProperty("constraints");
+      expect(result).toHaveProperty("ok", true);
+      expect(result).not.toHaveProperty("constraint", null);
 
-      const constraints = (result as { constraints: Constraint }).constraints;
+      const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // derived role simplifies to always, combined with NOT(forbid)
       // simplify(and([always, not(field_eq)])) => not(field_eq)
-      expect(constraints).toEqual({
+      expect(constraint).toEqual({
         type: "not",
         child: {
           type: "field_eq",
@@ -340,7 +343,7 @@ describe("buildConstraints", () => {
 
       // Admin with unconditional grant + no rules = should be unrestricted
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
-      expect(result).toEqual({ unrestricted: true });
+      expect(result).toEqual({ ok: true, constraint: null });
     });
   });
 
@@ -373,11 +376,12 @@ describe("buildConstraints", () => {
       const resolver = makeResolver();
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
-      expect(result).toHaveProperty("constraints");
+      expect(result).toHaveProperty("ok", true);
+      expect(result).not.toHaveProperty("constraint", null);
 
-      const constraints = (result as { constraints: Constraint }).constraints;
+      const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(unknown("businessHours"))
-      expect(constraints).toEqual({
+      expect(constraint).toEqual({
         type: "not",
         child: {
           type: "unknown",
@@ -409,7 +413,7 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // Should NOT grant access via prototype pollution
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
   });
 
@@ -433,9 +437,10 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // T025: Now emits a field constraint for $resource.status
-      expect("constraints" in result).toBe(true);
-      if ("constraints" in result) {
-        expect(result.constraints).toEqual({ type: "field_eq", field: "status", value: "active" });
+      expect(result.ok).toBe(true);
+      expect(result.constraint).not.toBeNull();
+      if (result.ok === true && result.constraint !== null) {
+        expect(result.constraint).toEqual({ type: "field_eq", field: "status", value: "active" });
       }
     });
 
@@ -457,7 +462,7 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy, { env: { feature_flag: true } });
       // T025: $env.feature_flag is inlined and matches -> unrestricted
-      expect(result).toEqual({ unrestricted: true });
+      expect(result).toEqual({ ok: true, constraint: null });
     });
 
     it("rejects derived role with $env condition when env value does not match", async () => {
@@ -478,7 +483,7 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy, { env: { feature_flag: false } });
       // $env.feature_flag is false, does not match true -> forbidden
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
 
     it("rejects derived role with $env condition when env not provided", async () => {
@@ -499,12 +504,12 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // No env provided -> $env.feature_flag is undefined -> null -> never -> forbidden
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
   });
 
   describe("fail-closed for unsupported cross-constraint operators (security)", () => {
-    it("returns forbidden when actor-resource cross-constraint uses unsupported operator like startsWith", async () => {
+    it("returns ok:false when actor-resource cross-constraint uses unsupported operator like startsWith", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -529,10 +534,10 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
 
-    it("returns forbidden when actor-resource cross-constraint uses contains operator", async () => {
+    it("returns ok:false when actor-resource cross-constraint uses contains operator", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -557,7 +562,7 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
-      expect(result).toEqual({ forbidden: true });
+      expect(result).toEqual({ ok: false });
     });
   });
 
