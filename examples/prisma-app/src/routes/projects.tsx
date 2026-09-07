@@ -42,22 +42,22 @@ app.get("/", async (c) => {
   // Step 1: Use buildConstraints() to determine the actor's access level.
   //
   // buildConstraints() evaluates the policy for the given actor+action+resource
-  // type and returns a ConstraintResult<"Project"> discriminated union:
-  //   - { unrestricted: true }  → actor can read all resources of this type
-  //   - { forbidden: true }     → actor cannot read any resources
-  //   - { constraints: ... }    → partial access, pass to translateConstraints()
+  // type and returns a ConstraintResult<"Project">:
+  //   - { ok: false }                 -> actor cannot read any resources
+  //   - { ok: true, constraint: null } -> actor can read all resources
+  //   - { ok: true, constraint }       -> partial access, translate the AST
   //
-  // translateConstraints() accepts the narrowed ConstraintResult directly and
-  // converts the constraint AST into a Prisma WHERE clause via the adapter.
+  // translateConstraints() accepts the Constraint AST from result.constraint
+  // and converts it into a Prisma WHERE clause via the adapter.
   // ---------------------------------------------------------------------------
   const result = await engine.buildConstraints(actor, "read", "Project");
 
-  if ("forbidden" in result) {
+  if (!result.ok) {
     projects = [];
-  } else if ("unrestricted" in result) {
+  } else if (result.constraint === null) {
     projects = await prisma.project.findMany({ orderBy: { name: "asc" } });
   } else {
-    const where = engine.translateConstraints(result, adapter);
+    const where = engine.translateConstraints(result.constraint, adapter);
     projects = await prisma.project.findMany({ where, orderBy: { name: "asc" } });
   }
 

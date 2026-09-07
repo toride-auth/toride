@@ -123,11 +123,6 @@ export const ConditionExpressionSchema: v.GenericSchema<unknown> = v.union([
   SimpleConditionsSchema,
 ]);
 
-// ─── Relation Definition ──────────────────────────────────────────
-
-/** Simplified: relation value is just the target resource type name. */
-export const RelationDefSchema = v.string();
-
 // ─── Derived Role Entry ───────────────────────────────────────────
 
 /**

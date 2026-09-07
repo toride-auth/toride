@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Design contracts are documentation, not executable source files.
+  "ignoreFiles": ["specs/**/contracts/**/*.ts"],
+  // Keep exports that are used within their own module.
+  "ignoreExportsUsedInFile": true,
+  "workspaces": {
+    ".": {
+      // Nx loads this package dynamically for nx release.
+      "ignoreDependencies": ["@nx/js"]
+    }
+  }
+}
