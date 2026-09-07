@@ -7,11 +7,9 @@
 
 import type {
   ActorRef,
-  // RelationResolver removed — replaced by AttributeCache
   Policy,
   ResourceBlock,
   DerivedRoleEntry,
-  Rule,
   ConditionExpression,
   ConditionValue,
   ConditionOperator,

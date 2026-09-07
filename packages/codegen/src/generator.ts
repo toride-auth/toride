@@ -22,23 +22,6 @@ import type { ActorDeclaration, AttributeSchema, Policy, ResourceBlock } from "t
 /** Safe identifier pattern: alphanumeric + underscore, starting with a letter or underscore */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** Map an AttributeSchema to its TypeScript type string */
-function mapAttributeType(attrType: string, context: string): string {
-  const primitiveMap: Record<string, string> = {
-    string: "string",
-    number: "number",
-    boolean: "boolean",
-  };
-  const mapped = primitiveMap[attrType];
-  if (!mapped) {
-    throw new Error(
-      `Unknown attribute type "${escapeStringLiteral(attrType)}" in ${context}. ` +
-      `Supported types: ${Object.keys(primitiveMap).join(", ")}`,
-    );
-  }
-  return mapped;
-}
-
 /** Escape quotes and backslashes for safe string interpolation into TypeScript string literals */
 function escapeStringLiteral(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');

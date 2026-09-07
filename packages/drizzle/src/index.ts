@@ -8,8 +8,7 @@ import type { ConstraintAdapter, LeafConstraint, ResourceRef, TorideSchema, Defa
 /**
  * Drizzle query representation.
  * Produces intermediate objects that describe the query operation.
- * Users can pass these to their own Drizzle query builder or use
- * the provided `toDrizzle()` helper when drizzle-orm is available.
+ * Users can pass these to their own Drizzle query builder.
  */
 export type DrizzleQuery = Record<string, unknown>;
 

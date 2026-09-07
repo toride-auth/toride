@@ -31,6 +31,3 @@ docs/.vitepress/cache/
 
 # Personal Dockerfile (gitignored)
 .worktree/Dockerfile.local
-
-# Personal worktreeinclude (not tracked)
-.worktreeinclude.local

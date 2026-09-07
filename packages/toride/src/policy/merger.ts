@@ -6,8 +6,6 @@ import type {
   FieldAccessDef,
   GlobalRole,
   ActorDeclaration,
-  DerivedRoleEntry,
-  Rule,
   AttributeSchema,
 } from "../types.js";
 
