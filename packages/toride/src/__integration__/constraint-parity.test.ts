@@ -81,10 +81,10 @@ it("separates independent ANY predicates from one related role condition", async
   expect(await Promise.all(refs.map(ref => sameRow.can(actor, "read", ref)))).toEqual([false, false, true]);
 });
 
-it("keeps explicit relation absence when the static comparison operand is unavailable", async () => {
+it("rejects exact translation when relation absence meets an unavailable operand", async () => {
   const engine = new Toride({ policy: policy({ relations: { projects: "Project" }, rules: [permit(), { effect: "forbid", permissions: ["read"], when: { "$resource.projects.tenant": "$env.missing" } }] }) });
   const rows = [{ id: "empty", projects: [] }, { id: "present", projects: [{ id: "p1", tenant: "a" }] }];
-  expect(await selected(engine, rows)).toEqual(["empty"]);
+  await expect(selected(engine, rows)).rejects.toThrow(/unavailable operand in relation traversal/);
   expect(await engine.can(actor, "read", { type: "Document", id: "empty", attributes: { projects: [] } })).toBe(true);
   expect(await engine.can(actor, "read", { type: "Document", id: "present", attributes: { projects: [{ type: "Project", id: "p1", attributes: { tenant: "a" } }] } })).toBe(false);
 });

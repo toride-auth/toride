@@ -17,9 +17,9 @@ async function resourcePath(path: string, resource: ResourceRef, cache: Attribut
     return { kind: "scalar", value: unavailable };
   }
   try {
-    if (path === "id") return { kind: "scalar", value: resource.id };
     const attributes = await cache.resolve(resource, block);
     if (attributes === null) return { kind: "scalar", value: null };
+    if (path === "id") return { kind: "scalar", value: resource.id };
     const [first, ...rest] = path.split(".");
     const target = block.relations?.[first];
     if (!target || !rest.length) return { kind: "scalar", value: readPath(attributes, path) };

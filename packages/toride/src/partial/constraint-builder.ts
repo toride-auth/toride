@@ -67,6 +67,7 @@ export async function buildConstraints(actor: ActorRef, action: string, resource
     const [first, ...rest] = path.split(".");
     const target = policy.resources[type]?.relations?.[first];
     if (target && rest.length) {
+      if (value === unavailable) return unsupported(`unavailable operand in relation traversal ${path}`);
       if (operator === "exists" && value === false) return logic.not(field(path, "exists", true, type, depth));
       return related(first, target, field(rest.join("."), operator, value, target, depth + 1));
     }
