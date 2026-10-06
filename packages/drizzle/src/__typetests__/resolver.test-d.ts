@@ -1,5 +1,5 @@
 import { expectType, expectAssignable, expectError, expectNotAssignable } from "tsd";
-import type { TorideSchema, DefaultSchema, ResourceRef, ResolverData } from "toride";
+import type { TorideSchema, ResourceRef, ResolverData } from "toride";
 import { createDrizzleResolver } from "../../dist/index.js";
 
 interface TestSchema extends TorideSchema {
@@ -65,8 +65,18 @@ expectNotAssignable<ResolverData<TestSchema, "Document">>({ org: { type: "Docume
 expectNotAssignable<ResolverData<TestSchema, "Document">>({ status: 123 });
 
 import { drizzle } from "drizzle-orm/sqlite-proxy";
-import { sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 const nativeTable = sqliteTable("Document", { id: text("id").primaryKey(), status: text("status") });
 const nativeDb = drizzle(async () => ({ rows: [] }));
 const nativeResolver = createDrizzleResolver<TestSchema, "Document">(nativeDb, nativeTable);
 expectType<Promise<ResolverData<TestSchema, "Document"> | null>>(nativeResolver({ type: "Document", id: "d1" }));
+
+interface CountSchema extends TestSchema {
+  resourceAttributeMap: { Document: { status: string; ownerId: string; count: number }; Organization: { plan: string } };
+}
+const wrongCountTable = sqliteTable("WrongCountDocument", { id: text("id").primaryKey(), count: text("count") });
+const countTable = sqliteTable("CountDocument", { id: text("id").primaryKey(), count: integer("count") });
+expectError(createDrizzleResolver<CountSchema, "Document">(nativeDb, wrongCountTable));
+const countResolver = createDrizzleResolver<CountSchema, "Document">(nativeDb, countTable);
+expectType<Promise<ResolverData<CountSchema, "Document"> | null>>(countResolver({ type: "Document", id: "d1" }));
+expectNotAssignable<Promise<{ count: number }>>(countResolver({ type: "Document", id: "d1" }));

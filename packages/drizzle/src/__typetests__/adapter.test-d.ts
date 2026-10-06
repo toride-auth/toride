@@ -6,6 +6,7 @@ import type { DrizzleQuery } from "../../dist/index.js";
 
 interface TestSchema extends DefaultSchema {
   resources: "Document" | "Organization";
+  actorTypes: "User";
   resourceAttributeMap: {
     Document: { status: string; labels: string[] };
     Organization: { plan: string; labels: string[] };
@@ -37,3 +38,12 @@ expectError(createDrizzleAdapter<TestSchema>(documents, { resourceType: "Other" 
 expectError(createDrizzleAdapter<TestSchema, never, { Document: number }>(documents, { resourceType: "Document" }));
 expectError(createDrizzleAdapter(documents));
 expectError(typedAdapter.translate({ type: "field_eq", field: "status", value: "active" }));
+
+const users = sqliteTable("User", { userId: text("id").primaryKey() });
+const actorRelationAdapter = createDrizzleAdapter<TestSchema>(documents, {
+  resourceType: "Document", resources: { User: users }, fields: { User: { id: "userId" } },
+  relations: { Document: { owner: { resourceType: "User", cardinality: "one", sourceColumn: "id", targetColumn: "userId" } } },
+});
+expectType<ConstraintAdapter<Record<string, DrizzleQuery>>>(actorRelationAdapter);
+expectError(createDrizzleAdapter<TestSchema>(documents, { resourceType: "User" }));
+expectError(createDrizzleAdapter<TestSchema>(documents, { resourceType: "Document", resources: { Other: users } }));
