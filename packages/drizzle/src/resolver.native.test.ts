@@ -55,6 +55,15 @@ describe("native Drizzle resolver", () => {
     await expect(resolver({ type: "Document", id: "missing" })).resolves.toBeNull();
   });
 
+  it("decodes stored JSON null even when the physical value is not SQL NULL", async () => {
+    execute('create table "JsonDocument" ("id" text primary key, "tags" text)');
+    execute('insert into "JsonDocument" values (?, ?)', ["json1", "null"]);
+    const table = sqliteTable("JsonDocument", { id: text("id").primaryKey(), tags: text("tags", { mode: "json" }).$type<string[]>() });
+    const resolver = createDrizzleResolver(db, table);
+    await expect(resolver({ type: "Document", id: "json1" })).resolves.toEqual({ id: "json1", tags: null });
+    expect(execute('select "tags" is null from "JsonDocument"')).toEqual([[0]]);
+  });
+
   it("rejects an unbound ID column before executing a query", async () => {
     const before = statements.length;
     expect(() => createDrizzleResolver(db, documents, { idColumn: "missing" })).toThrow(/ID column/);

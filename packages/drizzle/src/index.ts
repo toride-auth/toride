@@ -70,7 +70,7 @@ function physicalColumn(table: AnyTable, field: string): PhysicalColumn | undefi
 /**
  * Creates resource-scoped Drizzle descriptions without constructing SQL.
  * Native column metadata proves scalar type and nullability. Unmapped fields,
- * unbound relations, JSON comparisons, and physical array membership are rejected.
+ * unbound relations, JSON predicates, and physical array membership are rejected.
  * The application asserts that complete database rows match resolver observations.
  */
 export function createDrizzleAdapter<
@@ -148,15 +148,15 @@ export function createDrizzleAdapter<
 
     const bound = column(constraint.field, context);
     const base = { field: bound.field, table: bound.table, resourceType: context.resourceType, nullable: !bound.metadata.notNull };
+    const dataType = bound.metadata.dataType;
+    if (!["string", "number", "boolean"].includes(dataType)) {
+      throw new UnsupportedConstraintError(`scalar type ${dataType}`, context.resourceType);
+    }
     if (constraint.type === "field_exists") {
       return emit({ _op: constraint.exists ? "isNotNull" : "isNull", ...base, nullBehavior: "total" });
     }
     if (constraint.type === "field_includes") {
       throw new UnsupportedConstraintError("physical array membership", context.resourceType);
-    }
-    const dataType = bound.metadata.dataType;
-    if (!["string", "number", "boolean"].includes(dataType)) {
-      throw new UnsupportedConstraintError(`scalar type ${dataType}`, context.resourceType);
     }
     const values = constraint.type === "field_in" || constraint.type === "field_nin" ? constraint.values : [constraint.value];
     if (values.some(value => value === undefined || (value !== null && (typeof value !== dataType
