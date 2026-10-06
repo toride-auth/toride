@@ -1,5 +1,7 @@
 import type { EvaluationDiagnostic, Policy, ResourceRef, ResourceBlock, Resolvers } from "../types.js";
 
+const maxFastIdentityLength = 1024;
+
 export class ObservationError extends Error {
   constructor(readonly code: EvaluationDiagnostic["code"], readonly path: string) {
     super(`${code}: ${path}`);
@@ -24,7 +26,14 @@ export class AttributeCache {
   hasConflict = false;
   private readonly absent = new Set<string>();
 
-  isAbsent(ref: ResourceRef): boolean { return this.absent.has(JSON.stringify([ref.type, ref.id])); }
+  isAbsent(ref: ResourceRef): boolean {
+    // Preserve identity getter reads before the empty-set shortcut.
+    const type = ref.type;
+    const id = ref.id;
+    // Large escaped identities can exceed JSON's maximum string length.
+    if (this.absent.size === 0 && typeof type === "string" && typeof id === "string" && type.length + id.length <= maxFastIdentityLength) return false;
+    return this.absent.has(JSON.stringify([type, id]));
+  }
 
   constructor(private readonly resolvers: Resolvers = {}, readonly policy?: Policy) {}
 

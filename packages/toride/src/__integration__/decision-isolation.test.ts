@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { Toride } from "../index.js";
 import type { Policy } from "../index.js";
 
@@ -15,6 +15,42 @@ it("denies access when a resource identity getter fails", async () => {
   const explanation = await engine.explain(actor, "read", inaccessible);
   expect(explanation.allowed).toBe(false);
   expect(explanation.diagnostics).toContainEqual({ code: "evaluation_error", path: "Document" });
+});
+
+it("denies access when a long primitive identity cannot be serialized", async () => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: ["unused"], permissions: ["read"], rules: [{ effect: "permit", permissions: ["read"], when: {} }] },
+  } };
+  const longId = "\0".repeat(2048);
+  const stringify = JSON.stringify;
+  let injected = 0;
+  // Fault injection exercises the native maximum-string-size error path cheaply.
+  // The actual native limit is verified separately without allocating it per worker.
+  const serializer = vi.spyOn(JSON, "stringify").mockImplementation(value => {
+    if (Array.isArray(value) && value.length === 2 && value[0] === "Document" && value[1] === longId) {
+      injected++;
+      throw new RangeError("Injected identity serializer failure");
+    }
+    return stringify(value);
+  });
+  try {
+    for (const method of ["can", "explain"] as const) {
+      let reads = 0;
+      injected = 0;
+      const resource = { type: "Document", get id(): string { return ++reads === 2 ? longId : "d1"; } };
+      const engine = new Toride({ policy });
+      if (method === "can") expect(await engine.can(actor, "read", resource)).toBe(false);
+      else {
+        const explanation = await engine.explain(actor, "read", resource);
+        expect(explanation.allowed).toBe(false);
+        expect(explanation.diagnostics).toContainEqual({ code: "evaluation_error", path: "Document" });
+      }
+      expect(injected).toBe(1);
+      expect(reads).toBe(2);
+    }
+  } finally {
+    serializer.mockRestore();
+  }
 });
 
 function afterMicrotasks(remaining: number, action: () => void): void {
