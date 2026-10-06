@@ -32,6 +32,8 @@ export type {
   ResourceRef,
   ResourceResolver,
   ResolverData,
+  RelationRef,
+  ObservedAttributes,
   EvaluationOutcome,
   EvaluationDiagnostic,
   Resolvers,

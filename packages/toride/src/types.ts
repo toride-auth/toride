@@ -139,12 +139,11 @@ export type ActorRef<S extends TorideSchema = DefaultSchema> = {
 export type ResourceRef<
   S extends TorideSchema = DefaultSchema,
   R extends S["resources"] = S["resources"],
-> = {
-  readonly type: R;
+> = { [T in R]: {
+  readonly type: T;
   readonly id: string;
-  /** Pre-fetched attributes. Inline values take precedence over resolver results. */
-  readonly attributes?: ResolverData<S, R>;
-};
+  readonly attributes?: ResolverData<S, T>;
+} }[R];
 
 /** Optional per-check configuration. */
 export interface CheckOptions {
@@ -179,15 +178,35 @@ export type ResourceResolver<
   ref: ResourceRef<S, R>,
 ) => Promise<ResolverData<S, R> | null>;
 
+export type RelationRef<S extends TorideSchema, T extends string> = {
+  readonly type: T;
+  readonly id: string;
+  readonly attributes?: T extends S["resources"]
+    ? ResolverData<S, T>
+    : T extends S["actorTypes"]
+      ? ObservedAttributes<S["actorAttributeMap"][T]>
+      : Record<string, unknown>;
+};
+
+export type ObservedAttributes<T> = {
+  readonly [K in keyof T]?: T[K] extends readonly unknown[]
+    ? T[K] | null
+    : T[K] extends Record<string, unknown>
+      ? ObservedAttributes<T[K]> | null
+      : T[K] | null;
+};
+
 export type ResolverData<
   S extends TorideSchema = DefaultSchema,
   R extends S["resources"] = S["resources"],
 > = string extends S["resources"]
   ? Record<string, unknown>
-  : Partial<Omit<S["resourceAttributeMap"][R], keyof S["relationMap"][R]>> & {
+  : string extends keyof S["relationMap"][R]
+    ? ObservedAttributes<S["resourceAttributeMap"][R]>
+    : ObservedAttributes<Omit<S["resourceAttributeMap"][R], keyof S["relationMap"][R]>> & {
       readonly [K in keyof S["relationMap"][R]]?:
-        | ResourceRef<S, S["relationMap"][R][K] & S["resources"]>
-        | readonly ResourceRef<S, S["relationMap"][R][K] & S["resources"]>[]
+        | RelationRef<S, S["relationMap"][R][K]>
+        | readonly RelationRef<S, S["relationMap"][R][K]>[]
         | null;
     };
 

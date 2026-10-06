@@ -1,5 +1,7 @@
 // T081: snapshot() - Server-side permission snapshot generation
 
+import { sameObservation, ObservationError } from "./evaluation/cache.js";
+
 import type { TorideSchema, DefaultSchema, ActorRef, ResourceRef, CheckOptions } from "./types.js";
 
 /**
@@ -45,6 +47,15 @@ export async function snapshot<S extends TorideSchema = DefaultSchema>(
   resources: ResourceRef<S>[],
   options?: CheckOptions,
 ): Promise<PermissionSnapshot<S>> {
+  const observations = new Map<string, ResourceRef<S>>();
+  for (const resource of resources) {
+    const key = `${resource.type}:${resource.id}`;
+    const previous = observations.get(key);
+    if (previous && !sameObservation(previous.attributes ?? {}, resource.attributes ?? {})) {
+      throw new ObservationError("conflicting_observation", key);
+    }
+    observations.set(key, resource);
+  }
   const entries = await Promise.all(
     resources.map(async (resource) => {
       const key = `${resource.type}:${resource.id}`;
