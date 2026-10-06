@@ -25,9 +25,13 @@ export async function resolveRoleOutcomes(actor: ActorRef, resource: ResourceRef
     const key = JSON.stringify([ref.type, ref.id, name]);
     if (visited.has(key)) { cache.report("cycle", `${ref.type}.${name}`); return () => "indeterminate"; }
     if (depth > maxDepth) { cache.report("depth_limit", `${ref.type}.${name}`); return () => "indeterminate"; }
-    const memoKey = JSON.stringify([key, depth, [...visited].sort()]);
-    const stored = memo.get(memoKey);
-    if (stored) return stored;
+    // All root names must be primitive strings to exclude serialized-name collisions.
+    const bypassRootMemo = primitiveRootNames && depth === 0 && visited.size === 0 && typeof name === "string" && typeof key === "string" && key.length <= 1024;
+    const memoKey = bypassRootMemo ? undefined : JSON.stringify([key, depth, [...visited].sort()]);
+    if (memoKey !== undefined) {
+      const stored = memo.get(memoKey);
+      if (stored) return stored;
+    }
     const branch = new Set(visited).add(key);
     const computation = async (): Promise<RoleOutcome> => {
       const results: RoleOutcome[] = [];
@@ -80,10 +84,14 @@ export async function resolveRoleOutcomes(actor: ActorRef, resource: ResourceRef
       return () => cache.isAbsent(ref) ? "false" : any(results.map(result => result()));
     };
     const result = computation();
-    memo.set(memoKey, result);
+    if (memoKey !== undefined) memo.set(memoKey, result);
     return result;
   };
   const names = new Set([...block.roles, ...(block.derived_roles ?? []).map(entry => entry.role)]);
+  let primitiveRootNames = true;
+  for (const name of names) {
+    if (typeof name !== "string") { primitiveRootNames = false; break; }
+  }
   const outcomes = new Map<string, RoleOutcome>();
   for (const name of names) outcomes.set(name, await role(name, resource, block, new Set(), 0));
   return { get detail() { return { direct: [], derived: traces.filter(trace => trace.outcome() === "true").map(({ role, via }) => ({ role, via })) }; }, outcomes };

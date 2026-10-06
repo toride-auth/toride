@@ -27,7 +27,6 @@ export class AttributeCache {
   private readonly absent = new Set<string>();
 
   isAbsent(ref: ResourceRef): boolean {
-    // Preserve identity getter reads before the empty-set shortcut.
     const type = ref.type;
     const id = ref.id;
     // Large escaped identities can exceed JSON's maximum string length.

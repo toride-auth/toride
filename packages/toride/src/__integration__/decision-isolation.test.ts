@@ -5,6 +5,20 @@ import type { Policy } from "../index.js";
 const actor = { type: "User", id: "u1", attributes: { enabled: true } };
 const document = { type: "Document", id: "d1" };
 
+it.each([true, false])("preserves serialized role-name collisions with boxed-first=%s", async boxedFirst => {
+  const boxed = new String("viewer") as unknown as string;
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: boxedFirst ? [boxed, "viewer"] : ["viewer", boxed], permissions: ["read"],
+      derived_roles: [{ role: "viewer", when: {} }], grants: { viewer: ["read"] } },
+  } };
+  const engine = new Toride({ policy });
+  expect(await engine.can(actor, "read", document)).toBe(!boxedFirst);
+  const explanation = await engine.explain(actor, "read", document);
+  expect(explanation.allowed).toBe(!boxedFirst);
+  expect(explanation.resolvedRoles.derived).toEqual(boxedFirst ? [] : [{ role: "viewer", via: "when condition" }]);
+  if (!boxedFirst) expect(explanation.finalDecision).toContain("via roles [viewer, viewer]");
+});
+
 it("denies access when a resource identity getter fails", async () => {
   const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
     Document: { roles: [], permissions: ["read"], rules: [{ effect: "permit", permissions: ["read"], when: {} }] },
@@ -58,6 +72,7 @@ function afterMicrotasks(remaining: number, action: () => void): void {
 }
 
 it("denies when a later related identity fails after an earlier match", async () => {
+  const deferredAbsenceRead = 4;
   const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
     Document: { roles: ["owner"], permissions: ["read"], relations: { owners: "User" },
       derived_roles: [{ role: "owner", from_relation: "owners" }], grants: { owner: ["read"] } },
@@ -67,8 +82,7 @@ it("denies when a later related identity fails after an earlier match", async ()
     let laterReads = 0;
     const first = { type: "User", get id(): string { firstReads++; return "u1"; } };
     const later = { type: "User", get id(): string {
-      // Three reads validate/build the role; the fourth is its deferred absence read.
-      if (++laterReads === 4) throw new Error("later identity unavailable");
+      if (++laterReads === deferredAbsenceRead) throw new Error("later identity unavailable");
       return "u2";
     } };
     const resource = { type: "Document", id: "d1", attributes: { owners: [first, later] } };
@@ -80,7 +94,7 @@ it("denies when a later related identity fails after an earlier match", async ()
       expect(explanation.diagnostics).toContainEqual({ code: "evaluation_error", path: "Document" });
     }
     expect(firstReads).toBe(5);
-    expect(laterReads).toBe(4);
+    expect(laterReads).toBe(deferredAbsenceRead);
   }
 });
 
