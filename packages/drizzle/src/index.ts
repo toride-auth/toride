@@ -39,12 +39,12 @@ export interface DrizzleAdapterOptions<
 > {
   /** Policy resource represented by the table passed to createDrizzleAdapter. */
   readonly resourceType: S["resources"];
-  /** Additional policy resource tables, used when translation enters a relation. */
-  readonly resources?: Partial<Record<S["resources"], AnyTable>>;
+  /** Related resource and actor tables, used when translation enters a relation. */
+  readonly resources?: Partial<Record<S["resources"] | S["actorTypes"], AnyTable>>;
   /** Physical relations indexed by source resource, then policy relation field. */
   readonly relations?: Partial<Record<S["resources"], Record<string, RelationConfig>>>;
   /** Optional policy field to physical column key mappings, indexed by resource. */
-  readonly fields?: Partial<Record<S["resources"], Record<string, string>>>;
+  readonly fields?: Partial<Record<S["resources"] | S["actorTypes"], Record<string, string>>>;
   readonly virtualFields?: VirtualFieldsConfig<S, TModelMap>;
 }
 
@@ -208,6 +208,12 @@ export interface DrizzleResolverOptions {
   readonly idColumn?: string;
 }
 
+/** Native selected column types must agree with the policy fields they expose. */
+export type DrizzleResolverTable<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> = AnyTable & { readonly $inferSelect: ResolverData<S, R> & Record<string, unknown> };
+
 interface ResolverDatabase {
   select(): { from(table: AnyTable): { where(condition: SQL): PromiseLike<unknown[]> } };
 }
@@ -220,7 +226,7 @@ interface ResolverDatabase {
 export function createDrizzleResolver<
   S extends TorideSchema = DefaultSchema,
   R extends S["resources"] = S["resources"],
->(db: ResolverDatabase, table: AnyTable, options?: DrizzleResolverOptions): (ref: ResourceRef<S, R>) => Promise<ResolverData<S, R> | null> {
+>(db: ResolverDatabase, table: DrizzleResolverTable<S, R>, options?: DrizzleResolverOptions): (ref: ResourceRef<S, R>) => Promise<ResolverData<S, R> | null> {
   const idField = options?.idColumn ?? "id";
   const idColumn = physicalColumn(table, idField);
   if (!idColumn) throw new Error(`Drizzle resolver ID column "${idField}" is not bound`);
