@@ -6,7 +6,15 @@
   "scripts": {
     "dev": "vitepress dev",
     "build": "vitepress build",
+    "test": "node --test .vitepress/locale.test.mjs",
     "preview": "vitepress preview"
+  },
+  "nx": {
+    "targets": {
+      "build": {
+        "outputs": ["{projectRoot}/.vitepress/dist"]
+      }
+    }
   },
   "devDependencies": {
     "vitepress": "1.6.4",
