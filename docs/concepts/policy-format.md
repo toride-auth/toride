@@ -81,7 +81,7 @@ global_roles:
       $actor.scope: read
 ```
 
-Global roles are not directly usable in grants. Instead, resources reference them via [derived roles](/concepts/roles-and-relations#global-role-derivation) to map them to local roles:
+Global roles are not directly usable in grants. Instead, resources reference them via [derived roles](/concepts/roles-and-relations#_1-global-role-derivation) to map them to local roles:
 
 ```yaml
 resources:
