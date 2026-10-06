@@ -1,15 +1,11 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { Toride, loadJson } from 'toride';
 import { createPrismaAdapter, createPrismaResolver } from '@toride/prisma';
 import { createDrizzleAdapter, createDrizzleResolver } from '@toride/drizzle';
-import { PrismaLibSQL } from '@prisma/adapter-libsql';
-import { drizzle } from 'drizzle-orm/sqlite-proxy';
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { and, or, not, eq, ne, gt, gte, lt, lte, inArray, notInArray, isNull, isNotNull, sql, asc, count, exists, getTableName } from 'drizzle-orm';
 import { recorder, evidence, scratch } from './support.mjs';
 import { actor, rows, projects, users, reviewers, queryCases, policy, runtimeResolvers } from './fixtures.mjs';
 
@@ -19,12 +15,9 @@ const root = process.env.TORIDE_VERIFY_ROOT;
 const sqlEvents = { prisma: [], drizzle: [] };
 const translations = [];
 const ids = (result) => result.map((row) => row.id);
-const tables = {
-  Document: sqliteTable('Document', { id: text('id').primaryKey(), tenant: text('tenant').notNull(), blocked: integer('blocked', { mode: 'boolean' }).notNull(), title: text('title'), rank: integer('rank'), ownerId: text('ownerId'), projectId: text('projectId') }),
-  Project: sqliteTable('Project', { id: text('id').primaryKey(), isPublic: integer('isPublic', { mode: 'boolean' }).notNull() }),
-  User: sqliteTable('User', { id: text('id').primaryKey() }),
-  Reviewer: sqliteTable('Reviewer', { documentId: text('documentId').notNull(), userId: text('userId').notNull(), approved: integer('approved', { mode: 'boolean' }).notNull() }),
-};
+const { createDatabase: createPrismaDatabase } = await import(pathToFileURL(join(root, 'examples/prisma-app/verification/database.mjs')).href);
+const { createDatabase: createDrizzleDatabase, tables, lower, asc, count, getTableName, withMinimumRank } = await import(pathToFileURL(join(root, 'packages/drizzle/verification/database.mjs')).href);
+const db = createDrizzleDatabase(scratch, feature, sqlEvents.drizzle);
 const fields = {
   Document: Object.fromEntries(Object.entries({ id: ['string', false], tenant: ['string', false], blocked: ['boolean', false], title: ['string', true], rank: ['number', true], ownerId: ['string', true], projectId: ['string', true] }).map(([field, [type, nullable]]) => [field, { field, type, nullable, ...(type === 'string' ? { stringComparison: 'binary' } : {}) }])),
   Project: { id: { field: 'id', type: 'string', nullable: false, stringComparison: 'binary' }, isPublic: { field: 'isPublic', type: 'boolean', nullable: false } },
@@ -32,55 +25,14 @@ const fields = {
   Reviewer: { userId: { field: 'userId', type: 'string', nullable: false, stringComparison: 'binary' }, approved: { field: 'approved', type: 'boolean', nullable: false } },
 };
 function prismaAdapter() {
-  return createPrismaAdapter({ fields: { ...fields, Document: { ...fields.Document, title: { ...fields.Document.title, stringFilters: 'javascript' } } }, relations: { Document: { project: { field: 'project', resourceType: 'Project', cardinality: 'one' }, owner: { field: 'owner', resourceType: 'User', cardinality: 'one' }, reviewers: { field: 'reviewers', resourceType: 'Reviewer', cardinality: 'many' } } } });
+  return createPrismaAdapter({ fields: { ...fields, Document: { ...fields.Document, title: { ...fields.Document.title, stringFilters: 'javascript' } } }, relations: { Document: { project: { field: 'project', resourceType: 'Project', cardinality: 'one' }, owner: { field: 'owner', resourceType: 'User', cardinality: 'one' }, reviewers: { field: 'reviewers', resourceType: 'Reviewer', cardinality: 'many' } }, Project: { documents: { field: 'documents', resourceType: 'Document', cardinality: 'many' } } }, virtualFields: { Document: { reviewerIds: { relation: 'reviewers', matchField: 'userId', cardinality: 'many', valueType: 'string', stringComparison: 'binary' } }, Project: { reviewerIds: { relation: 'documents', matchField: 'tenant', cardinality: 'many', valueType: 'string', stringComparison: 'binary' } } } });
 }
 function drizzleAdapter() {
-  return createDrizzleAdapter(tables.Document, { resourceType: 'Document', resources: tables, relations: { Document: { project: { resourceType: 'Project', cardinality: 'one', sourceColumn: 'projectId', targetColumn: 'id' }, owner: { resourceType: 'User', cardinality: 'one', sourceColumn: 'ownerId', targetColumn: 'id' }, reviewers: { resourceType: 'Reviewer', cardinality: 'many', sourceColumn: 'id', targetColumn: 'documentId' } } } });
-}
-function lower(node, db) {
-  assert(node && typeof node._op === 'string', 'Expected a public Drizzle operation description');
-  if (node._op === 'literal') return sql`${node.value ? 1 : 0}`;
-  if (node._op === 'and') return node.children.length ? and(...node.children.map((child) => lower(child, db))) : sql`1`;
-  if (node._op === 'or') return node.children.length ? or(...node.children.map((child) => lower(child, db))) : sql`0`;
-  if (node._op === 'not') return not(lower(node.child, db));
-  if (node._op === 'relation') {
-    assert(node.table && node.relatedTable && node.sourceColumn && node.targetColumn, 'Relation requires an explicit physical binding');
-    assert.equal(node.quantifier, 'any');
-    const source = node.table[node.sourceColumn];
-    const target = node.relatedTable[node.targetColumn];
-    const joinCondition = source.dataType === 'string' ? sql`${source} collate binary = ${target} collate binary` : eq(source, target);
-    return exists(db.select({ one: sql`1` }).from(node.relatedTable).where(and(joinCondition, lower(node.child, db))));
-  }
-  const column = node.table?.[node.field];
-  assert(column, `No physical column for ${node.field}`);
-  const valueColumn = node.stringComparison === 'binary' ? sql`${column} collate binary` : column;
-  if (node._op === 'isNull') return isNull(column);
-  if (node._op === 'isNotNull') return isNotNull(column);
-  const comparisons = { eq, ne, gt, gte, lt, lte };
-  let predicate;
-  if (comparisons[node._op]) predicate = comparisons[node._op](valueColumn, node.value);
-  else if (node._op === 'inArray') predicate = node.values.length ? inArray(valueColumn, node.values) : sql`0`;
-  else if (node._op === 'notInArray') predicate = node.values.length ? notInArray(valueColumn, node.values) : sql`1`;
-  else if (node._op === 'contains') predicate = sql`instr(${column}, ${node.value}) > 0`;
-  else if (node._op === 'startsWith') predicate = sql`substr(${column}, 1, length(${node.value})) = ${node.value} collate binary`;
-  else if (node._op === 'endsWith') predicate = node.value === '' ? sql`1` : sql`substr(${column}, -length(${node.value})) = ${node.value} collate binary`;
-  else throw new Error(`Unsupported consumer operation ${node._op}`);
-  assert.equal(node.nullBehavior, 'false', 'Ordinary comparisons must declare total false semantics at null');
-  return and(isNotNull(column), predicate);
+  return createDrizzleAdapter(tables.Document, { resourceType: 'Document', resources: tables, relations: { Document: { project: { resourceType: 'Project', cardinality: 'one', sourceColumn: 'projectId', targetColumn: 'id' }, owner: { resourceType: 'User', cardinality: 'one', sourceColumn: 'ownerId', targetColumn: 'id' }, reviewers: { resourceType: 'Reviewer', cardinality: 'many', sourceColumn: 'id', targetColumn: 'documentId' } }, Project: { documents: { resourceType: 'Document', cardinality: 'many', sourceColumn: 'id', targetColumn: 'projectId' } } }, virtualFields: { Document: { reviewerIds: { relation: 'reviewers', matchField: 'userId' } }, Project: { reviewerIds: { relation: 'documents', matchField: 'tenant' } } } });
 }
 function sanitize(value) {
   return JSON.parse(JSON.stringify(value, (key, entry) => ['table', 'relatedTable'].includes(key) && entry ? getTableName(entry) : entry));
 }
-function executePython(statement, params = []) {
-  const result = spawnSync('python3', [join(scratch, 'sqlite.py'), join(scratch, `${feature}-drizzle.db`)], { input: JSON.stringify({ sql: statement, params }), encoding: 'utf8' });
-  sqlEvents.drizzle.push({ query: statement, params, exitCode: result.status, stderr: result.stderr });
-  assert.equal(result.status, 0, result.stderr);
-  return JSON.parse(result.stdout);
-}
-const db = drizzle(async (statement, params, method) => {
-  const result = executePython(statement, params);
-  return { rows: method === 'get' ? result.rows[0] : result.rows };
-});
 const ddls = [
   'CREATE TABLE "Project" ("id" TEXT PRIMARY KEY, "isPublic" BOOLEAN NOT NULL)',
   'CREATE TABLE "User" ("id" TEXT PRIMARY KEY)',
@@ -89,22 +41,20 @@ const ddls = [
 ];
 let prisma;
 try {
-  const generation = spawnSync(process.execPath, [join(scratch, 'node_modules/prisma/build/index.js'), 'generate'], { cwd: scratch, encoding: 'utf8', env: process.env });
-  writeFileSync(join(evidence, `${feature}-prisma-generate.log`), generation.stdout + generation.stderr);
-  writeFileSync(join(evidence, `${feature}-prisma-generate.command.json`), JSON.stringify({ executable: process.execPath, args: [join(scratch, 'node_modules/prisma/build/index.js'), 'generate'], cwd: scratch, exitCode: generation.status }, null, 2));
-  assert.equal(generation.status, 0, 'Scratch Prisma Client generation failed');
-  const { PrismaClient } = await import('./generated/index.js');
-  prisma = new PrismaClient({ adapter: new PrismaLibSQL({ url: `file:${scratch}/${feature}-prisma.db` }), log: [{ emit: 'event', level: 'query' }] });
-  prisma.$on('query', ({ query, params }) => sqlEvents.prisma.push({ query, params }));
-  await prisma.$executeRawUnsafe('PRAGMA case_sensitive_like = ON');
+  prisma = await createPrismaDatabase({ scratch, evidence, feature, events: sqlEvents.prisma });
   for (const ddl of ddls) {
     await prisma.$executeRawUnsafe(ddl);
-    executePython(ddl);
+    await db.run(ddl);
   }
   for (const [table, data] of [['Project', projects], ['User', users], ['Document', rows], ['Reviewer', reviewers]]) {
     await prisma[table[0].toLowerCase() + table.slice(1)].createMany({ data });
     await db.insert(tables[table]).values(data);
   }
+  await prisma.$executeRawUnsafe('PRAGMA case_sensitive_like = ON');
+  await proof.check('prisma-read-connection-binary-like', { sql: "SELECT 'Alpha' LIKE 'Alpha' AS same, 'Alpha' LIKE 'ALPHA' AS different", afterFixtureTransactions: true }, { same: 1, different: 0 }, async () => {
+    const [result] = await prisma.$queryRawUnsafe("SELECT 'Alpha' LIKE 'Alpha' AS same, 'Alpha' LIKE 'ALPHA' AS different");
+    return { same: Number(result.same), different: Number(result.different) };
+  });
   await proof.check('prisma-local-fixture-roundtrip', { rows }, rows, () => prisma.document.findMany({ orderBy: { id: 'asc' } }));
   await proof.check('drizzle-local-fixture-roundtrip', { rows }, rows, () => db.select().from(tables.Document).orderBy(asc(tables.Document.id)));
   if (feature === 'orm-resolvers') {
@@ -159,11 +109,32 @@ try {
       }
     }
     for (const backend of ['prisma', 'drizzle']) {
+      await proof.check(`${backend}-application-filter-before-pagination`, { policy: policy(queryCases[0].definition), filter: { rank: { gte: 4 } } }, { ids: ['d04', 'd08'], count: 2, first: ['d04', 'd08'], second: [], last: [] }, async () => {
+        const instance = new Toride({ policy: await loadJson(JSON.stringify(policy(queryCases[0].definition))), resolvers: runtimeResolvers });
+        const result = await instance.buildConstraints(actor, 'read', 'Document');
+        assert(result.ok && result.constraint);
+        const translated = instance.translateConstraints(result.constraint, backend === 'prisma' ? prismaAdapter() : drizzleAdapter());
+        if (backend === 'prisma') {
+          const where = { AND: [translated, { rank: { gte: 4 } }] };
+          return { ids: ids(await prisma.document.findMany({ where, orderBy: { id: 'asc' } })), count: await prisma.document.count({ where }), first: ids(await prisma.document.findMany({ where, orderBy: { id: 'asc' }, skip: 0, take: 2 })), second: ids(await prisma.document.findMany({ where, orderBy: { id: 'asc' }, skip: 2, take: 2 })), last: ids(await prisma.document.findMany({ where, orderBy: { id: 'asc' }, skip: 3, take: 2 })) };
+        }
+        const where = withMinimumRank(lower(translated, db), 4);
+        const select = () => db.select().from(tables.Document).where(where).orderBy(asc(tables.Document.id));
+        return { ids: ids(await select()), count: (await db.select({ count: count() }).from(tables.Document).where(where))[0].count, first: ids(await select().limit(2).offset(0)), second: ids(await select().limit(2).offset(2)), last: ids(await select().limit(2).offset(3)) };
+      });
+    }
+    for (const backend of ['prisma', 'drizzle']) {
       const instance = new Toride({ policy: await loadJson(JSON.stringify(policy({ rules: [] }))) });
       for (const test of [
         { id: 'not-always', node: { type: 'not', child: { type: 'always' } }, ids: [] },
         { id: 'or-always-never', node: { type: 'or', children: [{ type: 'always' }, { type: 'never' }] }, ids: ['d01', 'd02', 'd03', 'd04', 'd05', 'd06', 'd07', 'd08'] },
+        { id: 'double-not-always', node: { type: 'not', child: { type: 'not', child: { type: 'always' } } }, ids: ['d01', 'd02', 'd03', 'd04', 'd05', 'd06', 'd07', 'd08'] },
         { id: 'relation-always-requires-existence', node: { type: 'relation', field: 'project', resourceType: 'Project', quantifier: 'any', constraint: { type: 'always' } }, ids: ['d01', 'd02', 'd03', 'd05', 'd06', 'd07', 'd08'] },
+        { id: 'one-relation-never', node: { type: 'relation', field: 'project', resourceType: 'Project', quantifier: 'any', constraint: { type: 'never' } }, ids: [] },
+        { id: 'many-relation-always', node: { type: 'relation', field: 'reviewers', resourceType: 'Reviewer', quantifier: 'any', constraint: { type: 'always' } }, ids: ['d01', 'd02', 'd05', 'd08'] },
+        { id: 'many-relation-never', node: { type: 'relation', field: 'reviewers', resourceType: 'Reviewer', quantifier: 'any', constraint: { type: 'never' } }, ids: [] },
+        { id: 'not-one-relation-always', node: { type: 'not', child: { type: 'relation', field: 'project', resourceType: 'Project', quantifier: 'any', constraint: { type: 'always' } } }, ids: ['d04'] },
+        { id: 'not-many-relation-always', node: { type: 'not', child: { type: 'relation', field: 'reviewers', resourceType: 'Reviewer', quantifier: 'any', constraint: { type: 'always' } } }, ids: ['d03', 'd04', 'd06', 'd07'] },
       ]) {
         await proof.check(`${backend}-manual-${test.id}`, { constraint: test.node }, test.ids, async () => {
           const node = { ...test.node, rootResourceType: 'Document' };
@@ -193,6 +164,7 @@ try {
       for (const unsupported of [
         { id: 'custom', node: { type: 'unknown', name: 'external-decision', rootResourceType: 'Document' } },
         { id: 'legacy-has-role', node: { type: 'has_role', actorId: 'u1', actorType: 'User', role: 'viewer', rootResourceType: 'Document' } },
+        { id: 'unmapped-virtual', node: { type: 'field_includes', field: 'unmappedIds', value: 'u1', rootResourceType: 'Document' } },
       ]) {
         await proof.check(`${backend}-reject-${unsupported.id}-before-query`, unsupported.node, { error: 'UnsupportedConstraintError', queryCountChange: 0 }, async () => {
           const instance = new Toride({ policy: await loadJson(JSON.stringify(policy({ rules: [] }))) });

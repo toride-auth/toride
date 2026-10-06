@@ -31,6 +31,8 @@ function inventory() {
   }
   for (const name of Object.values(packages)) walk(join(root, 'packages', name, 'dist'));
   walk(helpers);
+  walk(join(root, 'examples/prisma-app/verification'));
+  walk(join(root, 'packages/drizzle/verification'));
   walk(join(root, '.claude/skills/verify-toride'));
   const hashes = Object.fromEntries([...files].sort().filter((path) => existsSync(join(root, path))).map((path) => [path, hash(readFileSync(join(root, path)))]));
   return { head: git('rev-parse', 'HEAD').trim(), status: git('status', '--short'), diffSha256: hash(git('diff', 'HEAD')), files: hashes };
@@ -56,6 +58,7 @@ function linkModule(scratch, name, target) {
 }
 function launch(parent) {
   const destination = resolve(parent ?? join(tmpdir(), 'toride-verification-evidence'));
+  assert(destination !== root && !destination.startsWith(`${root}/`), 'Evidence must be outside the checkout');
   mkdirSync(destination, { recursive: true });
   const run = mkdtempSync(join(destination, 'run-'));
   const scratch = mkdtempSync(join(tmpdir(), 'toride-verify-'));
@@ -88,7 +91,7 @@ function doctor(run) {
   const prior = JSON.parse(readFileSync(join(run, 'identity.json'), 'utf8'));
   const current = inventory();
   assert.deepEqual(current, { head: prior.head, status: prior.status, diffSha256: prior.diffSha256, files: prior.files }, 'Source or built artifacts changed. Launch a fresh run');
-  const status = command(run, 'doctor', process.execPath, [join(data.scratch, 'doctor.mjs')], { cwd: data.scratch, env: { ...process.env, TORIDE_VERIFY_EVIDENCE: run, TORIDE_VERIFY_SCRATCH: data.scratch } });
+  const status = command(run, 'doctor', process.execPath, [join(data.scratch, 'doctor.mjs')], { cwd: data.scratch, env: { ...process.env, TORIDE_VERIFY_EVIDENCE: run, TORIDE_VERIFY_SCRATCH: data.scratch, TORIDE_VERIFY_ROOT: root } });
   assert.equal(status, 0, 'Public ESM imports or local prerequisites failed');
   console.log(`READY ${run}`);
 }

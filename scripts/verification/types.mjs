@@ -42,7 +42,7 @@ const examplePolicy = readFileSync(join(root, 'examples/prisma-app/policy.yaml')
 writeFileSync(join(scratch, 'example-generated.ts'), generateTypes(await loadYaml(examplePolicy)));
 writeFileSync(join(evidence, 'example-generated.ts'), readFileSync(join(scratch, 'example-generated.ts')));
 const prelude = `import { Toride, type ResourceResolver, type ConstraintAdapter } from 'toride';
-import { createPrismaResolver } from '@toride/prisma';
+import { createPrismaResolver, createPrismaAdapter } from '@toride/prisma';
 import { type GeneratedSchema } from './generated.js';
 declare const engine: Toride<GeneratedSchema>;
 const actor = { type: 'User' as const, id: 'u1', attributes: { enabled: true } };
@@ -50,13 +50,15 @@ type QueryMap = { Document: { tenant?: string }; Organization: { plan?: string }
 declare const adapter: ConstraintAdapter<QueryMap>;
 `;
 const cases = [
-  { id: 'valid-generated-consumer', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({tenant:'alpha', org:{type:'Organization',id:'o1'}});\nengine.can(actor,'read',{type:'Document',id:'d1'});`, positive: true },
+  { id: 'valid-generated-consumer', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({tenant:'alpha', org:{type:'Organization',id:'o1'}});\nengine.can(actor,'read',{type:'Document',id:'d1'});\nasync function query(){const result=await engine.buildConstraints(actor,'read','Document');if(result.ok && result.constraint){const where:{tenant?:string}=engine.translateConstraints(result.constraint,adapter);}}`, positive: true },
   { id: 'reject-wrong-resolver-attribute', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({tenant:123});` },
   { id: 'reject-wrong-relation-target', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({org:{type:'Document',id:'d1'}});` },
   { id: 'reject-wrong-actor-attribute', source: `engine.can({type:'User',id:'u1',attributes:{enabled:'yes'}},'read',{type:'Document',id:'d1'});` },
   { id: 'reject-wrong-action-resource', source: `engine.can(actor,'manage',{type:'Document',id:'d1'});` },
   { id: 'reject-cross-resource-translation', source: `async function run(){const result=await engine.buildConstraints(actor,'read','Document'); if(result.ok && result.constraint) { engine.translateConstraints<'Organization',QueryMap>(result.constraint,adapter); }}` },
   { id: 'reject-selected-helper-complete-claim', source: `const resolver=createPrismaResolver<GeneratedSchema,'Document'>({},'Document',{select:{tenant:true}}); async function run(){ const selected=await resolver({type:'Document',id:'d1'}); if(selected){const blocked:boolean=selected.blocked;} }` },
+  { id: 'reject-wrong-scalar-binding', source: `createPrismaAdapter<GeneratedSchema>({fields:{Document:{tenant:{field:'tenant',type:'boolean',nullable:false}}}});` },
+  { id: 'reject-wrong-relation-binding', source: `createPrismaAdapter<GeneratedSchema>({relations:{Document:{org:{field:'org',resourceType:'Document',cardinality:'one'}}}});` },
 ];
 for (const test of cases) {
   const file = join(scratch, `${test.id}.ts`);

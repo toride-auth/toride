@@ -22,13 +22,13 @@ export const reviewers = [
 export const expectedPages = { ids: ['d02', 'd04', 'd05', 'd08'], count: 4, first: ['d02', 'd04'], second: ['d05', 'd08'], last: ['d08'] };
 export const document = {
   roles: ['viewer', 'owner'], permissions: ['read'],
-  attributes: { tenant: 'string', blocked: 'boolean', title: 'string', rank: 'number', ownerId: 'string', projectId: 'string' },
+  attributes: { tenant: 'string', blocked: 'boolean', title: 'string', rank: 'number', ownerId: 'string', projectId: 'string', reviewerIds: { kind: 'array', items: 'string' } },
   relations: { project: 'Project', owner: 'User', reviewers: 'Reviewer' },
 };
 export function policy(definition) {
   return { version: '1', actors: { User: { attributes: { enabled: 'boolean', tenant: 'string', userId: 'string' } } }, resources: {
     Document: { ...document, ...definition },
-    Project: { roles: ['member'], permissions: ['read'], attributes: { isPublic: 'boolean' }, derived_roles: [{ role: 'member', when: { '$resource.isPublic': true } }], grants: { member: ['read'] } },
+    Project: { roles: ['member'], permissions: ['read'], attributes: { isPublic: 'boolean', reviewerIds: { kind: 'array', items: 'string' } }, relations: { documents: 'Document' }, derived_roles: [{ role: 'member', when: { '$resource.isPublic': true } }], grants: { member: ['read'] } },
     User: { roles: ['self'], permissions: ['read'] },
     Reviewer: { roles: ['approved'], permissions: ['read'], attributes: { userId: 'string', approved: 'boolean' }, derived_roles: [{ role: 'approved', when: { '$resource.userId': '$actor.userId', '$resource.approved': true } }], grants: { approved: ['read'] } },
   } };
@@ -37,9 +37,12 @@ export const runtimeResolvers = {
   Document: async ({ id }) => {
     const row = rows.find((entry) => entry.id === id);
     if (!row) return null;
-    return { ...row, project: row.projectId === null ? null : { type: 'Project', id: row.projectId }, owner: row.ownerId === null ? null : { type: 'User', id: row.ownerId }, reviewers: reviewers.filter((entry) => entry.documentId === id).map((entry) => ({ type: 'Reviewer', id: `${entry.documentId}:${entry.userId}` })) };
+    return { ...row, reviewerIds: reviewers.filter((entry) => entry.documentId === id).map((entry) => entry.userId), project: row.projectId === null ? null : { type: 'Project', id: row.projectId }, owner: row.ownerId === null ? null : { type: 'User', id: row.ownerId }, reviewers: reviewers.filter((entry) => entry.documentId === id).map((entry) => ({ type: 'Reviewer', id: `${entry.documentId}:${entry.userId}` })) };
   },
-  Project: async ({ id }) => projects.find((entry) => entry.id === id) ?? null,
+  Project: async ({ id }) => {
+    const project = projects.find((entry) => entry.id === id);
+    return project ? { ...project, reviewerIds: rows.filter((entry) => entry.projectId === id).map((entry) => entry.tenant), documents: rows.filter((entry) => entry.projectId === id).map((entry) => ({ type: 'Document', id: entry.id })) } : null;
+  },
   User: async ({ id }) => users.find((entry) => entry.id === id) ?? null,
   Reviewer: async ({ id }) => reviewers.find((entry) => `${entry.documentId}:${entry.userId}` === id) ?? null,
 };
@@ -54,6 +57,7 @@ export const queryCases = [
   { id: 'one-relation-identity', definition: { derived_roles: [{ role: 'owner', from_relation: 'owner' }], grants: { owner: ['read'] } }, ids: ['d01', 'd02', 'd06', 'd08'] },
   { id: 'many-same-row-role', definition: { derived_roles: [{ role: 'viewer', from_role: 'approved', on_relation: 'reviewers' }], grants: { viewer: ['read'] } }, ids: ['d01', 'd05'] },
   { id: 'many-independent-leaf-conditions', definition: { rules: [{ effect: 'permit', permissions: ['read'], when: { '$resource.reviewers.userId': 'u1', '$resource.reviewers.approved': true } }] }, ids: ['d01', 'd02', 'd05'] },
+  { id: 'scoped-virtual-fields', definition: { rules: [{ effect: 'permit', permissions: ['read'], when: { '$resource.reviewerIds': { includes: 'u1' }, '$resource.project.reviewerIds': { includes: 'alpha' } } }] }, ids: ['d01', 'd02', 'd05'] },
   { id: 'unrestricted', definition: { rules: [{ effect: 'permit', permissions: ['read'], when: { '$actor.enabled': true } }] }, ids: ['d01', 'd02', 'd03', 'd04', 'd05', 'd06', 'd07', 'd08'] },
   { id: 'forbidden', definition: { rules: [] }, ids: [] },
   { id: 'binary-prefix', definition: { derived_roles: [{ role: 'viewer', when: { '$resource.title': { startsWith: 'Alpha' } } }], grants: { viewer: ['read'] } }, ids: ['d01', 'd02', 'd05'] },
