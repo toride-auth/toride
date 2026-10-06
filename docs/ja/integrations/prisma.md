@@ -1,312 +1,121 @@
 ---
-description: createPrismaAdapter() の関係マッピングとロール割り当て設定、createPrismaResolver() の select オプション、制約から Prisma の WHERE 句への変換を説明します。
+description: Prisma のフィールド、関係、仮想フィールドの明示的なマッピング、部分データのリゾルバー、正確なクエリの制限を説明します。
 ---
 
 # Prisma 連携 {#prisma-integration}
 
-`@toride/prisma` は、[Prisma ORM](https://www.prisma.io/) 向けの制約アダプターとリゾルバーヘルパーを提供します。Toride の制約 AST を Prisma の `where` 句オブジェクトへ変換し、データベースに認可条件を組み込めます。
+`@toride/prisma` は Toride の制約を Prisma の `where` オブジェクトに変換します。変換前に、ポリシーが使う物理フィールドと関係を設定してください。
 
-## インストール {#installation}
+## インストール {#install}
 
-::: code-group
-
-```bash [pnpm]
+```bash
 pnpm add @toride/prisma toride
 ```
 
-```bash [npm]
-npm install @toride/prisma toride
-```
+アダプターは `@prisma/client` をインポートしません。アプリケーションがクライアントを渡します。モデルのペイロード型を渡すと、マッピングを型で検証できます。
 
-```bash [yarn]
-yarn add @toride/prisma toride
-```
+## フィールドと関係の対応づけ {#bind-fields-and-relations}
 
-:::
-
-`@toride/prisma` は `@prisma/client` に直接依存しません。Prisma の WHERE 句の構造に合う通常の JavaScript オブジェクトを生成するため、Prisma のバージョンに依存せずに利用できます。
-
-## クイックスタート {#quick-start}
-
-### 1. アダプターの作成 {#_1-create-the-adapter}
+この例は、ポリシーに `Project.status`、`Project.archived`、`Task.project: Project` があることを前提にしています。
 
 ```typescript
 import { createPrismaAdapter } from "@toride/prisma";
+import type { GeneratedSchema } from "./generated/policy.js";
 
-const adapter = createPrismaAdapter();
-```
-
-### 2. 制約の構築とクエリ {#_2-build-constraints-and-query}
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: async (ref) => {
-      const project = await prisma.project.findUnique({
-        where: { id: ref.id },
-      });
-      return project ?? {};
-    },
-  },
+const adapter = createPrismaAdapter<GeneratedSchema>({
+	fields: {
+		Project: {
+			id: { field: "id", type: "string", nullable: false, stringComparison: "binary" },
+			status: { field: "status", type: "string", nullable: false, stringComparison: "binary" },
+			archived: { field: "archived", type: "boolean", nullable: false },
+		},
+		Task: {
+			id: { field: "id", type: "string", nullable: false, stringComparison: "binary" },
+		},
+	},
+	relations: {
+		Task: {
+			project: { field: "project", resourceType: "Project", cardinality: "one" },
+		},
+	},
 });
+```
+フィールドのマッピングは物理名、スカラー型、null 許容を宣言します。文字列の等値比較と含有には `stringComparison: "binary"` が必要です。これは大文字小文字を区別し、照合順序による正規化がなく、NUL を含まない正しい Unicode データの比較が JavaScript と一致することを表明します。
 
-const adapter = createPrismaAdapter();
+関係のマッピングは関係元リソースごとに指定します。関係先はポリシーと一致する必要があります。`cardinality` は物理関係の `"one"` または `"many"` を宣言します。one は Prisma の `is`、many は `some` に変換します。どちらも子の条件全体を満たす関連行の存在が必要です。
 
-const actor = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering" },
-};
+省略可能な第 2 型引数に `{ Project: Prisma.$ProjectPayload; Task: Prisma.$TaskPayload }` などのモデルペイロードを指定できます。物理スカラー名、null 許容、関係フィールド、多重度を検証します。アクター型だけの関係先に `User.id` などが必要な場合は、そのモデルペイロードも含めます。
 
+## クエリ、件数、ページ {#query-count-and-page}
+
+```typescript
 const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (!result.ok) {
-  // Actor has no access at all
-  return [];
-}
-
-if (result.constraint === null) {
-  // Actor can see everything
-  return await prisma.project.findMany();
-}
-
-// Translate constraints into a Prisma WHERE clause
-const where = engine.translateConstraints(result.constraint, adapter);
-const projects = await prisma.project.findMany({ where });
+if (!result.ok) return { total: 0, rows: [] };
+const where = result.constraint === null
+	? undefined
+	: engine.translateConstraints(result.constraint, adapter);
+const [total, rows] = await prisma.$transaction([
+	prisma.project.count({ where }),
+	prisma.project.findMany({ where, orderBy: { id: "asc" }, take: 20 }),
+]);
+return { total, rows };
 ```
+問い合わせ前に制約を変換します。件数とページに同じ完全な述語を使ってください。`UnsupportedConstraintError` は、この一覧クエリを正確に変換できないことを示します。空のフィルターへの置き換えや、取得後のページの絞り込みはしないでください。
 
-`where` は、Prisma がそのまま解釈できる通常の JavaScript オブジェクトです。たとえば「status が active かつ archived が false」という制約は、次のようになります。
+## 仮想フィールドの含有 {#virtual-membership}
+
+仮想配列は、明示した物理関係の行に対応できます。`Project.viewer_ids` を文字列配列として宣言したポリシーでは、次のオプションを `createPrismaAdapter()` に追加します。
 
 ```typescript
-{
-  AND: [
-    { status: "active" },
-    { NOT: { archived: true } }
-  ]
-}
-```
-
-## アダプターのオプション {#adapter-options}
-
-### 関係のマッピング {#relation-mapping}
-
-制約のフィールド名と Prisma の関係名が異なる場合は、`relationMapping` を指定します。
-
-```typescript
-const adapter = createPrismaAdapter({
-  relationMapping: {
-    org: "organization", // constraint field "org" → Prisma relation "organization"
-    project: "project",  // same name — optional, but explicit
-  },
-});
-```
-
-制約 AST に `org` フィールドの `relation` ノードがあると、アダプターは `{ org: childQuery }` の代わりに `{ organization: childQuery }` を生成します。
-
-### ロール割り当てテーブルのカスタマイズ {#custom-role-assignment-table}
-
-デフォルトでは、`userId` と `role` フィールドを持つ `roleAssignments` テーブルを使って `hasRole` 制約を生成します。次のように変更できます。
-
-```typescript
-const adapter = createPrismaAdapter({
-  roleAssignmentTable: "memberships",
-  roleAssignmentFields: {
-    userId: "memberId",
-    role: "memberRole",
-  },
-});
-```
-
-次のような WHERE 句が生成されます。
-
-```typescript
-{
-  memberships: {
-    some: {
-      memberId: "user-123",
-      memberRole: "editor",
-    },
-  },
+virtualFields: {
+	Project: {
+		viewer_ids: {
+			relation: "roleAssignments",
+			matchField: "userId",
+			filter: { role: "viewer" },
+			cardinality: "many",
+			valueType: "string",
+			stringComparison: "binary",
+		},
+	},
 }
 ```
+このマッピングは含有を、指定したフィルター付きの `roleAssignments.some` に変換します。リゾルバーの配列が、関連行の値と過不足なく対応することを表明します。暗黙のロール割り当て API は作りません。別のリソースの同名の仮想フィールドには異なるマッピングを指定できます。
 
-## 制約変換リファレンス {#constraint-translation-reference}
+## スカラーと文字列の制限 {#scalar-and-string-limits}
 
-各制約型は、対応する Prisma の WHERE 構文へ変換されます。
+通常の比較は null を除外します。否定は完全な述語の補集合を含み、必要に応じて null の行も含みます。`field_exists` は物理フィールドの null を確認します。順序比較は数値フィールドに対応します。ネイティブのスカラー配列の含有、正確性を確認していない JSON、フィールド間の操作は非対応です。
 
-| 制約型 | Prisma の出力 |
-|----------------|---------------|
-| `field_eq` | `{ field: value }` |
-| `field_neq` | `{ field: { not: value } }` |
-| `field_gt` | `{ field: { gt: value } }` |
-| `field_gte` | `{ field: { gte: value } }` |
-| `field_lt` | `{ field: { lt: value } }` |
-| `field_lte` | `{ field: { lte: value } }` |
-| `field_in` | `{ field: { in: values } }` |
-| `field_nin` | `{ field: { notIn: values } }` |
-| `field_exists` (true) | `{ field: { not: null } }` |
-| `field_exists` (false) | `{ field: null }` |
-| `field_includes` | `{ field: { has: value } }` |
-| `field_contains` | `{ field: { contains: value } }` |
+`contains`、`startsWith`、`endsWith` はそれぞれ別の Prisma フィルターです。バイナリ等値比較に加えて、フィールドに `stringFilters: "javascript"` が必要です。プロバイダー、接続設定、保存した文字列の一致規則が JavaScript と同じ場合だけ指定してください。`%`、`_`、バックスラッシュ、NUL を含むパターンは拒否します。すべてのプロバイダーに共通の保証はありません。この表明がない文字列フィルターはエラーになります。
 
-複合ノードの `and`、`or`、`not` は、Prisma の `AND`、`OR`、`NOT` 演算子に対応します。
-
-## Prisma によるリゾルバーの作成 {#creating-resolvers-with-prisma}
-
-`createPrismaResolver()` は、Prisma の `findUnique` 呼び出しを、Toride が要求するリゾルバーのシグネチャに合わせるヘルパーです。
+## リゾルバーヘルパー {#resolver-helper}
 
 ```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
 import { createPrismaResolver } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const projectResolver = createPrismaResolver<GeneratedSchema, "Project", "project">(
+	prisma,
+	"project",
+	{ select: { status: true, archived: true } },
+);
+```
+ヘルパーは `findUnique({ where: { id: ref.id }, select })` を呼び出します。`ResolverData<GeneratedSchema, "Project"> | null` を非同期で返します。行がない場合は `null` です。選択から除いた属性は取得できない値です。完全なポリシー属性を返すとは保証せず、外部キーから関係の参照を作りません。仮想配列や宣言された関係の参照には、型付きのカスタムリゾルバーを使ってください。
 
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: createPrismaResolver(prisma, "project"),
-    Task: createPrismaResolver(prisma, "task"),
-    Document: createPrismaResolver(prisma, "document", {
-      select: { id: true, title: true, ownerId: true, status: true },
-    }),
-  },
-});
+## ローカル変更の検証 {#verify-local-changes}
+
+リポジトリのルートから、実際のローカル SQLite クエリと公開 API の検証を実行できます。
+
+```bash
+scripts/verification/verify.sh check queries /tmp/toride-query-evidence
+scripts/verification/verify.sh check types-and-policy /tmp/toride-type-evidence
 ```
 
-リゾルバーは `prisma[modelName].findUnique({ where: { id: ref.id } })` を呼び出し、結果を通常のオブジェクトとして返します。レコードが見つからない場合は、空のオブジェクト `{}` を返します。
+検証コマンドはビルド後に公開パッケージを読み込み、期待した ID、件数、ページと実際の結果を比較します。型の検証は生成したファイルを TypeScript でコンパイルします。手順の詳細はリポジトリの `.claude/skills/verify-toride/SKILL.md` にあります。
 
-### select オプション {#select-option}
+## 移行 {#migration}
 
-`select` で取得するフィールドを限定できます。モデルに多数の列があり、認可判断には一部だけが必要な場合に、パフォーマンスの改善に役立ちます。
+旧形式の平坦な `relationMapping` を、関係元ごとの `relations` に変更し、関係先と多重度を指定します。判定に関係する制約が使うすべてのスカラーを `fields` に追加してください。関係先との同一性に使う ID も含めます。暗黙の `roleAssignmentTable` と `roleAssignmentFields` オプションを削除します。保存した割り当ては、ポリシー属性と明示的な仮想マッピングで表現してください。
 
-```typescript
-const resolver = createPrismaResolver(prisma, "project", {
-  select: { id: true, ownerId: true, department: true, isPublic: true },
-});
-```
+仮想マッピングにスカラーと多重度の意味を追加します。行がない場合は `null` を返し、リゾルバーの型を再生成してください。`buildConstraints()`、`translateConstraints()`、`ok` の分岐は維持します。
 
-## 完全な例 {#complete-example}
-
-ポリシー、Prisma スキーマ、エンジンの設定、認可済みデータの取得を組み合わせた一連の例です。
-
-```yaml
-# policy.yaml
-version: "1"
-
-actors:
-  User:
-    attributes:
-      department: string
-      isSuperAdmin: boolean
-
-global_roles:
-  superadmin:
-    actor_type: User
-    when:
-      $actor.isSuperAdmin: true
-
-resources:
-  Project:
-    roles: [viewer, editor, admin]
-    permissions: [read, update, delete]
-
-    relations:
-      org: Organization
-
-    grants:
-      viewer: [read]
-      editor: [read, update]
-      admin: [all]
-
-    derived_roles:
-      - role: admin
-        from_global_role: superadmin
-      - role: viewer
-        when:
-          $resource.isPublic: true
-      - role: viewer
-        actor_type: User
-        when:
-          $actor.department: $resource.department
-
-    rules:
-      - effect: forbid
-        permissions: [read, update, delete]
-        when:
-          $resource.archived: true
-```
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter, createPrismaResolver } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: createPrismaResolver(prisma, "project"),
-  },
-});
-
-const adapter = createPrismaAdapter({
-  relationMapping: {
-    org: "organization",
-  },
-});
-
-async function listProjects(actor: {
-  type: string;
-  id: string;
-  attributes: Record<string, unknown>;
-}) {
-  const result = await engine.buildConstraints(actor, "read", "Project");
-
-  if (!result.ok) {
-    return [];
-  }
-
-  if (result.constraint === null) {
-    return await prisma.project.findMany();
-  }
-
-  const where = engine.translateConstraints(result.constraint, adapter);
-  return await prisma.project.findMany({ where });
-}
-
-// A regular user sees projects in their department + public projects (minus archived)
-const alice = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering", isSuperAdmin: false },
-};
-const aliceProjects = await listProjects(alice);
-
-// A superadmin sees all non-archived projects
-const admin = {
-  type: "User",
-  id: "admin",
-  attributes: { department: "ops", isSuperAdmin: true },
-};
-const adminProjects = await listProjects(admin);
-```
-
-## 次に読むページ {#what-s-next}
-
-- [部分評価](/ja/concepts/partial-evaluation)：`buildConstraints()` と制約 AST の仕組みを理解します。
-- [条件とルール](/ja/concepts/conditions-and-rules)：制約生成の元になる条件式を学びます。
-- [ロールと関係](/ja/concepts/roles-and-relations)：ロールの導出が制約の出力に与える影響を確認します。
-- [Drizzle 連携](/ja/integrations/drizzle)：Drizzle ORM 向けのアダプターです。
-- [コード生成](/ja/integrations/codegen)：ポリシーファイルから TypeScript 型を生成します。
+[部分評価](/ja/concepts/partial-evaluation)と[リゾルバー](/ja/concepts/resolvers)も参照してください。

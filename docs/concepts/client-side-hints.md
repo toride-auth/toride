@@ -238,6 +238,12 @@ Snapshots are point-in-time. If permissions change (e.g., a role is revoked), th
 
 For large resource lists, consider paginating and only generating snapshots for the visible page.
 
+Each `canBatch()` item uses an independent cache. A resolver that reads inline attributes therefore produces decisions that do not depend on input order. This can make more resolver requests than a shared cache. Contradictory inline observations for one identity within a decision are rejected.
+
+### Field permissions
+
+`canField()` and `permittedFields()` require the corresponding resource operation to be allowed. A field role guard cannot override a resource denial. If resource read is denied, field read is denied and `permittedFields()` does not return that field.
+
 ## Security Notes
 
 Client-side hints are for **UI rendering only**. They are not a security boundary:

@@ -1,142 +1,78 @@
 ---
-description: Resolvers and the default resolver — how Toride resolves resource attributes from inline data, registered resolvers, or both, with merge precedence rules.
+description: Partial resolver data, inline attributes, declared relation targets, and the difference between unavailable data and known absence.
 ---
 
 # Resolvers
 
-Resolvers are functions that fetch resource attributes at evaluation time. They supply the data that Toride needs to evaluate [conditions](/concepts/conditions-and-rules) referencing `$resource.<field>`. However, resolvers are **entirely optional** — if you pass attributes inline on a `ResourceRef`, the engine uses them directly without calling any resolver. This is the **default resolver** behavior.
+A resolver supplies attributes and relation refs when a decision needs resource data. Register a resolver for each resource type that needs a data source. If all required data is inline, you can omit the resolver.
 
-## The Default Resolver
+## Inline attributes
 
-When no `ResourceResolver` is registered for a resource type, Toride falls back to inline attributes — the `attributes` property on the `ResourceRef` you pass to `can()`. This works the same way default resolvers work in GraphQL: if no resolver is defined for a field, the framework returns the value from the parent object.
-
-In Toride, the "parent object" is the `ResourceRef` you provide at the call site. Any attributes you include are immediately available for condition evaluation, no resolver registration needed.
-
-### Inline-Only Example
+`ResourceRef.attributes` accepts partial schema-derived data. The engine uses inline fields before resolver fields. A resolver fills fields that the inline ref does not provide.
 
 ```typescript
-import { createToride } from "toride";
+const allowed = await engine.can(actor, "read", {
+	type: "Document",
+	id: "doc-1",
+	attributes: { status: "published" },
+});
+```
 
-const policy = {
-  version: "1" as const,
-  actors: { User: {} },
-  resources: {
-    Document: {
-      roles: ["viewer"],
-      permissions: ["read"],
-      grants: { viewer: ["read"] },
-      rules: [
-        {
-          effect: "permit" as const,
-          permissions: ["read"],
-          when: { "$resource.status": "published" },
-        },
-      ],
-    },
-  },
+An omitted field or an `undefined` value is unavailable. An explicit `null` is known absence. These meanings apply to inline data, resolver data, actor attributes, and environment values.
+
+## Registered resolvers
+
+`ResourceResolver<S, R>` returns `Promise<ResolverData<S, R> | null>`. `ResolverData` contains partial declared attributes and optional declared relation refs. `Resolvers<S>` maps resource types to these functions.
+
+```typescript
+import type { Resolvers } from "toride";
+import type { GeneratedSchema } from "./generated/policy.js";
+
+const resolvers: Resolvers<GeneratedSchema> = {
+	Document: async (ref) => {
+		const doc = await db.documents.findById(ref.id);
+		if (!doc) return null;
+		return {
+			status: doc.status,
+			org: doc.orgId ? { type: "Organization", id: doc.orgId } : null,
+		};
+	},
 };
-
-// No resolvers registered — inline attributes are the data source
-const engine = createToride({ policy });
-
-const allowed = await engine.can(
-  { type: "User", id: "alice", attributes: {} },
-  "read",
-  { type: "Document", id: "doc-1", attributes: { status: "published" } },
-);
-// true — the condition $resource.status matches the inline attribute
 ```
 
-This is the simplest way to use Toride. You already have the data at the call site, so there is no need to write a resolver function.
+Return `null` when the resource does not exist. Return a partial object when a projection supplies only some fields. A selected-out field remains unavailable. An empty object does not establish that the resource or its fields are absent.
 
-### When No Data Is Available
+A resolver is called at most once for each resource identity within a decision. Policies that use only actor data do not require an eager resource lookup. Check resource existence in your application when an operation requires an existing row.
 
-If no resolver is registered **and** no inline attributes are provided, all `$resource.<field>` references resolve to `undefined`. Toride applies **strict null semantics** — comparisons against `undefined` fail, which means conditions do not match and the engine defaults to deny:
+## Relation refs
+
+A declared relation accepts one ref, a readonly array of refs, or `null`. The ref's `type` must match the target declared in the policy. Actor types can be relation targets, such as `Task.assignee: User`, without becoming resolver-map keys.
 
 ```typescript
-const denied = await engine.can(
-  { type: "User", id: "alice", attributes: {} },
-  "read",
-  { type: "Document", id: "doc-1" }, // no attributes
-);
-// false — $resource.status is undefined, condition fails, default deny
+return {
+	project: { type: "Project", id: task.projectId },
+	assignee: task.assigneeId ? { type: "User", id: task.assigneeId } : null,
+};
 ```
 
-This fail-closed behavior ensures that missing data never accidentally grants access.
+Generated types reject a wrong target. Runtime validation checks every ref, including refs supplied inline. A malformed ref or wrong target makes the observation indeterminate. The engine never follows a different target policy to grant access.
 
-## Registered Resolvers
+## Missing data and failures
 
-For scenarios where you need to fetch data dynamically — from a database, API, or any other source — you register a `ResourceResolver` when creating the engine:
+Unavailable data does not satisfy either `exists: true` or `exists: false`. Use explicit `null` for known absence. Ordinary comparisons against known absence are false, including equality and inequality.
 
-```typescript
-const engine = createToride({
-  policy,
-  resolvers: {
-    Document: async (ref) => {
-      const doc = await db.documents.findById(ref.id);
-      return {
-        status: doc.status,
-        ownerId: doc.ownerId,
-        org: { type: "Organization", id: doc.orgId },
-      };
-    },
-  },
-});
-```
+Resolver errors, invalid relation data, cycles, depth failures, and missing custom evaluators make the affected condition indeterminate. Access requires a true permit or grant and a false forbid. A relevant indeterminate forbid prevents access. `explain()` reports diagnostic codes and paths.
 
-The resolver receives a `ResourceRef` (with `type` and `id`) and returns a flat object containing attribute values and relation references. Toride calls the resolver only when it needs to evaluate conditions or follow relations for that resource type.
+See [conditions and rules](/concepts/conditions-and-rules#strict-null-semantics) for logical combination rules.
 
-## Merge Precedence
+## Merge and cache scope
 
-When both inline attributes **and** a registered resolver provide data for the same resource, Toride merges them with a clear precedence rule: **inline attributes win**.
+Inline fields take precedence over resolver fields for the same ref. Within one decision, contradictory inline observations for the same identity are rejected. Treat inline data as trusted authorization input.
 
-### Resolver + Inline Merge Example
+`canBatch()` evaluates each item with an independent cache because a resolver can inspect the entire ref, including inline data. Batch results therefore follow individual decisions without depending on item order. This can increase resolver requests. Cache data in your own data layer only when its keys capture every input that affects the result.
 
-```typescript
-const engine = createToride({
-  policy,
-  resolvers: {
-    Document: async (ref) => {
-      // Resolver returns status: "draft"
-      return { status: "draft", category: "internal" };
-    },
-  },
-});
+## Migration
 
-const allowed = await engine.can(
-  { type: "User", id: "alice", attributes: {} },
-  "read",
-  {
-    type: "Document",
-    id: "doc-1",
-    // Inline attribute overrides the resolver's status
-    attributes: { status: "published" },
-  },
-);
-// true — inline "published" wins over resolver's "draft"
-```
+Regenerate policy bindings to obtain `ResolverMap = Resolvers<GeneratedSchema>`. Return `null` for a missing row. Preserve `null` values for known absent fields and include every field needed by a rule. Replace omitted values used with `exists: false` with explicit absence. Correct refs whose targets differ from the policy declaration.
 
-The merge happens field by field:
-
-| Field | Resolver Value | Inline Value | Result |
-|-------|---------------|--------------|--------|
-| `status` | `"draft"` | `"published"` | `"published"` (inline wins) |
-| `category` | `"internal"` | *(not provided)* | `"internal"` (resolver fills the gap) |
-
-This design lets you use resolvers as a baseline data source while overriding specific fields at the call site when you have fresher or more specific data.
-
-## Choosing an Approach
-
-| Approach | When to Use |
-|----------|-------------|
-| **Inline only** (default resolver) | You already have the attributes at the call site — no extra data fetching needed |
-| **Resolver only** | Attributes must be fetched dynamically and the caller does not have them |
-| **Resolver + inline** | Resolver provides baseline data, but the caller overrides specific fields |
-
-For simple applications or cases where the caller already loads the resource (e.g., in a REST handler that fetches the entity before checking permissions), the default resolver approach avoids boilerplate. For complex scenarios with relations and nested role derivation, registered resolvers keep the authorization logic decoupled from your request handlers.
-
-## What's Next
-
-- [Roles & Relations](/concepts/roles-and-relations) — see how resolvers supply data for relation-based role derivation
-- [Conditions & Rules](/concepts/conditions-and-rules) — the condition syntax that resolvers provide data for
-- [Partial Evaluation](/concepts/partial-evaluation) — push authorization into data-layer queries
+See [code generation](/integrations/codegen), [roles and relations](/concepts/roles-and-relations), and [partial evaluation](/concepts/partial-evaluation).

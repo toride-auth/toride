@@ -140,7 +140,7 @@ const allowed = await engine.can(actor, "delete", {
 
 ### 2. 関連リソース上のロール {#_2-role-on-a-related-resource}
 
-関連リソースからロールを伝播させます。アクターが親でロールを持っていれば、子でも自動的にロールを取得します。
+関連先のポリシーを再帰的に評価して、子のロールを導出します。関係が存在するだけではロールを付与しません。
 
 ```yaml
 resources:
@@ -196,6 +196,10 @@ resources:
 ```
 
 Organization の `admin` は org 関係を通じて Project の `admin` になり、Project の `admin` は project 関係を通じて Task の `editor` になります。
+
+関連ロールは、関連先に宣言された `derived_roles` の条件から解決します。暗黙の `roleAssignments` テーブルは参照しません。ロール割り当てを保存するアプリケーションでは、リゾルバーの属性とポリシー条件でそのデータを表現します。クエリ変換には対応する明示的なマッピングが必要です。
+
+関係の参照は宣言した関係先と一致する必要があります。配列の関係では、必要なロールが 1 つの関連リソース上で成立すれば導出できます。派生ロールの条件全体は、その関連リソースの中で評価します。実行時と部分評価は同じ環境値とカスタム評価の規則を使います。再帰的なロール構造を正確にクエリへ変換できない場合は、エラーになります。
 
 ### 3. 関係先との同一性 {#_3-relation-identity}
 
@@ -337,8 +341,8 @@ const roles = await engine.resolvedRoles(actor, {
 
 関係に基づく導出（パターン 2）は、Task → Project → Organization のような連鎖を作れます。Toride は無限ループや過度な深さを防止します。
 
-- **循環検出**：導出の連鎖で同じリソース（`Type:id` で識別）を 2 回訪れると、`CycleError` をスローします。
-- **深さ制限**：`maxDerivedRoleDepth` で設定できます（デフォルトは 5）。上限を超えると `DepthLimitError` をスローします。
+- **循環検出**：導出の連鎖で `Type:id` が同じリソースを 2 回訪れると、その導出は判定不能になります。
+- **深さ制限**：`maxDerivedRoleDepth` で設定できます（デフォルトは 5）。上限を超えると、その導出は判定不能になります。
 
 ```typescript
 const engine = new Toride({

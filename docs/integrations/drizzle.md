@@ -1,326 +1,152 @@
 ---
-description: createDrizzleAdapter() with relation and role assignment config, createDrizzleResolver() with custom ID column, intermediate query description format with _op field.
+description: Resource-scoped Drizzle bindings, intermediate operation descriptions, exact native consumer requirements, and resolver helpers.
 ---
 
-# Drizzle Integration
+# Drizzle integration
 
-`@toride/drizzle` provides a constraint adapter and resolver helper for [Drizzle ORM](https://orm.drizzle.team/). It translates Toride's constraint AST into intermediate query description objects that you can use with Drizzle's query builder.
+`@toride/drizzle` translates constraints into intermediate operation descriptions. Your application converts those descriptions into native Drizzle expressions. A description is not a SQL expression accepted by `.where()`.
 
-## Installation
+## Install
 
-::: code-group
-
-```bash [pnpm]
-pnpm add @toride/drizzle toride
+```bash
+pnpm add @toride/drizzle toride drizzle-orm
 ```
 
-```bash [npm]
-npm install @toride/drizzle toride
-```
+`drizzle-orm` is an optional peer for the package. The resolver helper uses it to create native column equality.
 
-```bash [yarn]
-yarn add @toride/drizzle toride
-```
-
-:::
-
-`drizzle-orm` is an optional peer dependency (>= 0.29.0). The adapter produces intermediate query objects that describe operations -- it does not import `drizzle-orm` directly, so it works whether or not you have Drizzle installed at build time.
-
-## Quick Start
-
-### 1. Create the Adapter
-
-The adapter is created for a specific Drizzle table reference:
+## Bind resource tables and relations
 
 ```typescript
 import { createDrizzleAdapter } from "@toride/drizzle";
-import { projects } from "./schema";
+import { tasks, projects } from "./schema.js";
 
-const adapter = createDrizzleAdapter(projects);
-```
-
-### 2. Build Constraints and Query
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createDrizzleAdapter } from "@toride/drizzle";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and, or, not } from "drizzle-orm";
-import { projects } from "./schema";
-
-const db = drizzle(pool);
-
-const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
-
-const engine = new Toride({
-  policy,
-  resolvers: {
-    Project: async (ref) => {
-      const rows = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, ref.id));
-      return rows[0] ?? {};
-    },
-  },
+const adapter = createDrizzleAdapter(tasks, {
+	resourceType: "Task",
+	resources: { Project: projects },
+	fields: { Task: { owner: "ownerId" } },
+	relations: {
+		Task: {
+			project: {
+				resourceType: "Project",
+				cardinality: "one",
+				sourceColumn: "projectId",
+				targetColumn: "id",
+			},
+		},
+	},
 });
+```
+`resourceType` is required and identifies the root table. `resources` supplies tables used in related scopes. Native Drizzle column metadata determines scalar types and nullability. `fields` optionally maps a policy field to a physical column key.
 
-const adapter = createDrizzleAdapter(projects);
+Relations are scoped by their source resource. Each binding declares its target, physical join columns, and cardinality. Both one and many descriptions mean that a matching related row exists. The join columns must have compatible scalar types. The target must match the policy's declared target.
 
-const actor = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering" },
-};
+The generic positions remain `createDrizzleAdapter<S, TModelMap, TQueryMap>`. Pass the generated schema in the first position, the optional model map second, and your description query map third.
 
-const result = await engine.buildConstraints(actor, "read", "Project");
+## Translate and lower before querying
 
-if (!result.ok) {
-  return [];
-}
-
+```typescript
+const result = await engine.buildConstraints(actor, "read", "Task");
+if (!result.ok) return [];
 if (result.constraint === null) {
-  return await db.select().from(projects);
+	return db.select().from(tasks).orderBy(tasks.id).limit(20);
 }
-
-// Translate constraints into a Drizzle query description
-const where = engine.translateConstraints(result.constraint, adapter);
-// Use the where description with your Drizzle query builder
+const description = engine.translateConstraints(result.constraint, adapter);
+const predicate = toNativePredicate(description);
+return db.select().from(tasks).where(predicate).orderBy(tasks.id).limit(20);
 ```
+`toNativePredicate` is application code. It must implement every emitted operation or throw. Use its complete predicate for membership, counts, and pages before applying pagination. Do not replace unsupported operations with true or filter a fetched page afterward.
 
-## Adapter Output Format
+## Operation descriptions
 
-Unlike the Prisma adapter (which produces objects that Prisma consumes directly), the Drizzle adapter produces **intermediate query description objects** with an `_op` field that describes the operation. This gives you full control over how to apply them to your Drizzle queries.
-
-Each translated constraint has the shape:
+Scalar descriptions carry their table, resource, and null behavior.
 
 ```typescript
 {
-  _op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte" | "inArray" | "notInArray"
-       | "isNull" | "isNotNull" | "arrayContains" | "like"
-       | "and" | "or" | "not" | "relation" | "hasRole" | "literal",
-  field?: string,
-  value?: unknown,
-  table?: AnyTable,
-  // ... additional properties depending on the operation
+	_op: "eq",
+	field: "status",
+	value: "active",
+	table: projects,
+	resourceType: "Project",
+	nullable: true,
+	nullBehavior: "false",
+	stringComparison: "binary",
 }
 ```
+| Constraint | Operation |
+| --- | --- |
+| `field_eq`, `field_neq` | `eq`, `ne` |
+| `field_gt`, `field_gte`, `field_lt`, `field_lte` | `gt`, `gte`, `lt`, `lte` |
+| `field_in`, `field_nin` | `inArray`, `notInArray` |
+| `field_exists` | `isNull`, `isNotNull` |
+| `field_contains` | `contains` with a literal value |
+| `field_starts_with` | `startsWith` with a literal value |
+| `field_ends_with` | `endsWith` with a literal value |
+| `and`, `or`, `not` | `children` or `child` descriptions |
+| `always`, `never` | `literal` with a Boolean value |
+| `relation` | Scoped existence with a complete `child` description |
 
-### Constraint Translation Reference
+Ordinary scalar comparisons are false at null. The native consumer must make them total before applying `not`. For example, lower nullable equality as `column IS NOT NULL AND column = value`. Presence uses total null tests. A relation still requires existence when its child is literal true. Alias repeated physical tables for each relation scope.
 
-| Constraint Type | `_op` Value | Drizzle Equivalent |
-|----------------|-------------|-------------------|
-| `field_eq` | `"eq"` | `eq(table.field, value)` |
-| `field_neq` | `"ne"` | `ne(table.field, value)` |
-| `field_gt` | `"gt"` | `gt(table.field, value)` |
-| `field_gte` | `"gte"` | `gte(table.field, value)` |
-| `field_lt` | `"lt"` | `lt(table.field, value)` |
-| `field_lte` | `"lte"` | `lte(table.field, value)` |
-| `field_in` | `"inArray"` | `inArray(table.field, values)` |
-| `field_nin` | `"notInArray"` | `notInArray(table.field, values)` |
-| `field_exists` (true) | `"isNotNull"` | `isNotNull(table.field)` |
-| `field_exists` (false) | `"isNull"` | `isNull(table.field)` |
-| `field_includes` | `"arrayContains"` | `arrayContains(table.field, value)` |
-| `field_contains` | `"like"` | `like(table.field, pattern)` |
+String operations describe JavaScript matching with `stringComparison: "binary"`. `contains`, `startsWith`, and `endsWith` keep literal values and remain distinct. A native consumer must prove the backend lowering or reject it. `LIKE` alone does not establish the required case, Unicode, and literal wildcard behavior. The locally verified SQLite lowering uses `instr` and `substr` for NUL-free valid Unicode strings. This bounded check does not guarantee every SQL backend or stored string domain.
 
-Composite nodes use `"and"`, `"or"`, and `"not"` with `children` or `child` properties.
+Unbound fields, resources, or relations throw `UnsupportedConstraintError`. Nonnumeric ordering, unverified JSON operations, and native scalar-array membership are unsupported. Relevant custom conditions and legacy manual `has_role` nodes also throw.
 
-## Adapter Options
+## Virtual membership
 
-### Relation Configuration
-
-Map constraint relation fields to Drizzle table references and foreign keys:
+Bind a virtual array to an explicit many relation.
 
 ```typescript
-import { projects, organizations } from "./schema";
-
 const adapter = createDrizzleAdapter(projects, {
-  relations: {
-    org: {
-      table: organizations,
-      foreignKey: "orgId",
-    },
-  },
+	resourceType: "Project",
+	resources: { Assignment: assignments },
+	relations: {
+		Project: {
+			assignments: {
+				resourceType: "Assignment",
+				cardinality: "many",
+				sourceColumn: "id",
+				targetColumn: "projectId",
+			},
+		},
+	},
+	virtualFields: {
+		Project: {
+			viewer_ids: {
+				relation: "assignments",
+				matchField: "userId",
+				filter: { role: "viewer" },
+			},
+		},
+	},
 });
 ```
+The resolver array must correspond to exactly the related values selected by the filter. Virtual names remain scoped by resource. Stored assignment data is an application mapping, not an implicit role-assignment operation.
 
-When the constraint AST contains a `relation` node for the field `org`, the adapter includes the related table reference and foreign key in the output:
-
-```typescript
-{
-  _op: "relation",
-  field: "org",
-  resourceType: "Organization",
-  child: { /* nested constraint */ },
-  relatedTable: organizations,
-  foreignKey: "orgId",
-}
-```
-
-### Role Assignment Configuration
-
-Configure how `hasRole` constraints are generated:
+## Resolver helper
 
 ```typescript
-import { memberships } from "./schema";
-
-const adapter = createDrizzleAdapter(projects, {
-  roleAssignments: {
-    table: memberships,
-    userIdColumn: "memberId",
-    roleColumn: "memberRole",
-  },
-});
-```
-
-This produces:
-
-```typescript
-{
-  _op: "hasRole",
-  actorId: "user-123",
-  actorType: "User",
-  role: "editor",
-  roleTable: memberships,
-  userIdColumn: "memberId",
-  roleColumn: "memberRole",
-}
-```
-
-## Creating Resolvers with Drizzle
-
-`@toride/drizzle` provides `createDrizzleResolver()`, a helper that wraps a Drizzle `select` query into the resolver signature that Toride expects:
-
-```typescript
-import { readFileSync } from "node:fs";
 import { createDrizzleResolver } from "@toride/drizzle";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { projects, tasks } from "./schema";
 
-const db = drizzle(pool);
+const projectResolver = createDrizzleResolver(db, projects);
+const resolverWithUuid = createDrizzleResolver(db, documents, { idColumn: "uuid" });
+```
+The helper validates the ID column and calls a native `eq(table[idColumn], ref.id)` query. It returns partial `ResolverData<S, R>` or `null` asynchronously. A missing row returns `null`. It does not pass a plain object to `.where()`, promise complete policy attributes, or construct relation refs from foreign keys.
 
-const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
+## Verify local changes
 
-const engine = new Toride({
-  policy,
-  resolvers: {
-    Project: createDrizzleResolver(db, projects),
-    Task: createDrizzleResolver(db, tasks),
-  },
-});
+Run the repository's real local SQLite query and public API checks from its root.
+
+```bash
+scripts/verification/verify.sh check queries /tmp/toride-query-evidence
+scripts/verification/verify.sh check types-and-policy /tmp/toride-type-evidence
 ```
 
-The resolver calls `db.select().from(table).where({ id: ref.id })` and returns the first row. If no row is found, it returns an empty object `{}`.
+The commands build and import public packages, then compare literal expected IDs, counts, and pages with actual results. The type check compiles generated files with TypeScript. The full workflow is in `.claude/skills/verify-toride/SKILL.md` in the repository.
 
-### Custom ID Column
+## Migration
 
-If your table uses a column other than `id` as the primary key:
+Add the required `resourceType`, related resource tables, and source-scoped relation bindings. Replace `foreignKey` guesses with explicit `sourceColumn`, `targetColumn`, target, and cardinality. Remove implicit role-assignment configuration.
 
-```typescript
-const resolver = createDrizzleResolver(db, projects, {
-  idColumn: "uuid",
-});
-```
+Update your native consumer for resource scope, constants, total null predicates, and distinct literal string operations. Return `null` for missing rows. Keep the intermediate description contract and the existing `buildConstraints()`, `translateConstraints()`, and `ok` flow.
 
-## Complete Example
-
-Here is an end-to-end example with a policy, Drizzle schema, engine setup, and authorized data fetching:
-
-```yaml
-# policy.yaml
-version: "1"
-
-actors:
-  User:
-    attributes:
-      department: string
-
-resources:
-  Project:
-    roles: [viewer, editor, admin]
-    permissions: [read, update, delete]
-
-    relations:
-      org: Organization
-
-    grants:
-      viewer: [read]
-      editor: [read, update]
-      admin: [all]
-
-    derived_roles:
-      - role: viewer
-        when:
-          $resource.isPublic: true
-      - role: viewer
-        actor_type: User
-        when:
-          $actor.department: $resource.department
-
-    rules:
-      - effect: forbid
-        permissions: [read, update, delete]
-        when:
-          $resource.archived: true
-```
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createDrizzleAdapter, createDrizzleResolver } from "@toride/drizzle";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { projects, organizations } from "./schema";
-
-const db = drizzle(pool);
-
-const policy = await loadYaml(readFileSync("./policy.yaml", "utf-8"));
-
-const engine = new Toride({
-  policy,
-  resolvers: {
-    Project: createDrizzleResolver(db, projects),
-  },
-});
-
-const adapter = createDrizzleAdapter(projects, {
-  relations: {
-    org: { table: organizations, foreignKey: "orgId" },
-  },
-});
-
-async function listProjects(actor: {
-  type: string;
-  id: string;
-  attributes: Record<string, unknown>;
-}) {
-  const result = await engine.buildConstraints(actor, "read", "Project");
-
-  if (!result.ok) {
-    return [];
-  }
-
-  if (result.constraint === null) {
-    return await db.select().from(projects);
-  }
-
-  const where = engine.translateConstraints(result.constraint, adapter);
-  // Process the `where` description object with your Drizzle query builder
-  return where;
-}
-
-const alice = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering" },
-};
-const aliceProjects = await listProjects(alice);
-```
-
-## What's Next
-
-- [Partial Evaluation](/concepts/partial-evaluation) -- understand how `buildConstraints()` works and what the constraint AST looks like
-- [Conditions & Rules](/concepts/conditions-and-rules) -- learn the condition syntax that drives constraint generation
-- [Roles & Relations](/concepts/roles-and-relations) -- see how role derivation patterns affect constraint output
-- [Prisma Integration](/integrations/prisma) -- equivalent adapter for Prisma ORM
-- [Codegen](/integrations/codegen) -- generate TypeScript types from your policy file
+See [partial evaluation](/concepts/partial-evaluation) and [Prisma integration](/integrations/prisma).

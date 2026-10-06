@@ -1,312 +1,121 @@
 ---
-description: createPrismaAdapter() with relation mapping and role assignment config, createPrismaResolver() with select option, constraint-to-Prisma WHERE clause translation reference.
+description: Explicit Prisma field, relation, and virtual mappings, truthful partial resolvers, and exact-query limits.
 ---
 
-# Prisma Integration
+# Prisma integration
 
-`@toride/prisma` provides a constraint adapter and resolver helper for [Prisma ORM](https://www.prisma.io/). It translates Toride's constraint AST into Prisma `where` clause objects, so you can push authorization logic down to the database.
+`@toride/prisma` translates Toride constraints into Prisma `where` objects. Configure the physical fields and relations used by your policy before translating.
 
-## Installation
+## Install
 
-::: code-group
-
-```bash [pnpm]
+```bash
 pnpm add @toride/prisma toride
 ```
 
-```bash [npm]
-npm install @toride/prisma toride
-```
+The adapter does not import `@prisma/client`. Your application supplies its client and can supply model payload types for mapping checks.
 
-```bash [yarn]
-yarn add @toride/prisma toride
-```
+## Bind fields and relations
 
-:::
-
-`@toride/prisma` has no direct dependency on `@prisma/client`. It produces plain JavaScript objects that match Prisma's WHERE clause structure, so it works with any Prisma version.
-
-## Quick Start
-
-### 1. Create the Adapter
+This example assumes a policy with `Project.status`, `Project.archived`, and `Task.project: Project`.
 
 ```typescript
 import { createPrismaAdapter } from "@toride/prisma";
+import type { GeneratedSchema } from "./generated/policy.js";
 
-const adapter = createPrismaAdapter();
-```
-
-### 2. Build Constraints and Query
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: async (ref) => {
-      const project = await prisma.project.findUnique({
-        where: { id: ref.id },
-      });
-      return project ?? {};
-    },
-  },
+const adapter = createPrismaAdapter<GeneratedSchema>({
+	fields: {
+		Project: {
+			id: { field: "id", type: "string", nullable: false, stringComparison: "binary" },
+			status: { field: "status", type: "string", nullable: false, stringComparison: "binary" },
+			archived: { field: "archived", type: "boolean", nullable: false },
+		},
+		Task: {
+			id: { field: "id", type: "string", nullable: false, stringComparison: "binary" },
+		},
+	},
+	relations: {
+		Task: {
+			project: { field: "project", resourceType: "Project", cardinality: "one" },
+		},
+	},
 });
+```
+Each field binding declares its physical name, scalar type, and nullability. String equality and membership require `stringComparison: "binary"`. This asserts case-sensitive JavaScript-compatible equality without collation normalization and well-formed Unicode data without NUL.
 
-const adapter = createPrismaAdapter();
+Relation bindings are scoped by source resource. The target must match the policy, and `cardinality` declares the physical relation as `"one"` or `"many"`. One uses Prisma `is`; many uses `some`. Both require a related row satisfying the complete child predicate.
 
-const actor = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering" },
-};
+The optional second generic parameter supplies model payloads, such as `{ Project: Prisma.$ProjectPayload; Task: Prisma.$TaskPayload }`. These types check physical scalar names, nullability, relation fields, and cardinality. Include actor model payloads when an actor-only relation target needs fields such as `User.id`.
 
+## Query, count, and page
+
+```typescript
 const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (!result.ok) {
-  // Actor has no access at all
-  return [];
-}
-
-if (result.constraint === null) {
-  // Actor can see everything
-  return await prisma.project.findMany();
-}
-
-// Translate constraints into a Prisma WHERE clause
-const where = engine.translateConstraints(result.constraint, adapter);
-const projects = await prisma.project.findMany({ where });
+if (!result.ok) return { total: 0, rows: [] };
+const where = result.constraint === null
+	? undefined
+	: engine.translateConstraints(result.constraint, adapter);
+const [total, rows] = await prisma.$transaction([
+	prisma.project.count({ where }),
+	prisma.project.findMany({ where, orderBy: { id: "asc" }, take: 20 }),
+]);
+return { total, rows };
 ```
+Translate before querying. Use the same complete predicate for counts and pages. `UnsupportedConstraintError` means this list query cannot be translated exactly. Do not substitute an empty filter or filter a fetched page afterward.
 
-The `where` object is a plain JavaScript object that Prisma understands natively. For example, a constraint like "status equals active AND archived is false" becomes:
+## Virtual membership
+
+A virtual array can correspond to rows in an explicit physical relation. For a policy that declares `Project.viewer_ids` as a string array, add this option to `createPrismaAdapter()`.
 
 ```typescript
-{
-  AND: [
-    { status: "active" },
-    { NOT: { archived: true } }
-  ]
-}
-```
-
-## Adapter Options
-
-### Relation Mapping
-
-If your constraint field names differ from your Prisma relation names, provide a `relationMapping`:
-
-```typescript
-const adapter = createPrismaAdapter({
-  relationMapping: {
-    org: "organization", // constraint field "org" → Prisma relation "organization"
-    project: "project",  // same name — optional, but explicit
-  },
-});
-```
-
-When the constraint AST contains a `relation` node for the field `org`, the adapter produces `{ organization: childQuery }` instead of `{ org: childQuery }`.
-
-### Custom Role Assignment Table
-
-By default, the adapter generates `hasRole` constraints using a table named `roleAssignments` with `userId` and `role` fields. You can customize this:
-
-```typescript
-const adapter = createPrismaAdapter({
-  roleAssignmentTable: "memberships",
-  roleAssignmentFields: {
-    userId: "memberId",
-    role: "memberRole",
-  },
-});
-```
-
-This produces WHERE clauses like:
-
-```typescript
-{
-  memberships: {
-    some: {
-      memberId: "user-123",
-      memberRole: "editor",
-    },
-  },
+virtualFields: {
+	Project: {
+		viewer_ids: {
+			relation: "roleAssignments",
+			matchField: "userId",
+			filter: { role: "viewer" },
+			cardinality: "many",
+			valueType: "string",
+			stringComparison: "binary",
+		},
+	},
 }
 ```
+This mapping compiles membership to `roleAssignments.some` with the supplied filter. The mapping asserts that the resolver's array contains exactly those related values. It does not create an implicit role-assignment API. The same virtual name on another resource can have a different mapping.
 
-## Constraint Translation Reference
+## Scalar and string limits
 
-The adapter translates each constraint type into the corresponding Prisma WHERE syntax:
+Ordinary comparisons exclude null. A negated comparison includes the complement of that complete predicate, including null rows when appropriate. `field_exists` tests physical null presence. Ordered comparisons support numeric fields. Native scalar-array membership and unverified JSON or field-to-field operations are unsupported.
 
-| Constraint Type | Prisma Output |
-|----------------|---------------|
-| `field_eq` | `{ field: value }` |
-| `field_neq` | `{ field: { not: value } }` |
-| `field_gt` | `{ field: { gt: value } }` |
-| `field_gte` | `{ field: { gte: value } }` |
-| `field_lt` | `{ field: { lt: value } }` |
-| `field_lte` | `{ field: { lte: value } }` |
-| `field_in` | `{ field: { in: values } }` |
-| `field_nin` | `{ field: { notIn: values } }` |
-| `field_exists` (true) | `{ field: { not: null } }` |
-| `field_exists` (false) | `{ field: null }` |
-| `field_includes` | `{ field: { has: value } }` |
-| `field_contains` | `{ field: { contains: value } }` |
+`contains`, `startsWith`, and `endsWith` remain separate Prisma filters. They require `stringFilters: "javascript"` on the field binding in addition to binary equality. Set that assertion only when your provider, connection settings, and stored strings have the same matching behavior as JavaScript. Patterns containing `%`, `_`, a backslash, or NUL are rejected. There is no universal provider guarantee. Without that assertion, string filters throw.
 
-Composite nodes (`and`, `or`, `not`) map to Prisma's `AND`, `OR`, and `NOT` operators.
-
-## Creating Resolvers with Prisma
-
-`@toride/prisma` also provides `createPrismaResolver()`, a helper that wraps a Prisma `findUnique` call into the resolver signature that Toride expects:
+## Resolver helper
 
 ```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
 import { createPrismaResolver } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const projectResolver = createPrismaResolver<GeneratedSchema, "Project", "project">(
+	prisma,
+	"project",
+	{ select: { status: true, archived: true } },
+);
+```
+The helper calls `findUnique({ where: { id: ref.id }, select })`. It returns `ResolverData<GeneratedSchema, "Project"> | null` asynchronously. A missing row returns `null`. Selected-out attributes are unavailable. The helper does not claim complete policy attributes or create relation refs from foreign keys. Use a custom typed resolver for virtual arrays and declared relation refs.
 
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: createPrismaResolver(prisma, "project"),
-    Task: createPrismaResolver(prisma, "task"),
-    Document: createPrismaResolver(prisma, "document", {
-      select: { id: true, title: true, ownerId: true, status: true },
-    }),
-  },
-});
+## Verify local changes
+
+Run the repository's real local SQLite query and public API checks from its root.
+
+```bash
+scripts/verification/verify.sh check queries /tmp/toride-query-evidence
+scripts/verification/verify.sh check types-and-policy /tmp/toride-type-evidence
 ```
 
-The resolver calls `prisma[modelName].findUnique({ where: { id: ref.id } })` and returns the result as a plain object. If the record is not found, it returns an empty object `{}`.
+The commands build and import public packages, then compare literal expected IDs, counts, and pages with actual results. The type check compiles generated files with TypeScript. The full workflow is in `.claude/skills/verify-toride/SKILL.md` in the repository.
 
-### Select Option
+## Migration
 
-Pass a `select` option to limit which fields are fetched. This is useful for performance when your model has many columns but only a few are needed for authorization decisions:
+Replace the old flat `relationMapping` option with source-scoped `relations` and explicit target and cardinality. Add `fields` for every scalar used by a relevant constraint, including IDs used by relation identity. Remove implicit `roleAssignmentTable` and `roleAssignmentFields` options. Represent stored assignments through policy attributes and explicit virtual mappings instead.
 
-```typescript
-const resolver = createPrismaResolver(prisma, "project", {
-  select: { id: true, ownerId: true, department: true, isPublic: true },
-});
-```
+Add scalar and cardinality semantics to virtual mappings. Return `null` for missing rows and regenerate resolver bindings. Keep `buildConstraints()`, `translateConstraints()`, and the `ok` result branches.
 
-## Complete Example
-
-Here is an end-to-end example with a policy, Prisma schema, engine setup, and authorized data fetching:
-
-```yaml
-# policy.yaml
-version: "1"
-
-actors:
-  User:
-    attributes:
-      department: string
-      isSuperAdmin: boolean
-
-global_roles:
-  superadmin:
-    actor_type: User
-    when:
-      $actor.isSuperAdmin: true
-
-resources:
-  Project:
-    roles: [viewer, editor, admin]
-    permissions: [read, update, delete]
-
-    relations:
-      org: Organization
-
-    grants:
-      viewer: [read]
-      editor: [read, update]
-      admin: [all]
-
-    derived_roles:
-      - role: admin
-        from_global_role: superadmin
-      - role: viewer
-        when:
-          $resource.isPublic: true
-      - role: viewer
-        actor_type: User
-        when:
-          $actor.department: $resource.department
-
-    rules:
-      - effect: forbid
-        permissions: [read, update, delete]
-        when:
-          $resource.archived: true
-```
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter, createPrismaResolver } from "@toride/prisma";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: createPrismaResolver(prisma, "project"),
-  },
-});
-
-const adapter = createPrismaAdapter({
-  relationMapping: {
-    org: "organization",
-  },
-});
-
-async function listProjects(actor: {
-  type: string;
-  id: string;
-  attributes: Record<string, unknown>;
-}) {
-  const result = await engine.buildConstraints(actor, "read", "Project");
-
-  if (!result.ok) {
-    return [];
-  }
-
-  if (result.constraint === null) {
-    return await prisma.project.findMany();
-  }
-
-  const where = engine.translateConstraints(result.constraint, adapter);
-  return await prisma.project.findMany({ where });
-}
-
-// A regular user sees projects in their department + public projects (minus archived)
-const alice = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering", isSuperAdmin: false },
-};
-const aliceProjects = await listProjects(alice);
-
-// A superadmin sees all non-archived projects
-const admin = {
-  type: "User",
-  id: "admin",
-  attributes: { department: "ops", isSuperAdmin: true },
-};
-const adminProjects = await listProjects(admin);
-```
-
-## What's Next
-
-- [Partial Evaluation](/concepts/partial-evaluation) -- understand how `buildConstraints()` works and what the constraint AST looks like
-- [Conditions & Rules](/concepts/conditions-and-rules) -- learn the condition syntax that drives constraint generation
-- [Roles & Relations](/concepts/roles-and-relations) -- see how role derivation patterns affect constraint output
-- [Drizzle Integration](/integrations/drizzle) -- equivalent adapter for Drizzle ORM
-- [Codegen](/integrations/codegen) -- generate TypeScript types from your policy file
+See [partial evaluation](/concepts/partial-evaluation) and [resolvers](/concepts/resolvers).
