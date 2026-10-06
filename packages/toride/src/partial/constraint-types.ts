@@ -70,7 +70,20 @@ export interface FieldContainsConstraint {
 
 // ─── Composite / Special Constraints ──────────────────────────────
 
+export interface FieldStartsWithConstraint {
+  readonly type: "field_starts_with";
+  readonly field: string;
+  readonly value: string;
+}
+
+export interface FieldEndsWithConstraint {
+  readonly type: "field_ends_with";
+  readonly field: string;
+  readonly value: string;
+}
+
 export interface RelationConstraint {
+  readonly quantifier: "any";
   readonly type: "relation";
   readonly field: string;
   readonly resourceType: string;
@@ -126,6 +139,8 @@ export type Constraint =
   | FieldNinConstraint
   | FieldExistsConstraint
   | FieldIncludesConstraint
+  | FieldStartsWithConstraint
+  | FieldEndsWithConstraint
   | FieldContainsConstraint
   | RelationConstraint
   | HasRoleConstraint
@@ -148,32 +163,42 @@ export type LeafConstraint =
   | FieldNinConstraint
   | FieldExistsConstraint
   | FieldIncludesConstraint
+  | FieldStartsWithConstraint
+  | FieldEndsWithConstraint
   | FieldContainsConstraint;
 
 // ─── Constraint Result ────────────────────────────────────────────
 
 /** Result of partial evaluation, tagged with resource type R (phantom). */
+export type ResourceConstraint<R extends string = string> = Constraint & {
+  readonly rootResourceType: R;
+};
+
 export type ConstraintResult<R extends string = string> =
-  | { readonly ok: true; readonly constraint: Constraint | null; readonly __resource?: R }
+  | { readonly ok: true; readonly constraint: ResourceConstraint<R> | null; readonly __resource?: R }
   | { readonly ok: false; readonly __resource?: R };
 
 // ─── Constraint Adapter ───────────────────────────────────────────
 
-/**
- * User-provided adapter for translating constraint ASTs to queries.
- * TQueryMap maps resource type names to their query output types.
- *
- * BREAKING CHANGE: Previously ConstraintAdapter<TQuery> with a single query type.
- * Now uses a resource-to-query-type map for per-resource output typing.
- */
+export interface ConstraintContext {
+  readonly resourceType: string;
+}
+
+export class UnsupportedConstraintError extends Error {
+  constructor(readonly feature: string, readonly resourceType?: string) {
+    super(`Unsupported constraint: ${feature}${resourceType ? ` on ${resourceType}` : ""}`);
+    this.name = "UnsupportedConstraintError";
+  }
+}
+
 export interface ConstraintAdapter<
   TQueryMap extends Record<string, unknown> = Record<string, unknown>,
 > {
-  translate(constraint: LeafConstraint): TQueryMap[string];
-  relation(field: string, resourceType: string, childQuery: TQueryMap[string]): TQueryMap[string];
-  hasRole(actorId: string, actorType: string, role: string): TQueryMap[string];
-  unknown(name: string): TQueryMap[string];
-  and(queries: TQueryMap[string][]): TQueryMap[string];
-  or(queries: TQueryMap[string][]): TQueryMap[string];
-  not(query: TQueryMap[string]): TQueryMap[string];
+  translate(constraint: LeafConstraint, context: ConstraintContext): TQueryMap[string];
+  relation(field: string, resourceType: string, childQuery: TQueryMap[string], context: ConstraintContext): TQueryMap[string];
+  and(queries: TQueryMap[string][], context: ConstraintContext): TQueryMap[string];
+  or(queries: TQueryMap[string][], context: ConstraintContext): TQueryMap[string];
+  not(query: TQueryMap[string], context: ConstraintContext): TQueryMap[string];
+  always(context: ConstraintContext): TQueryMap[string];
+  never(context: ConstraintContext): TQueryMap[string];
 }

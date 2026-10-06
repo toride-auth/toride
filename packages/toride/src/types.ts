@@ -143,7 +143,7 @@ export type ResourceRef<
   readonly type: R;
   readonly id: string;
   /** Pre-fetched attributes. Inline values take precedence over resolver results. */
-  readonly attributes?: S["resourceAttributeMap"][R];
+  readonly attributes?: ResolverData<S, R>;
 };
 
 /** Optional per-check configuration. */
@@ -177,7 +177,26 @@ export type ResourceResolver<
   R extends S["resources"] = S["resources"],
 > = (
   ref: ResourceRef<S, R>,
-) => Promise<Record<string, unknown>>;
+) => Promise<ResolverData<S, R> | null>;
+
+export type ResolverData<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> = string extends S["resources"]
+  ? Record<string, unknown>
+  : Partial<Omit<S["resourceAttributeMap"][R], keyof S["relationMap"][R]>> & {
+      readonly [K in keyof S["relationMap"][R]]?:
+        | ResourceRef<S, S["relationMap"][R][K] & S["resources"]>
+        | readonly ResourceRef<S, S["relationMap"][R][K] & S["resources"]>[]
+        | null;
+    };
+
+export type EvaluationOutcome = "true" | "false" | "indeterminate";
+
+export interface EvaluationDiagnostic {
+  readonly code: "missing_value" | "resolver_error" | "invalid_relation" | "conflicting_observation" | "cycle" | "depth_limit" | "custom_evaluator" | "evaluation_error";
+  readonly path: string;
+}
 
 /**
  * Map of resource type names to their resolver functions.
@@ -404,6 +423,7 @@ export interface MatchedRule {
   readonly matched: boolean;
   readonly rule: Rule;
   readonly resolvedValues: Record<string, unknown>;
+  readonly outcome?: EvaluationOutcome;
 }
 
 /** Full decision trace from explain(). */
@@ -416,6 +436,7 @@ export interface ExplainResult<
   readonly grantedPermissions: S["permissionMap"][R][];
   readonly matchedRules: MatchedRule[];
   readonly finalDecision: string;
+  readonly diagnostics?: readonly EvaluationDiagnostic[];
 }
 
 /** Audit event for authorization checks. */
