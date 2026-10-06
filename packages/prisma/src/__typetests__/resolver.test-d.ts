@@ -56,3 +56,22 @@ expectAssignable<ResourceResolver<TestSchema, "Document">>(
 );
 const defaultResolver = createPrismaResolver(client, "document");
 expectType<Promise<Record<string, unknown> | null>>(defaultResolver({} as ResourceRef));
+
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: { status: true, org: true } },
+));
+const relationSelection = { status: true, org: true };
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: relationSelection },
+));
+
+interface NoRelationSchema extends TorideSchema {
+  resources: "Document";
+  resourceAttributeMap: { Document: { status: string } };
+  relationMap: { Document: Record<string, never> };
+}
+expectAssignable<ResourceResolver<NoRelationSchema, "Document">>(
+  createPrismaResolver<NoRelationSchema, "Document", "document">(
+    client, "document", { select: { status: true } },
+  ),
+);

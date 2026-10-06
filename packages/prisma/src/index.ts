@@ -238,8 +238,12 @@ export function createPrismaAdapter<
   return adapter as unknown as ConstraintAdapter<TQueryMap>;
 }
 
+type DeclaredRelationKeys<S extends TorideSchema, R extends S["resources"]> =
+  string extends keyof S["relationMap"][R] ? never : keyof S["relationMap"][R] & string;
+
 export type PrismaResolverSelect<S extends TorideSchema, R extends S["resources"]> =
-  Partial<Record<(keyof ResolverData<S, R> & string) | "id", boolean>>;
+  Partial<Record<Exclude<keyof ResolverData<S, R> & string, DeclaredRelationKeys<S, R>> | "id", boolean>>
+  & Partial<Record<DeclaredRelationKeys<S, R>, never>>;
 
 export interface PrismaResolverOptions<S extends TorideSchema = DefaultSchema, R extends S["resources"] = S["resources"]> {
   readonly select?: PrismaResolverSelect<S, R>;
@@ -249,7 +253,10 @@ export interface PrismaResolverModel<S extends TorideSchema, R extends S["resour
   findUnique(query: { where: { id: string }; select?: PrismaResolverSelect<S, R> }): Promise<ResolverData<S, R> | null>;
 }
 
-/** The physical model M may differ from policy resource R. Selected-out fields remain partial. */
+/**
+ * The physical model M may differ from policy resource R. Selected-out fields remain partial.
+ * Declared relations require a custom resolver that constructs typed resource references.
+ */
 export function createPrismaResolver<
   S extends TorideSchema = DefaultSchema,
   R extends S["resources"] = S["resources"],
