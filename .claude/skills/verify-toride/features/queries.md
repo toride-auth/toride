@@ -30,6 +30,7 @@ Preconditions:
 - **Compare runtime.** The script calls public `can()` over every seeded resource. Each query case compares those decisions and both actual database routes with the hand-written expected IDs.
 - **Exercise relations and null.** The related public role returns `['d01','d02','d05','d08']`. The same-row reviewer role returns `['d01','d05']`; independent reviewer leaf conditions return `['d01','d02','d05']`. The null title `exists:false` case returns `['d04']`.
 - **Reject unsafe translation.** Each standard adapter rejects custom and legacy `has_role` nodes with `UnsupportedConstraintError`; its query event count does not change.
+- **Reject unavailable traversal inputs.** A permit plus a forbid comparing `project.isPublic` or `reviewers.approved` with omitted `$env.missing` throws `UnsupportedConstraintError` before either ORM queries.
 - **Retain proof.** Read `queries.json`, `queries-translations.json`, `queries-sql.json`, and `queries-fixture.json`. Require all checks and exit code 0.
 
 ## Gotchas
@@ -37,5 +38,6 @@ Preconditions:
 - An application postfilter cannot prove exact counts or pages.
 - Unknown custom predicates and field-to-field expressions require explicit unsupported handling when no exact lowering exists.
 - A relation with a true child still requires a related row to exist. Many-row conjunctions retain their intended scopes.
+- Relevant unavailable static operands on traversed resource paths require explicit rejection. Compiling their complement as relation absence can admit a row that runtime denies.
 - Prisma's local string certificate requires binary case-sensitive LIKE behavior. It does not establish compatibility with another provider or collation.
 - Drizzle descriptions require an exhaustive consumer translator. Unrecognized operations throw instead of becoming true.

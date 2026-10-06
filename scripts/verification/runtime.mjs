@@ -69,6 +69,33 @@ if (feature === 'decisions') {
     const allowed = { type: 'Document', id: 'public' };
     return { decisions: await Promise.all(['public', 'private', 'wrong'].map((id) => instance.can(actor, 'read', { type: 'Document', id }))), roles: await instance.resolvedRoles(actor, allowed), actions: await instance.permittedActions(actor, allowed) };
   });
+  await proof.check('unavailable-traversal-distinguishes-null-one-from-empty-many', { staticOperand: '$env.missing', one: null, many: [] }, [false, true], async () => {
+    const results = [];
+    for (const [relation, target, field, value] of [['project', 'Project', 'isPublic', null], ['reviewers', 'Reviewer', 'approved', []]]) {
+      const input = { version: '1', actors: { User: { attributes: {} } }, resources: {
+        Document: { roles: [], permissions: ['read'], relations: { [relation]: target }, rules: [{ effect: 'permit', permissions: ['read'], when: {} }, { effect: 'forbid', permissions: ['read'], when: { [`$resource.${relation}.${field}`]: '$env.missing' } }] },
+        [target]: { roles: [], permissions: ['read'], attributes: { [field]: 'boolean' } },
+      } };
+      const instance = new Toride({ policy: await loadJson(JSON.stringify(input)), resolvers: { Document: async () => ({ [relation]: value }) } });
+      results.push(await instance.can(actor, 'read', ref));
+    }
+    return results;
+  });
+  for (const reversed of [false, true]) {
+    await proof.check(`absent-related-id-${reversed ? 'forbid-first' : 'permit-first'}`, { relatedRef: { type: 'Project', id: 'gone' }, resolverOutcomes: ['clear', 'blocked', 'null'], reversed }, [true, false, false], async () => {
+      const rules = [{ effect: 'permit', permissions: ['read'], when: { '$resource.project.id': 'gone' } }, { effect: 'forbid', permissions: ['read'], when: { '$resource.project.blocked': true } }];
+      const input = { version: '1', actors: { User: { attributes: {} } }, resources: {
+        Document: { roles: [], permissions: ['read'], relations: { project: 'Project' }, rules: reversed ? [...rules].reverse() : rules },
+        Project: { roles: [], permissions: ['read'], attributes: { blocked: 'boolean' } },
+      } };
+      const results = [];
+      for (const data of [{ blocked: false }, { blocked: true }, null]) {
+        const instance = new Toride({ policy: await loadJson(JSON.stringify(input)), resolvers: { Document: async () => ({ project: { type: 'Project', id: 'gone' } }), Project: async () => data } });
+        results.push(await instance.can(actor, 'read', ref));
+      }
+      return results;
+    });
+  }
 } else if (feature === 'fields-batch-client') {
   const instance = await engine({ grants: { viewer: ['read'] }, derived_roles: [{ role: 'viewer', when: { '$actor.enabled': true } }], rules: [forbid], field_access: { secret: { read: ['viewer'] } } });
   const clear = { ...ref, id: 'clear', attributes: { blocked: false } };

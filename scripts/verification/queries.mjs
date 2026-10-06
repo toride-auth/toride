@@ -146,12 +146,17 @@ try {
       for (const test of [
         { id: 'field-to-field', when: { '$resource.title': '$resource.tenant' } },
         { id: 'custom-policy', when: { '$resource.title': { custom: 'external-decision' } } },
+        { id: 'unavailable-static-one-traversal', when: { '$resource.project.isPublic': '$env.missing' }, forbid: true },
+        { id: 'unavailable-static-many-traversal', when: { '$resource.reviewers.approved': '$env.missing' }, forbid: true },
       ]) {
         await proof.check(`${backend}-reject-${test.id}-before-query`, { when: test.when }, { error: 'UnsupportedConstraintError', queryCountChange: 0 }, async () => {
           const before = sqlEvents[backend].length;
           let error;
           try {
-            const instance = new Toride({ policy: await loadJson(JSON.stringify(policy({ rules: [{ effect: 'permit', permissions: ['read'], when: test.when }] }))) });
+            const rules = test.forbid
+              ? [{ effect: 'permit', permissions: ['read'], when: {} }, { effect: 'forbid', permissions: ['read'], when: test.when }]
+              : [{ effect: 'permit', permissions: ['read'], when: test.when }];
+            const instance = new Toride({ policy: await loadJson(JSON.stringify(policy({ rules }))) });
             const result = await instance.buildConstraints(actor, 'read', 'Document');
             assert(result.ok && result.constraint, 'Unsupported policy must not become unrestricted or an ordinary result');
             instance.translateConstraints(result.constraint, backend === 'prisma' ? prismaAdapter() : drizzleAdapter());

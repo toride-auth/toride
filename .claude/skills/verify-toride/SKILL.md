@@ -63,6 +63,8 @@ Read `evidence.json` and the selected feature's JSON and log. A proof needs the 
 
 SQL proof includes `queries-fixture.json`, `queries-translations.json`, and `queries-sql.json`. Require both ORM routes to match the hand-written authorized IDs and the database's count and ordered pages. Authorization applies in SQL before `skip`, `take`, `limit`, or `offset`; no application postfilter establishes exact pages. Unsupported nodes must throw `UnsupportedConstraintError` before a database query. Record unsupported checks separately from successful query equivalence.
 
+An unavailable actor or environment operand on a traversed resource path requires explicit rejection when relevant to the query. Null one relations and empty many traversals have different runtime outcomes. Related ID checks require an observed resource row, in either rule order.
+
 Type proof includes generated files, each consumer fixture, compiler diagnostics, and CLI transcripts. A valid consumer must compile. Each negative fixture must fail compilation. Passing only the negative fixtures could conceal a broken dependency or declaration.
 
 The evidence directory is a local artifact. No command sends messages, contacts authorization services, opens accounts, or writes an application database. Package installation contacts the package registry. Launch writes built files in this checkout. Drives write their owned temporary clients and databases.
