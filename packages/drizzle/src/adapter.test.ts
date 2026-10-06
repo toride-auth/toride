@@ -42,6 +42,11 @@ describe("DrizzleConstraintAdapter", () => {
     });
   });
 
+  it("rejects JSON presence whose decoded null differs from SQL NULL", () => {
+    expect(() => adapter.translate({ type: "field_exists", field: "tags", exists: true }, context)).toThrow(UnsupportedConstraintError);
+    expect(adapter.translate({ type: "field_exists", field: "status", exists: true }, context)).toMatchObject({ _op: "isNotNull", field: "status", table: tasks });
+  });
+
   it("rejects physical array membership without a proven lowering", () => {
     expect(() => adapter.translate({ type: "field_includes", field: "tags", value: "urgent" }, context)).toThrow(UnsupportedConstraintError);
     expect(adapter.translate({ type: "field_eq", field: "status", value: "active" }, context)).toEqual(comparison("eq", "status", { value: "active" }));
