@@ -169,7 +169,7 @@ export type LeafConstraint =
 
 // ─── Constraint Result ────────────────────────────────────────────
 
-/** Result of partial evaluation, tagged with resource type R (phantom). */
+/** A compiler-produced root carrying the resource type used for query inference. */
 export type ResourceConstraint<R extends string = string> = Constraint & {
   readonly rootResourceType: R;
 };
@@ -191,6 +191,11 @@ export class UnsupportedConstraintError extends Error {
   }
 }
 
+/**
+ * Each translated predicate must return a Boolean, including for null fields.
+ * Ordinary comparison leaves are false for null. `not` complements that total
+ * predicate. Relation callbacks implement ANY using their persistence mapping.
+ */
 export interface ConstraintAdapter<
   TQueryMap extends Record<string, unknown> = Record<string, unknown>,
 > {

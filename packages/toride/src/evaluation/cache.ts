@@ -26,7 +26,7 @@ export class AttributeCache {
 
   isAbsent(ref: ResourceRef): boolean { return this.absent.has(JSON.stringify([ref.type, ref.id])); }
 
-  constructor(private readonly resolvers: Resolvers = {}, private readonly policy?: Policy) {}
+  constructor(private readonly resolvers: Resolvers = {}, readonly policy?: Policy) {}
 
   report(code: EvaluationDiagnostic["code"], path: string): void {
     if (!this.diagnostics.some(item => item.code === code && item.path === path)) this.diagnostics.push({ code, path });

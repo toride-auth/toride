@@ -109,7 +109,7 @@ export async function composeAction<T>(
   const permits: T[] = [];
   const forbids: T[] = [];
   for (const [name, permissions] of Object.entries(block.grants ?? {})) {
-    if (permissions.includes(action) || permissions.includes("all")) permits.push(await role(name));
+    if (permissions.some(permission => permission === "all" ? block.permissions.includes(action) : permission === action)) permits.push(await role(name));
   }
   for (const rule of block.rules ?? []) {
     if (!rule.permissions.includes(action)) continue;

@@ -158,8 +158,9 @@ export interface BatchCheckItem<S extends TorideSchema = DefaultSchema> {
 
 /**
  * Per-type resolver function.
- * Called when the engine needs attributes not available inline.
- * Called at most once per unique resource per evaluation (cached).
+ * Called on the first resource-data lookup for a ref in an evaluation.
+ * A registered resolver is called even when the ref includes inline data.
+ * Each evaluation caches the returned observation.
  *
  * Registering a resolver is **optional** per resource type. When no resolver is
  * registered, inline {@link ResourceRef.attributes} are used as the sole data
@@ -223,8 +224,9 @@ export interface EvaluationDiagnostic {
  * Not all types need resolvers. Types without a registered resolver use
  * **default resolver** behavior (also called "trivial resolution"): the engine
  * reads attribute values directly from the inline {@link ResourceRef.attributes}
- * passed at the call site. Fields not present inline resolve to `undefined`,
- * causing conditions that reference them to fail (default-deny).
+ * passed at the call site. Omitted fields are unavailable observations.
+ * An indeterminate permit cannot grant access, and an indeterminate forbid
+ * prevents access unless its role guard or condition is known false.
  *
  * This mirrors GraphQL's default field resolver pattern, where an unresolved
  * field simply returns `parent[fieldName]` — here, inline attributes play the

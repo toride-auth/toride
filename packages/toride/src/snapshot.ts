@@ -57,7 +57,7 @@ export async function snapshot<S extends TorideSchema = DefaultSchema>(
     observations.set(key, resource);
   }
   const entries = await Promise.all(
-    resources.map(async (resource) => {
+    [...observations.values()].map(async (resource) => {
       const key = `${resource.type}:${resource.id}`;
       const actions = await engine.permittedActions(actor, resource, options);
       return [key, actions] as const;

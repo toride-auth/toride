@@ -47,6 +47,9 @@ export async function buildConstraints(actor: ActorRef, action: string, resource
         if (!leftDynamic && !rightDynamic) return known(compare(node.operator, staticOperand(node.left, actor, env, actorOnly), staticOperand(node.right, actor, env, actorOnly)));
         const fieldOperand = leftDynamic ? node.left : node.right;
         if (fieldOperand.kind !== "reference") return known("indeterminate");
+        if (!leftDynamic && fieldOperand.path.includes(".") && policy.resources[type]?.relations?.[fieldOperand.path.split(".")[0]]) {
+          return unsupported("right-hand relation traversal");
+        }
         const value = staticOperand(leftDynamic ? node.right : node.left, actor, env, actorOnly);
         let operator = node.operator;
         if (!leftDynamic) {

@@ -34,8 +34,7 @@ import type { PermissionSnapshot, SnapshotEngine } from "./snapshot.js";
 
 /**
  * Main authorization engine.
- * Creates a per-check cache, resolves direct roles, checks grants,
- * and returns boolean with default-deny semantics.
+ * Evaluates declared roles and permit/forbid rules using per-check observations.
  */
 export class Toride<S extends TorideSchema = DefaultSchema> {
   private policy: Policy;
@@ -67,9 +66,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   }
 
   /**
-   * T097: Atomic policy swap. In-flight checks capture the resource block
-   * at the start of evaluateInternal, so they complete with the old policy.
-   * JS single-threaded nature ensures the assignment is atomic.
+   * In-flight checks retain the policy captured when their evaluation began.
    */
   setPolicy(policy: Policy): void {
     this.policy = policy;
@@ -95,7 +92,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
 
   /**
    * T069: Check all declared permissions for a resource and return permitted ones.
-   * Uses a shared cache across all per-action evaluations.
+   * Uses one cache across the resource's per-action evaluations.
    */
   async permittedActions<R extends S["resources"]>(
     actor: ActorRef<S>,
@@ -221,7 +218,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   }
 
   /**
-   * T071: Evaluate multiple checks for the same actor with a shared resolver cache.
+   * Evaluate multiple checks with an independent resolver cache for each item.
    * Returns boolean[] in the same order as the input checks.
    */
   async canBatch(
@@ -288,8 +285,8 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
    *
-   * Accepts Constraint (the AST) from buildConstraints() and returns
-   * TQueryMap[R] — the adapter's mapped output type for resource R.
+   * Accepts the scoped AST from buildConstraints() and infers the resource
+   * query type from its rootResourceType.
    * Callers must check result.ok and result.constraint before calling this method.
    */
   translateConstraints<
@@ -380,10 +377,6 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     });
   }
 
-  /**
-   * Evaluate with full ExplainResult (shared code path for can(), explain(), and helpers).
-   * Accepts an optional pre-existing AttributeCache for shared-cache scenarios (canBatch, permittedActions).
-   */
   private async evaluateInternal(
     actor: ActorRef,
     action: string,
@@ -391,7 +384,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     checkOptions?: CheckOptions,
     existingCache?: AttributeCache,
   ): Promise<ExplainResult> {
-    const policy = this.policy;
+    const policy = existingCache?.policy ?? this.policy;
     const resourceBlock = policy.resources[resource.type];
     if (!resourceBlock) {
       return {

@@ -24,6 +24,8 @@ async () => {
   const result = await engine.buildConstraints(actor, "read", "Document");
   if (!result.ok || !result.constraint) return;
   expectType<{ title?: string }>(engine.translateConstraints(result.constraint, adapter));
-  // @ts-expect-error A Document constraint cannot select Project output.
-  engine.translateConstraints<"Project", { Document: { title?: string }; Project: { public?: boolean } }>(result.constraint, adapter);
+  const constraint = result.constraint;
+  expectNotAssignable<(input: typeof constraint, queryAdapter: typeof adapter) => unknown>(
+    engine.translateConstraints<"Project", { Document: { title?: string }; Project: { public?: boolean } }>,
+  );
 };

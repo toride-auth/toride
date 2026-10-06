@@ -265,3 +265,29 @@ describe("simplify", () => {
     expect(result).toEqual({ type: "field_eq", field: "a", value: 1 });
   });
 });
+
+it("passes parent and child resource scopes to adapter callbacks", () => {
+  const scopes: string[] = [];
+  const base = makeStringAdapter();
+  const adapter = {
+    ...base,
+    translate: (leaf: Parameters<typeof base.translate>[0], context: Parameters<typeof base.translate>[1]) => {
+      scopes.push(`leaf:${context.resourceType}.${leaf.field}`);
+      return base.translate(leaf, context);
+    },
+    always: (context: Parameters<typeof base.always>[0]) => {
+      scopes.push(`always:${context.resourceType}`);
+      return base.always(context);
+    },
+    relation: (field: string, target: string, child: string, context: Parameters<typeof base.relation>[3]) => {
+      scopes.push(`relation:${context.resourceType}.${field}->${target}`);
+      return base.relation(field, target, child, context);
+    },
+  };
+  const translated = translateConstraints({ rootResourceType: "Document", type: "and", children: [
+    { type: "field_eq", field: "active", value: true },
+    { type: "relation", quantifier: "any", field: "project", resourceType: "Project", constraint: { type: "and", children: [{ type: "always" }, { type: "field_eq", field: "active", value: true }] } },
+  ] }, adapter);
+  expect(translated).toBe("(active = true AND project -> Project((TRUE AND active = true)))");
+  expect(scopes).toEqual(["leaf:Document.active", "always:Project", "leaf:Project.active", "relation:Document.project->Project"]);
+});

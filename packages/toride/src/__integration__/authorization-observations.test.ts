@@ -122,3 +122,46 @@ it("evaluates duplicate snapshot refs once before recording their permissions", 
   expect(await engine.snapshot(actor, [document, document])).toEqual({ "Document:d1": ["read"] });
   expect(reads).toBe(1);
 });
+
+it("keeps an independent permit after an absent related role is discarded", async () => {
+  let customCalls = 0;
+  const engine = new Toride({ policy: policy({ relations: { project: "Project" }, grants: { viewer: ["read"] }, derived_roles: [{ role: "viewer", from_role: "viewer", on_relation: "project" }], rules: [permit({ "$resource.value": { custom: "allow" } }), { effect: "forbid", roles: ["viewer"], permissions: ["read"], when: { "$resource.project.value": { exists: false } } }] }, { derived_roles: [{ role: "viewer", when: {} }] }), customEvaluators: { allow: async () => { customCalls++; return true; } }, resolvers: { Document: async () => ({ project: { type: "Project", id: "gone" } }), Project: async () => null } });
+  const result = await engine.explain(actor, "read", document);
+  expect(result.allowed).toBe(true);
+  expect(result.resolvedRoles.derived).toEqual([]);
+  expect(customCalls).toBe(1);
+});
+
+it("does not fetch a resource for an actor-only permission", async () => {
+  let reads = 0;
+  const engine = new Toride({ policy: policy({ rules: [permit({ "$actor.enabled": true })] }), resolvers: { Document: async () => { reads++; throw new Error("unavailable"); } } });
+  expect(await engine.can(actor, "read", document)).toBe(true);
+  expect(reads).toBe(0);
+});
+
+it.each(["permit", "forbid"] as const)("preserves string ordering in %s conditions", async effect => {
+  const p = policy({ rules: [...(effect === "forbid" ? [permit()] : []), { effect, permissions: ["read"], when: { "$resource.date": { gt: "2026-01-01" } } }] });
+  const engine = new Toride({ policy: p });
+  expect(await engine.can(actor, "read", { ...document, attributes: { date: "2026-02-01" } })).toBe(effect === "permit");
+  expect(await engine.can(actor, "read", { ...document, attributes: { date: "2025-12-31" } })).toBe(effect === "forbid");
+  const result = await engine.buildConstraints(actor, "read", "Document");
+  expect(result.ok).toBe(true);
+  expect(JSON.stringify(result)).toContain('"type":"field_gt"');
+});
+
+it("limits all grants to declared resource permissions", async () => {
+  const engine = new Toride({ policy: policy({ grants: { viewer: ["all"] }, derived_roles: [{ role: "viewer", when: {} }] }) });
+  expect(await engine.can(actor, "read", document)).toBe(true);
+  for (const action of ["undeclared", "all"]) {
+    expect(await engine.can(actor, action, document)).toBe(false);
+    expect(await engine.buildConstraints(actor, action, "Document")).toEqual({ ok: false });
+  }
+});
+
+it("keeps one captured policy across a resource's permitted actions", async () => {
+  const original = policy({ permissions: ["read", "write"], grants: { viewer: ["all"] }, derived_roles: [{ role: "viewer", when: { "$resource.enabled": true } }] });
+  const replacement = policy({ permissions: ["read", "write"] });
+  const engine = new Toride({ policy: original, resolvers: { Document: async () => { engine.setPolicy(replacement); return { enabled: true }; } } });
+  expect(await engine.permittedActions(actor, document)).toEqual(["read", "write"]);
+  expect(await engine.permittedActions(actor, document)).toEqual([]);
+});
