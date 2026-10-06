@@ -57,6 +57,33 @@ function afterMicrotasks(remaining: number, action: () => void): void {
   queueMicrotask(() => remaining === 0 ? action() : afterMicrotasks(remaining - 1, action));
 }
 
+it("denies when a later related identity fails after an earlier match", async () => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: ["owner"], permissions: ["read"], relations: { owners: "User" },
+      derived_roles: [{ role: "owner", from_relation: "owners" }], grants: { owner: ["read"] } },
+  } };
+  for (const method of ["can", "explain"] as const) {
+    let firstReads = 0;
+    let laterReads = 0;
+    const first = { type: "User", get id(): string { firstReads++; return "u1"; } };
+    const later = { type: "User", get id(): string {
+      // Three reads validate/build the role; the fourth is its deferred absence read.
+      if (++laterReads === 4) throw new Error("later identity unavailable");
+      return "u2";
+    } };
+    const resource = { type: "Document", id: "d1", attributes: { owners: [first, later] } };
+    const engine = new Toride({ policy });
+    if (method === "can") expect(await engine.can(actor, "read", resource)).toBe(false);
+    else {
+      const explanation = await engine.explain(actor, "read", resource);
+      expect(explanation.allowed).toBe(false);
+      expect(explanation.diagnostics).toContainEqual({ code: "evaluation_error", path: "Document" });
+    }
+    expect(firstReads).toBe(5);
+    expect(laterReads).toBe(4);
+  }
+});
+
 it.each(["rule", "role"] as const)("preserves delayed custom observations before a forbid %s", async scope => {
   const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
     Document: scope === "rule" ? {
