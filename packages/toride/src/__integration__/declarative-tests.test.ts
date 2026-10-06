@@ -81,7 +81,7 @@ describe("declarative test runner integration", () => {
           name: "editor can update tasks",
           actor: { type: "User", id: "u1", attributes: { isSuperAdmin: false, department: "eng", is_editor: true } },
           action: "update",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
       ];
@@ -98,7 +98,7 @@ describe("declarative test runner integration", () => {
           name: "viewer cannot delete tasks",
           actor: { type: "User", id: "u1", attributes: { isSuperAdmin: false, department: "eng", is_viewer: true } },
           action: "delete",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "deny",
         },
       ];
@@ -114,7 +114,7 @@ describe("declarative test runner integration", () => {
           name: "viewer can delete (wrong expectation)",
           actor: { type: "User", id: "u1", attributes: { isSuperAdmin: false, department: "eng", is_viewer: true } },
           action: "delete",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow", // wrong - viewer cannot delete
         },
       ];
@@ -181,7 +181,7 @@ describe("declarative test runner integration", () => {
             },
           },
           action: "update",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
       ];
@@ -203,7 +203,7 @@ describe("declarative test runner integration", () => {
             },
           },
           action: "update",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
       ];
@@ -243,7 +243,7 @@ describe("declarative test runner integration", () => {
             "Task:42": { archived: false },
           },
           action: "update",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
       ];
@@ -261,21 +261,21 @@ describe("declarative test runner integration", () => {
           name: "editor can read",
           actor: { type: "User", id: "u1", attributes: { isSuperAdmin: false, department: "eng", is_editor: true } },
           action: "read",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
         {
           name: "no role cannot read (default deny)",
           actor: { type: "User", id: "u2", attributes: { isSuperAdmin: false, department: "eng" } },
           action: "read",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "deny",
         },
         {
           name: "editor can update",
           actor: { type: "User", id: "u1", attributes: { isSuperAdmin: false, department: "eng", is_editor: true } },
           action: "update",
-          resource: { type: "Task", id: "42" },
+          resource: { type: "Task", id: "42", attributes: { archived: false } },
           expected: "allow",
         },
       ];

@@ -1,588 +1,80 @@
-// T046: Condition expression evaluator
-// T047: Nested property resolution
-// T048: Strict null semantics
-// T053: Cardinality:many relation resolution with ANY semantics
-
-import type {
-  ActorRef,
-  ResourceRef,
-  // RelationResolver removed — replaced by AttributeCache
-  ConditionExpression,
-  ConditionOperator,
-  ConditionValue,
-  ResourceBlock,
-  Policy,
-  EvaluatorFn,
-} from "../types.js";
-import type { AttributeCache } from "./cache.js";
-
-/** Default maximum depth for nested property resolution. */
-const DEFAULT_MAX_CONDITION_DEPTH = 3;
-
-/** Default maximum recursion depth for logical combinator nesting (any/all). */
-const DEFAULT_MAX_COMBINATOR_DEPTH = 10;
-
-/** Module-level set of valid operator keys to avoid per-call allocation. */
-const OPERATOR_KEYS = new Set([
-  "eq", "neq", "gt", "gte", "lt", "lte",
-  "in", "includes", "exists",
-  "startsWith", "endsWith", "contains",
-  "custom",
-]);
-
-/** Sentinel value representing an undefined/missing property. */
-const UNDEFINED_SENTINEL = Symbol("UNDEFINED");
+import type { ActorRef, ResourceRef, ConditionExpression, ResourceBlock, Policy, EvaluatorFn } from "../types.js";
+import { AttributeCache, isResourceRef } from "./cache.js";
+import { all, any, compare, normalizeCondition, readPath, staticOperand, unavailable } from "./semantics.js";
+import type { Condition, Operand, Truth } from "./semantics.js";
 
 export interface ConditionOptions {
   readonly maxConditionDepth?: number;
   readonly maxCombinatorDepth?: number;
   readonly customEvaluators?: Record<string, EvaluatorFn>;
-  readonly ruleEffect?: "permit" | "forbid";
+  readonly actorOnly?: boolean;
 }
+type Values = { kind: "scalar"; value: unknown } | { kind: "traversal"; values: unknown[] };
 
-/**
- * Evaluate a condition expression against the full context.
- * Handles all operators, cross-references, nested property resolution,
- * strict null semantics, logical combinators, and cardinality:many ANY semantics.
- */
-export async function evaluateCondition(
-  condition: ConditionExpression,
-  actor: ActorRef,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  env: Record<string, unknown>,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  options?: ConditionOptions,
-  combinatorDepth: number = 0,
-): Promise<boolean> {
-  const maxDepth = options?.maxConditionDepth ?? DEFAULT_MAX_CONDITION_DEPTH;
-  const maxCombinatorDepth = options?.maxCombinatorDepth ?? DEFAULT_MAX_COMBINATOR_DEPTH;
-
-  // Handle logical combinators with recursion depth limit
-  if ("any" in condition && Array.isArray((condition as { any: unknown }).any)) {
-    if (combinatorDepth >= maxCombinatorDepth) {
-      // Fail-closed: excessive nesting -> false
-      return false;
-    }
-    const items = (condition as { any: ConditionExpression[] }).any;
-    for (const item of items) {
-      if (await evaluateCondition(item, actor, resource, cache, env, resourceBlock, policy, options, combinatorDepth + 1)) {
-        return true;
-      }
-    }
-    return false;
+async function resourcePath(path: string, resource: ResourceRef, cache: AttributeCache, block: ResourceBlock, policy: Policy, depth: number): Promise<Values> {
+  if (depth < 0) {
+    cache.report("depth_limit", `$resource.${path}`);
+    return { kind: "scalar", value: unavailable };
   }
-
-  if ("all" in condition && Array.isArray((condition as { all: unknown }).all)) {
-    if (combinatorDepth >= maxCombinatorDepth) {
-      // Fail-closed: excessive nesting -> false
-      return false;
-    }
-    const items = (condition as { all: ConditionExpression[] }).all;
-    for (const item of items) {
-      if (!(await evaluateCondition(item, actor, resource, cache, env, resourceBlock, policy, options, combinatorDepth + 1))) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  // Simple conditions: all key-value pairs ANDed together
-  const entries = Object.entries(condition as Record<string, ConditionValue>);
-  for (const [key, conditionValue] of entries) {
-    const matched = await evaluatePair(
-      key,
-      conditionValue,
-      actor,
-      resource,
-      cache,
-      env,
-      resourceBlock,
-      policy,
-      maxDepth,
-      options,
-    );
-    if (!matched) return false;
-  }
-
-  return true;
-}
-
-/**
- * Evaluate a single key-value pair from a simple condition.
- */
-async function evaluatePair(
-  key: string,
-  conditionValue: ConditionValue,
-  actor: ActorRef,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  env: Record<string, unknown>,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  maxDepth: number,
-  options?: ConditionOptions,
-): Promise<boolean> {
-  // Resolve the left-hand side value
-  const leftValue = await resolveValue(
-    key,
-    actor,
-    resource,
-    cache,
-    env,
-    resourceBlock,
-    policy,
-    maxDepth,
-  );
-
-  // Handle operator-based conditions
-  if (isOperator(conditionValue)) {
-    return evaluateOperator(
-      leftValue,
-      conditionValue,
-      actor,
-      resource,
-      cache,
-      env,
-      resourceBlock,
-      policy,
-      maxDepth,
-      options,
-    );
-  }
-
-  // Equality shorthand: primitive or cross-reference string
-  const rightValue = await resolveRightValue(
-    conditionValue,
-    actor,
-    resource,
-    cache,
-    env,
-    resourceBlock,
-    policy,
-    maxDepth,
-  );
-
-  // T053: If leftValue is an array (from cardinality:many), apply ANY semantics for equality
-  if (Array.isArray(leftValue)) {
-    if (rightValue === UNDEFINED_SENTINEL || rightValue === null || rightValue === undefined) {
-      return false;
-    }
-    return leftValue.some((v) => {
-      if (v === UNDEFINED_SENTINEL || v === null || v === undefined) return false;
-      return v === rightValue;
-    });
-  }
-
-  // Strict null semantics: undefined never equals anything
-  if (leftValue === UNDEFINED_SENTINEL || leftValue === null || leftValue === undefined) {
-    return false;
-  }
-  if (rightValue === UNDEFINED_SENTINEL || rightValue === null || rightValue === undefined) {
-    return false;
-  }
-
-  return leftValue === rightValue;
-}
-
-/**
- * Resolve a reference path to its value.
- * Handles $actor.x, $resource.x, $env.x, and nested paths like $resource.org.name.
- */
-async function resolveValue(
-  path: string,
-  actor: ActorRef,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  env: Record<string, unknown>,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  maxDepth: number,
-): Promise<unknown> {
-  if (path.startsWith("$actor.")) {
-    const attrPath = path.slice(7); // Remove "$actor."
-    return getNestedAttribute(actor.attributes, attrPath);
-  }
-
-  if (path.startsWith("$resource.")) {
-    const attrPath = path.slice(10); // Remove "$resource."
-    return resolveResourcePath(
-      attrPath,
-      resource,
-      cache,
-      resourceBlock,
-      policy,
-      maxDepth,
-    );
-  }
-
-  if (path.startsWith("$env.")) {
-    const attrName = path.slice(5); // Remove "$env."
-    const val = env[attrName];
-    return val === undefined ? UNDEFINED_SENTINEL : val;
-  }
-
-  return UNDEFINED_SENTINEL;
-}
-
-/**
- * Check if a value is ResourceRef-shaped (has `type` and `id` string fields).
- */
-function isResourceRef(value: unknown): value is ResourceRef {
-  if (typeof value !== "object" || value === null) return false;
-  const obj = value as Record<string, unknown>;
-  return typeof obj.type === "string" && typeof obj.id === "string";
-}
-
-/**
- * Resolve a resource attribute path, handling nested property resolution via relations.
- * T047: $resource.org.name -> resolve org relation, then get name attribute.
- * T053: Cardinality:many -> ANY semantics (returns array of values for further eval).
- * T019: Full lazy cascading relation traversal via AttributeCache.
- *
- * At each path segment:
- * 1. Resolve attributes for the current resource (via cache, which merges inline + resolver)
- * 2. Check if the segment is a declared relation with a ResourceRef-shaped value
- * 3. If yes, recurse with the related resource's block and decremented depth
- * 4. If array of ResourceRefs (many relation), resolve each and return array (ANY semantics)
- * 5. If not a relation, fall back to nested attribute object traversal
- */
-async function resolveResourcePath(
-  path: string,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  depthRemaining: number,
-): Promise<unknown> {
-  const parts = path.split(".");
-
-  if (parts.length === 1) {
-    // Simple attribute lookup via cache (merges inline + resolver)
-    try {
-      const attrs = await cache.resolve(resource, resourceBlock);
-      const val = attrs[parts[0]];
-      return val === undefined ? UNDEFINED_SENTINEL : val;
-    } catch {
-      return UNDEFINED_SENTINEL;
-    }
-  }
-
-  // Nested path: first part may be a relation name
-  if (depthRemaining <= 0) {
-    return UNDEFINED_SENTINEL;
-  }
-
-  const relationName = parts[0];
-  const remainingPath = parts.slice(1).join(".");
-
-  // Check if the relation exists in the resource block
-  const relationDef = resourceBlock.relations?.[relationName];
-  if (!relationDef) {
-    // Not a relation - might be a nested attribute object
-    try {
-      const attrs = await cache.resolve(resource, resourceBlock);
-      const val = getNestedAttribute(attrs, path);
-      return val;
-    } catch {
-      return UNDEFINED_SENTINEL;
-    }
-  }
-
-  // Resolve the relation target from resource attributes (via cache)
   try {
-    const attrs = await cache.resolve(resource, resourceBlock);
-    const relValue = attrs[relationName];
-
-    if (relValue === null || relValue === undefined) {
-      return UNDEFINED_SENTINEL;
+    const attributes = await cache.resolve(resource, block);
+    if (attributes === null) return { kind: "scalar", value: null };
+    if (path === "id") return { kind: "scalar", value: resource.id };
+    const [first, ...rest] = path.split(".");
+    const target = block.relations?.[first];
+    if (!target || !rest.length) return { kind: "scalar", value: readPath(attributes, path) };
+    const relation = readPath(attributes, first);
+    if (relation === unavailable || relation === null) return { kind: "scalar", value: relation };
+    const refs = Array.isArray(relation) ? relation : [relation];
+    const values: unknown[] = [];
+    for (const ref of refs) {
+      if (!isResourceRef(ref)) return { kind: "scalar", value: unavailable };
+      const child = await resourcePath(rest.join("."), ref, cache, policy.resources[target] ?? { roles: [], permissions: [] }, policy, depth - 1);
+      values.push(...(child.kind === "scalar" ? [child.value] : child.values));
     }
-
-    // T053: Array of ResourceRefs (many relations) -> ANY semantics
-    if (Array.isArray(relValue)) {
-      const results: unknown[] = [];
-      for (const item of relValue) {
-        if (!isResourceRef(item)) continue;
-        const relatedRef = item as ResourceRef;
-        const relatedBlock = policy.resources[relatedRef.type] ?? {
-          roles: [],
-          permissions: [],
-        };
-        const val = await resolveResourcePath(
-          remainingPath,
-          relatedRef,
-          cache,
-          relatedBlock,
-          policy,
-          depthRemaining - 1,
-        );
-        results.push(val);
-      }
-      // Return array for ANY semantics evaluation
-      return results.length > 0 ? results : UNDEFINED_SENTINEL;
-    }
-
-    // Single ResourceRef-shaped value
-    if (isResourceRef(relValue)) {
-      const relatedRef = relValue as ResourceRef;
-      const relatedBlock = policy.resources[relatedRef.type] ?? {
-        roles: [],
-        permissions: [],
-      };
-      return resolveResourcePath(
-        remainingPath,
-        relatedRef,
-        cache,
-        relatedBlock,
-        policy,
-        depthRemaining - 1,
-      );
-    }
-
-    // Not a ResourceRef or array - treat as plain attribute
-    if (typeof relValue === "object") {
-      const val = getNestedAttribute(relValue as Record<string, unknown>, remainingPath);
-      return val;
-    }
-
-    return UNDEFINED_SENTINEL;
+    return { kind: "traversal", values };
   } catch {
-    return UNDEFINED_SENTINEL;
+    return { kind: "scalar", value: unavailable };
   }
 }
 
-/** Property names that must never be traversed (prototype pollution guard). */
-const FORBIDDEN_PROPS = new Set(["__proto__", "constructor", "prototype"]);
-
-/**
- * Get a nested attribute from an object using dot-separated path.
- */
-function getNestedAttribute(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split(".");
-  let current: unknown = obj;
-
-  for (const part of parts) {
-    if (FORBIDDEN_PROPS.has(part)) return UNDEFINED_SENTINEL;
-    if (current === null || current === undefined || typeof current !== "object") {
-      return UNDEFINED_SENTINEL;
-    }
-    current = (current as Record<string, unknown>)[part];
-  }
-
-  return current === undefined ? UNDEFINED_SENTINEL : current;
-}
-
-/**
- * Resolve a right-hand side value, handling cross-references.
- */
-async function resolveRightValue(
-  value: ConditionValue,
-  actor: ActorRef,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  env: Record<string, unknown>,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  maxDepth: number,
-): Promise<unknown> {
-  if (typeof value === "string" && isCrossReference(value)) {
-    return resolveValue(value, actor, resource, cache, env, resourceBlock, policy, maxDepth);
-  }
-  return value;
-}
-
-/**
- * Check if a string value is a cross-reference ($actor., $resource., $env.).
- */
-function isCrossReference(value: string): boolean {
-  return (
-    value.startsWith("$actor.") ||
-    value.startsWith("$resource.") ||
-    value.startsWith("$env.")
-  );
-}
-
-/**
- * Check if a ConditionValue is an operator object.
- */
-function isOperator(value: ConditionValue): value is ConditionOperator {
-  if (typeof value !== "object" || value === null) return false;
-  const keys = Object.keys(value as object);
-  return keys.length === 1 && OPERATOR_KEYS.has(keys[0]);
-}
-
-/**
- * Evaluate an operator condition.
- */
-async function evaluateOperator(
-  leftValue: unknown,
-  operator: ConditionOperator,
-  actor: ActorRef,
-  resource: ResourceRef,
-  cache: AttributeCache,
-  env: Record<string, unknown>,
-  resourceBlock: ResourceBlock,
-  policy: Policy,
-  maxDepth: number,
-  options?: ConditionOptions,
-): Promise<boolean> {
-  const op = operator as Record<string, unknown>;
-  const opKey = Object.keys(op)[0];
-  const opValue = op[opKey];
-
-  // Handle custom evaluator
-  if (opKey === "custom") {
-    return evaluateCustom(
-      opValue as string,
-      actor,
-      resource,
-      env,
-      options,
-    );
-  }
-
-  // Handle exists operator (doesn't need right-side resolution)
-  if (opKey === "exists") {
-    const exists = leftValue !== UNDEFINED_SENTINEL && leftValue !== undefined && leftValue !== null;
-    return opValue === true ? exists : !exists;
-  }
-
-  // Resolve right-hand side value (may be a cross-reference)
-  const rightValue = await resolveRightValue(
-    opValue as ConditionValue,
-    actor,
-    resource,
-    cache,
-    env,
-    resourceBlock,
-    policy,
-    maxDepth,
-  );
-
-  // T053: If leftValue is an array (from cardinality:many), apply ANY semantics
-  if (Array.isArray(leftValue)) {
-    return evaluateAnySemantics(leftValue, opKey, rightValue);
-  }
-
-  // Strict null semantics
-  if (leftValue === UNDEFINED_SENTINEL || leftValue === null || leftValue === undefined) {
-    return false;
-  }
-
-  return evaluateOperatorPrimitive(leftValue, opKey, rightValue);
-}
-
-/**
- * T053: Cardinality:many ANY semantics - true if ANY value in the array satisfies the operator.
- */
-function evaluateAnySemantics(
-  values: unknown[],
-  opKey: string,
-  rightValue: unknown,
-): boolean {
-  // Special case: "includes" on an array of arrays - check each sub-value
-  if (opKey === "includes") {
-    // The left side is an array of individual values from many related resources
-    // "includes" means: does this collection include the value
-    return values.some((v) => v === rightValue);
-  }
-
-  return values.some((v) => {
-    if (v === UNDEFINED_SENTINEL || v === null || v === undefined) return false;
-    return evaluateOperatorPrimitive(v, opKey, rightValue);
-  });
-}
-
-/**
- * Evaluate a primitive operator comparison.
- */
-function evaluateOperatorPrimitive(
-  left: unknown,
-  opKey: string,
-  right: unknown,
-): boolean {
-  switch (opKey) {
-    case "eq":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return left === right;
-
-    case "neq":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return left !== right;
-
-    case "gt":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return (left as number) > (right as number);
-
-    case "gte":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return (left as number) >= (right as number);
-
-    case "lt":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return (left as number) < (right as number);
-
-    case "lte":
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      return (left as number) <= (right as number);
-
-    case "in": {
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      if (Array.isArray(right)) {
-        return right.includes(left);
+export async function evaluateNormalizedCondition(condition: Condition, actor: ActorRef, resource: ResourceRef, cache: AttributeCache, env: Record<string, unknown>, block: ResourceBlock, policy: Policy, options: ConditionOptions = {}): Promise<Truth> {
+  const resolve = async (value: Operand): Promise<Values> => {
+    const result = value.kind === "reference" && value.scope === "resource" && !options.actorOnly
+      ? await resourcePath(value.path, resource, cache, block, policy, options.maxConditionDepth ?? 3)
+      : { kind: "scalar" as const, value: staticOperand(value, actor, env, options.actorOnly) };
+    if (result.kind === "scalar" && result.value === unavailable && value.kind === "reference") cache.report("missing_value", `$${value.scope}.${value.path}`);
+    return result;
+  };
+  switch (condition.kind) {
+    case "all": return all(await Promise.all(condition.children.map(child => evaluateNormalizedCondition(child, actor, resource, cache, env, block, policy, options))));
+    case "any": return any(await Promise.all(condition.children.map(child => evaluateNormalizedCondition(child, actor, resource, cache, env, block, policy, options))));
+    case "unavailable": cache.report("depth_limit", "condition"); return "indeterminate";
+    case "custom": {
+      const evaluator = options.customEvaluators?.[condition.name];
+      if (evaluator && !options.actorOnly) {
+        try { return await evaluator(actor, resource, env) ? "true" : "false"; } catch {}
       }
-      // right might be a string reference that resolved to an array
-      return false;
+      cache.report("custom_evaluator", condition.name);
+      return "indeterminate";
     }
-
-    case "includes": {
-      if (right === UNDEFINED_SENTINEL || right === null || right === undefined) return false;
-      if (Array.isArray(left)) {
-        return (left as unknown[]).includes(right);
+    case "predicate": {
+      const left = await resolve(condition.left);
+      const right = await resolve(condition.right);
+      if (right.kind === "traversal") return "indeterminate";
+      if (left.kind === "scalar") return compare(condition.operator, left.value, right.value);
+      if (condition.operator === "exists") {
+        const present = any(left.values.map(value => compare("exists", value, true)));
+        return right.value === false ? present === "true" ? "false" : present === "false" ? "true" : "indeterminate" : present;
       }
-      return false;
+      return any(left.values.map(value => compare(condition.operator, value, right.value)));
     }
-
-    case "startsWith":
-      if (typeof left !== "string" || typeof right !== "string") return false;
-      return left.startsWith(right);
-
-    case "endsWith":
-      if (typeof left !== "string" || typeof right !== "string") return false;
-      return left.endsWith(right);
-
-    case "contains":
-      if (typeof left !== "string" || typeof right !== "string") return false;
-      return left.includes(right);
-
-    default:
-      return false;
   }
 }
 
-/**
- * Evaluate a custom evaluator.
- * Fail-closed semantics: errors in permit rules -> false (not matched),
- * errors in forbid rules -> true (matched = deny).
- */
-async function evaluateCustom(
-  evaluatorName: string,
-  actor: ActorRef,
-  resource: ResourceRef,
-  env: Record<string, unknown>,
-  options?: ConditionOptions,
-): Promise<boolean> {
-  const evaluator = options?.customEvaluators?.[evaluatorName];
-  if (!evaluator) {
-    // Evaluator not found -> fail-closed
-    return options?.ruleEffect === "forbid";
-  }
-
-  try {
-    return await evaluator(actor, resource, env);
-  } catch {
-    // Fail-closed: permit errors -> false, forbid errors -> true
-    return options?.ruleEffect === "forbid";
-  }
+export async function evaluateConditionOutcome(condition: ConditionExpression, actor: ActorRef, resource: ResourceRef, cache: AttributeCache, env: Record<string, unknown>, block: ResourceBlock, policy: Policy, options?: ConditionOptions): Promise<Truth> {
+  return evaluateNormalizedCondition(normalizeCondition(condition, 0, options?.maxCombinatorDepth), actor, resource, cache, env, block, policy, options);
+}
+export async function evaluateCondition(condition: ConditionExpression, actor: ActorRef, resource: ResourceRef, cache: AttributeCache, env: Record<string, unknown>, block: ResourceBlock, policy: Policy, options?: ConditionOptions): Promise<boolean> {
+  return await evaluateConditionOutcome(condition, actor, resource, cache, env, block, policy, options) === "true";
 }

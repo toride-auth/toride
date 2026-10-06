@@ -188,6 +188,7 @@ resources:
 
     // Verify exact structure: NOT(field_eq(department, "engineering"))
     expect(constraint).toEqual({
+        rootResourceType: "Task",
       type: "not",
       child: {
         type: "field_eq",
@@ -285,6 +286,7 @@ resources:
     const constraint = (result as { ok: true; constraint: Constraint }).constraint;
     // Verify exact structure: NOT(field_eq(archived, true))
     expect(constraint).toEqual({
+        rootResourceType: "Task",
       type: "not",
       child: {
         type: "field_eq",
@@ -339,6 +341,7 @@ resources:
     const constraint = (result as { ok: true; constraint: Constraint }).constraint;
     // Verify exact structure: NOT(unknown("businessHours"))
     expect(constraint).toEqual({
+        rootResourceType: "Task",
       type: "not",
       child: {
         type: "unknown",
@@ -346,7 +349,6 @@ resources:
       },
     });
 
-    const translated = engine.translateConstraints(constraint, adapter);
-    expect(translated).toBe("NOT(UNKNOWN(businessHours))");
+    expect(() => engine.translateConstraints(result.constraint!, adapter)).toThrow(/businessHours/);
   });
 });

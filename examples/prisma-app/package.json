@@ -20,6 +20,7 @@
     "@toride/prisma": "workspace:*"
   },
   "devDependencies": {
+    "@prisma/adapter-libsql": "6.19.2",
     "@toride/codegen": "workspace:*",
     "prisma": "^6.4.0",
     "tsx": "^4.19.0",

@@ -6,8 +6,23 @@
   "ignoreExportsUsedInFile": true,
   "workspaces": {
     ".": {
+      "entry": [
+        "scripts/verification/run.mjs",
+        "scripts/verification/doctor.mjs",
+        "scripts/verification/runtime.mjs",
+        "scripts/verification/types.mjs",
+        "scripts/verification/queries.mjs"
+      ],
       // Nx loads this package dynamically for nx release.
       "ignoreDependencies": ["@nx/js"]
+    },
+    "examples/prisma-app": {
+      "entry": ["verification/database.mjs", "verification/prisma.config.ts", "verification/schema.prisma"]
+    },
+    "packages/drizzle": {
+      "entry": ["verification/database.mjs"],
+      // The native resolver loads the optional ORM peer only when used.
+      "ignoreIssues": {"package.json": ["optionalPeerDependencies"]}
     }
   }
 }

@@ -28,6 +28,8 @@ export function makeStringAdapter(): ConstraintAdapter<Record<string, string>> {
         case "field_nin": return `${c.field} NOT IN ${JSON.stringify(c.values)}`;
         case "field_exists": return c.exists ? `${c.field} IS NOT NULL` : `${c.field} IS NULL`;
         case "field_includes": return `${c.field} INCLUDES ${JSON.stringify(c.value)}`;
+        case "field_starts_with": return `${c.field} STARTS_WITH ${JSON.stringify(c.value)}`;
+        case "field_ends_with": return `${c.field} ENDS_WITH ${JSON.stringify(c.value)}`;
         case "field_contains": return `${c.field} CONTAINS ${JSON.stringify(c.value)}`;
         default: return "UNKNOWN_LEAF";
       }
@@ -35,12 +37,8 @@ export function makeStringAdapter(): ConstraintAdapter<Record<string, string>> {
     relation(field: string, resourceType: string, childQuery: string): string {
       return `${field} -> ${resourceType}(${childQuery})`;
     },
-    hasRole(actorId: string, actorType: string, role: string): string {
-      return `HAS_ROLE(${actorType}:${actorId}, ${role})`;
-    },
-    unknown(name: string): string {
-      return `UNKNOWN(${name})`;
-    },
+    always: () => "TRUE",
+    never: () => "FALSE",
     and(queries: string[]): string {
       return `(${queries.join(" AND ")})`;
     },

@@ -68,8 +68,7 @@ app.get("/", async (c) => {
   // batches all calls and returns a PermissionSnapshot map. TorideClient wraps
   // the snapshot for synchronous lookups with full type safety.
   //
-  // This is more efficient for list views and demonstrates the snapshot/client
-  // pattern intended for server-to-client permission transport.
+  // The snapshot carries permissions to the list view for synchronous lookups.
   // ---------------------------------------------------------------------------
   const snap = await engine.snapshot(
     actor,

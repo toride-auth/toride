@@ -140,7 +140,7 @@ const allowed = await engine.can(actor, "delete", {
 
 ### 2. Role on a Related Resource
 
-Propagates a role from a related resource. If the actor has a role on the parent, they automatically get a role on the child.
+Derives a child role by recursively evaluating the target resource policy. The relation alone does not assign a role.
 
 ```yaml
 resources:
@@ -196,6 +196,10 @@ resources:
 ```
 
 An Organization `admin` becomes a Project `admin` (via org relation), and a Project `admin` becomes a Task `editor` (via project relation).
+
+Related roles come from the target's declared `derived_roles` and conditions. Toride does not assume a `roleAssignments` table. If your application stores assignments, expose that data through resolver attributes and policy conditions. Query translation requires the corresponding explicit mapping.
+
+Every relation ref must match the declared target. For a relation array, a derivation succeeds when one related resource has the required role. The complete derived-role condition stays within that related resource. Runtime and partial evaluation use the same environment and custom-condition semantics. Recursive role schemas that cannot become an exact query produce an error.
 
 ### 3. Relation Identity
 
@@ -337,8 +341,8 @@ const roles = await engine.resolvedRoles(actor, {
 
 Relation-based derivation (pattern 2) can create chains: a Task derives from a Project, which derives from an Organization. Toride protects against infinite loops and excessive depth:
 
-- **Cycle detection**: If the same resource (identified by `Type:id`) is visited twice in a derivation chain, a `CycleError` is thrown.
-- **Depth limit**: Configurable via `maxDerivedRoleDepth` (default: 5). If exceeded, a `DepthLimitError` is thrown.
+- **Cycle detection**: If the same resource identified by `Type:id` is visited twice in a derivation chain, the derivation is indeterminate.
+- **Depth limit**: Configurable via `maxDerivedRoleDepth` (default: 5). If exceeded, the derivation is indeterminate.
 
 ```typescript
 const engine = new Toride({
@@ -348,7 +352,7 @@ const engine = new Toride({
 });
 ```
 
-Both errors are fail-closed: if the engine cannot resolve a derivation path, the role is not granted.
+A cycle or depth failure makes the affected derivation indeterminate. A relevant indeterminate forbid role guard prevents access.
 
 ## What's Next
 

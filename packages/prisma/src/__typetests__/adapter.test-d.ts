@@ -41,7 +41,7 @@ expectAssignable<ConstraintAdapter<Record<string, PrismaWhere>>>(untypedAdapter)
 // ─── T024: Typed adapter with options ───────────────────────────
 
 const typedAdapterWithOpts = createPrismaAdapter<DefaultSchema, never, TestQueryMap>({
-  relationMapping: { org: "organization" },
+  relations: { Document: { org: { field: "organization", resourceType: "Organization", cardinality: "one" } } },
 });
 expectType<ConstraintAdapter<TestQueryMap>>(typedAdapterWithOpts);
 
@@ -73,7 +73,7 @@ interface TestSchema extends TorideSchema {
 createPrismaAdapter<TestSchema>({
   virtualFields: {
     Document: {
-      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -84,7 +84,7 @@ createPrismaAdapter<TestSchema>({
     Document: {
       viewer_ids: {
         relation: "roleAssignments",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
         filter: { role: "viewer" },
       },
     },
@@ -96,7 +96,7 @@ createPrismaAdapter<TestSchema>({
   virtualFields: {
     // @ts-expect-error - "Projet" is not a valid resource
     Projet: {
-      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -106,7 +106,7 @@ createPrismaAdapter<TestSchema>({
   virtualFields: {
     Document: {
       // @ts-expect-error - "viwer_ids" is not a valid array field
-      viwer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viwer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -116,7 +116,7 @@ createPrismaAdapter<TestSchema>({
   virtualFields: {
     Document: {
       // @ts-expect-error - "status" is not an array type
-      status: { relation: "roleAssignments", matchField: "userId" },
+      status: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -125,7 +125,7 @@ createPrismaAdapter<TestSchema>({
 createPrismaAdapter<TestSchema>({
   virtualFields: {
     Document: {
-      tag_ids: { relation: "tags", matchField: "id" },
+      tag_ids: { relation: "tags", matchField: "id", cardinality: "many", valueType: "number" },
     },
   },
 });
@@ -134,7 +134,7 @@ createPrismaAdapter<TestSchema>({
 createPrismaAdapter<TestSchema>({
   virtualFields: {
     Organization: {
-      member_ids: { relation: "memberships", matchField: "userId" },
+      member_ids: { relation: "memberships", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -158,7 +158,7 @@ type TestModelMap = {
 createPrismaAdapter<TestSchema, TestModelMap>({
   virtualFields: {
     Document: {
-      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -167,7 +167,7 @@ createPrismaAdapter<TestSchema, TestModelMap>({
 createPrismaAdapter<TestSchema, TestModelMap>({
   virtualFields: {
     Document: {
-      tag_ids: { relation: "tags", matchField: "id" },
+      tag_ids: { relation: "tags", matchField: "id", cardinality: "many", valueType: "number" },
     },
   },
 });
@@ -177,7 +177,7 @@ createPrismaAdapter<TestSchema, TestModelMap>({
   virtualFields: {
     Document: {
       // @ts-expect-error - "status" is a model field, not a virtual field
-      status: { relation: "roleAssignments", matchField: "userId" },
+      status: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -187,7 +187,7 @@ createPrismaAdapter<TestSchema, TestModelMap>({
   virtualFields: {
     Document: {
       // @ts-expect-error - "ownerId" is a model field, not a virtual field
-      ownerId: { relation: "roleAssignments", matchField: "userId" },
+      ownerId: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -197,7 +197,7 @@ createPrismaAdapter<TestSchema, TestModelMap>({
   virtualFields: {
     Organization: {
       // @ts-expect-error - "name" is a model field, not a virtual field
-      name: { relation: "memberships", matchField: "userId" },
+      name: { relation: "memberships", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -208,7 +208,7 @@ createPrismaAdapter<TestSchema, TestModelMap>({
     Document: {
       viewer_ids: {
         relation: "roleAssignments",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
         filter: { role: "viewer", customField: "anyValue" },
       },
     },
@@ -235,7 +235,7 @@ type PayloadModelMap = { Document: MockDocumentPayload; Organization: MockOrgani
 createPrismaAdapter<TestSchema, PayloadModelMap>({
   virtualFields: {
     Document: {
-      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -247,7 +247,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
       viewer_ids: {
         // @ts-expect-error - "nonExistent" is not a valid relation in Document.objects
         relation: "nonExistent",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
       },
     },
   },
@@ -257,7 +257,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
 createPrismaAdapter<TestSchema, PayloadModelMap>({
   virtualFields: {
     Document: {
-      viewer_ids: { relation: "roleAssignments", matchField: "userId" },
+      viewer_ids: { relation: "roleAssignments", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -269,7 +269,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
       viewer_ids: {
         relation: "roleAssignments",
         // @ts-expect-error - "badField" is not a scalar in MockRoleAssignmentPayload
-        matchField: "badField",
+        matchField: "badField", cardinality: "many", valueType: "string", stringComparison: "binary",
       },
     },
   },
@@ -281,7 +281,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
     Document: {
       viewer_ids: {
         relation: "roleAssignments",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
         filter: { role: "viewer" },
       },
     },
@@ -294,7 +294,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
     Document: {
       viewer_ids: {
         relation: "roleAssignments",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
         // @ts-expect-error - "badKey" is not a scalar in MockRoleAssignmentPayload
         filter: { badKey: "x" },
       },
@@ -306,7 +306,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
 createPrismaAdapter<TestSchema, PayloadModelMap>({
   virtualFields: {
     Document: {
-      tag_ids: { relation: "tags", matchField: "id" },
+      tag_ids: { relation: "tags", matchField: "id", cardinality: "many", valueType: "number" },
     },
   },
 });
@@ -315,7 +315,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
 createPrismaAdapter<TestSchema, PayloadModelMap>({
   virtualFields: {
     Organization: {
-      member_ids: { relation: "memberships", matchField: "userId" },
+      member_ids: { relation: "memberships", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" },
     },
   },
 });
@@ -326,7 +326,7 @@ createPrismaAdapter<TestSchema, PayloadModelMap>({
     Document: {
       viewer_ids: {
         relation: "roleAssignments",
-        matchField: "userId",
+        matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary",
         filter: { role: "editor", userId: "user123" },
       },
     },
@@ -340,9 +340,57 @@ createPrismaAdapter<TestSchema, TestModelMap>({
     Document: {
       viewer_ids: {
         relation: "anyString",
-        matchField: "anyField",
+        matchField: "anyField", cardinality: "many", valueType: "string", stringComparison: "binary",
         filter: { anyKey: "anyValue" },
       },
     },
   },
 });
+
+interface BindingSchema extends TorideSchema {
+  resources: "Document" | "Organization";
+  actorTypes: "User";
+  actorAttributeMap: { User: { email: string } };
+  resourceAttributeMap: {
+    Document: { title: string | null; rank: number; viewer_ids: string[] };
+    Organization: { name: string };
+  };
+  relationMap: {
+    Document: { org: "Organization"; owner: "User" };
+    Organization: {};
+  };
+}
+type BindingPayloads = {
+  Document: {
+    scalars: { id: string; title: string | null; rank: number };
+    objects: { organization: { scalars: { id: string; name: string }; objects: {} } | null; owner: { scalars: { id: string }; objects: {} } | null };
+  };
+  Organization: { scalars: { id: string; name: string }; objects: {} };
+  User: { scalars: { id: string; email: string }; objects: {} };
+};
+
+createPrismaAdapter<BindingSchema, BindingPayloads>({
+  fields: {
+    Document: {
+      id: { field: "id", type: "string", nullable: false, stringComparison: "binary" },
+      title: { field: "title", type: "string", nullable: true, stringComparison: "binary" },
+      rank: { field: "rank", type: "number", nullable: false },
+    },
+    User: { id: { field: "id", type: "string", nullable: false, stringComparison: "binary" } },
+  },
+  relations: {
+    Document: {
+      org: { field: "organization", resourceType: "Organization", cardinality: "one" },
+      owner: { field: "owner", resourceType: "User", cardinality: "one" },
+    },
+  },
+});
+expectError(createPrismaAdapter<BindingSchema>({ fields: { Document: { missing: { field: "title", type: "string", nullable: true } } } }));
+expectError(createPrismaAdapter<BindingSchema, BindingPayloads>({ fields: { Document: { title: { field: "missing", type: "string", nullable: true } } } }));
+expectError(createPrismaAdapter<BindingSchema, BindingPayloads>({ fields: { Document: { title: { field: "rank", type: "string", nullable: false } } } }));
+expectError(createPrismaAdapter<BindingSchema, BindingPayloads>({ fields: { Document: { title: { field: "title", type: "string", nullable: false } } } }));
+expectError(createPrismaAdapter<BindingSchema>({ relations: { Document: { missing: { field: "organization", resourceType: "Organization", cardinality: "one" } } } }));
+expectError(createPrismaAdapter<BindingSchema>({ relations: { Document: { org: { field: "organization", resourceType: "Document", cardinality: "one" } } } }));
+expectError(createPrismaAdapter<BindingSchema, BindingPayloads>({ relations: { Document: { org: { field: "missing", resourceType: "Organization", cardinality: "one" } } } }));
+expectError(createPrismaAdapter<BindingSchema, BindingPayloads>({ relations: { Document: { org: { field: "organization", resourceType: "Organization", cardinality: "many" } } } }));
+expectError(createPrismaAdapter<BindingSchema>({ virtualFields: { Document: { viewer_ids: { relation: "reviewers", matchField: "id", cardinality: "many", valueType: "number" } } } }));

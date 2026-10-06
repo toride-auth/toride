@@ -1,29 +1,8 @@
-// T024: Unit tests for role resolution (direct roles)
-// FR-008: getRoles removed. Direct roles always empty.
+import { expect, it } from "vitest";
+import { Toride } from "../engine.js";
 
-import { describe, it, expect, beforeAll } from "vitest";
-import type { ActorRef, ResourceRef } from "../types.js";
-import { AttributeCache } from "./cache.js";
-
-describe("resolveDirectRoles", () => {
-  let resolveDirectRoles: (
-    actor: ActorRef,
-    resource: ResourceRef,
-    cache: AttributeCache,
-  ) => Promise<import("../types.js").ResolvedRolesDetail>;
-
-  beforeAll(async () => {
-    const mod = await import("./role-resolver.js");
-    resolveDirectRoles = mod.resolveDirectRoles;
-  });
-
-  const actor: ActorRef = { type: "User", id: "u1", attributes: {} };
-  const resource: ResourceRef = { type: "Task", id: "42" };
-
-  it("returns empty direct roles (FR-008: getRoles removed)", async () => {
-    const cache = new AttributeCache({});
-    const result = await resolveDirectRoles(actor, resource, cache);
-    expect(result.direct).toEqual([]);
-    expect(result.derived).toEqual([]);
-  });
+it("resolves declared roles without implicit direct assignments", async () => {
+  const engine = new Toride({ policy: { version: "1", actors: { User: { attributes: {} } }, resources: { Document: { roles: ["viewer"], permissions: ["read"], derived_roles: [{ role: "viewer", when: { "$actor.enabled": true } }] } } } });
+  expect(await engine.resolvedRoles({ type: "User", id: "u1", attributes: { enabled: true } }, { type: "Document", id: "d1" })).toEqual(["viewer"]);
+  expect(await engine.resolvedRoles({ type: "User", id: "u1", attributes: { enabled: false } }, { type: "Document", id: "d1" })).toEqual([]);
 });

@@ -22,7 +22,7 @@ import type {
 import type {
   ConstraintResult,
   ConstraintAdapter,
-  Constraint,
+  ResourceConstraint,
 } from "./partial/constraint-types.js";
 import { evaluate } from "./evaluation/rule-engine.js";
 import { AttributeCache } from "./evaluation/cache.js";
@@ -30,16 +30,11 @@ import { buildConstraints as buildConstraintsImpl } from "./partial/constraint-b
 import { translateConstraints as translateConstraintsImpl } from "./partial/translator.js";
 import { snapshot as snapshotImpl } from "./snapshot.js";
 import type { PermissionSnapshot, SnapshotEngine } from "./snapshot.js";
-import {
-  canField as canFieldImpl,
-  permittedFields as permittedFieldsImpl,
-} from "./field-access.js";
-import type { FieldAccessEngine } from "./field-access.js";
+
 
 /**
  * Main authorization engine.
- * Creates a per-check cache, resolves direct roles, checks grants,
- * and returns boolean with default-deny semantics.
+ * Evaluates declared roles and permit/forbid rules using per-check observations.
  */
 export class Toride<S extends TorideSchema = DefaultSchema> {
   private policy: Policy;
@@ -71,9 +66,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   }
 
   /**
-   * T097: Atomic policy swap. In-flight checks capture the resource block
-   * at the start of evaluateInternal, so they complete with the old policy.
-   * JS single-threaded nature ensures the assignment is atomic.
+   * In-flight checks retain the policy captured when their evaluation began.
    */
   setPolicy(policy: Policy): void {
     this.policy = policy;
@@ -99,7 +92,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
 
   /**
    * T069: Check all declared permissions for a resource and return permitted ones.
-   * Uses a shared cache across all per-action evaluations.
+   * Each action uses independent observations under one captured policy.
    */
   async permittedActions<R extends S["resources"]>(
     actor: ActorRef<S>,
@@ -108,12 +101,12 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   ): Promise<S["permissionMap"][R][]> {
     const a = actor as ActorRef;
     const r = resource as ResourceRef;
-    const resourceBlock = this.policy.resources[r.type];
+    const policy = this.policy;
+    const resourceBlock = policy.resources[r.type];
     if (!resourceBlock) {
       return [];
     }
 
-    const sharedCache = new AttributeCache(this.resolvers);
     const permitted: string[] = [];
 
     for (const action of resourceBlock.permissions) {
@@ -122,7 +115,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
         action,
         r,
         options,
-        sharedCache,
+        new AttributeCache(this.resolvers, policy),
       );
       if (result.allowed) {
         permitted.push(action);
@@ -168,15 +161,10 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     if (!resourceBlock) {
       return false;
     }
-    return canFieldImpl(
-      this as unknown as FieldAccessEngine,
-      actor as ActorRef,
-      operation,
-      r,
-      field as string,
-      resourceBlock.field_access,
-      options,
-    );
+    const result = await this.evaluateInternal(actor as ActorRef, operation, r, options);
+    const guard = resourceBlock.field_access?.[field]?.[operation];
+    return result.allowed && (!guard || result.resolvedRoles.derived.some(role => guard.includes(role.role)));
+
   }
 
   /**
@@ -194,14 +182,14 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     if (!resourceBlock) {
       return [];
     }
-    return permittedFieldsImpl(
-      this as unknown as FieldAccessEngine,
-      actor as ActorRef,
-      operation,
-      r,
-      resourceBlock.field_access,
-      options,
-    ) as Promise<(keyof S["resourceAttributeMap"][R] & string)[]>;
+    const result = await this.evaluateInternal(actor as ActorRef, operation, r, options);
+    if (!result.allowed) return [];
+    const roles = result.resolvedRoles.derived.map(role => role.role);
+    return Object.entries(resourceBlock.field_access ?? {}).filter(([, definition]) => {
+      const guard = definition[operation];
+      return !guard || roles.some(role => guard.includes(role));
+    }).map(([field]) => field) as (keyof S["resourceAttributeMap"][R] & string)[];
+
   }
 
   /**
@@ -230,7 +218,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   }
 
   /**
-   * T071: Evaluate multiple checks for the same actor with a shared resolver cache.
+   * Evaluate multiple checks with an independent resolver cache for each item.
    * Returns boolean[] in the same order as the input checks.
    */
   async canBatch(
@@ -243,7 +231,6 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     }
 
     const a = actor as ActorRef;
-    const sharedCache = new AttributeCache(this.resolvers);
     const results: boolean[] = [];
 
     for (const check of checks) {
@@ -254,7 +241,6 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
         act,
         r,
         options,
-        sharedCache,
       );
       this.fireDecisionEvent(a, act, r, result);
       results.push(result.allowed);
@@ -276,7 +262,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     const a = actor as ActorRef;
     const act = action as string;
     const rt = resourceType as string;
-    const cache = new AttributeCache(this.resolvers);
+    const cache = new AttributeCache(this.resolvers, this.policy);
     const constraintResult = await buildConstraintsImpl(
       a,
       act,
@@ -286,6 +272,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
       {
         env: options?.env,
         maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
+        maxConditionDepth: this.options.maxConditionDepth,
         customEvaluators: this.options.customEvaluators,
       },
     );
@@ -298,15 +285,15 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
    * T064: Translate constraint AST using an adapter.
    * Dispatches each constraint node to the adapter's methods.
    *
-   * Accepts Constraint (the AST) from buildConstraints() and returns
-   * TQueryMap[R] — the adapter's mapped output type for resource R.
+   * Accepts the scoped AST from buildConstraints() and infers the resource
+   * query type from its rootResourceType.
    * Callers must check result.ok and result.constraint before calling this method.
    */
   translateConstraints<
     R extends string,
     TQueryMap extends Record<string, unknown>,
   >(
-    constraint: Constraint,
+    constraint: ResourceConstraint<R>,
     adapter: ConstraintAdapter<TQueryMap>,
   ): TQueryMap[R] {
     return translateConstraintsImpl(constraint, adapter) as TQueryMap[R];
@@ -390,10 +377,6 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     });
   }
 
-  /**
-   * Evaluate with full ExplainResult (shared code path for can(), explain(), and helpers).
-   * Accepts an optional pre-existing AttributeCache for shared-cache scenarios (canBatch, permittedActions).
-   */
   private async evaluateInternal(
     actor: ActorRef,
     action: string,
@@ -401,8 +384,8 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     checkOptions?: CheckOptions,
     existingCache?: AttributeCache,
   ): Promise<ExplainResult> {
-    // Look up resource block; unknown resource type -> default deny
-    const resourceBlock = this.policy.resources[resource.type];
+    const policy = existingCache?.policy ?? this.policy;
+    const resourceBlock = policy.resources[resource.type];
     if (!resourceBlock) {
       return {
         allowed: false,
@@ -414,12 +397,12 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
     }
 
     // Use existing cache or create a new one
-    const cache = existingCache ?? new AttributeCache(this.resolvers);
+    const cache = existingCache ?? new AttributeCache(this.resolvers, policy);
     const env = checkOptions?.env ?? {};
 
     // T052: Forward all options including customEvaluators and maxConditionDepth
     try {
-      return await evaluate(actor, action, resource, resourceBlock, cache, this.policy, {
+      return await evaluate(actor, action, resource, resourceBlock, cache, policy, {
         maxDerivedRoleDepth: this.options.maxDerivedRoleDepth,
         maxConditionDepth: this.options.maxConditionDepth,
         customEvaluators: this.options.customEvaluators,
@@ -433,6 +416,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
         grantedPermissions: [],
         matchedRules: [],
         finalDecision: `Denied: evaluation error (fail-closed)`,
+        diagnostics: cache.diagnostics.length ? cache.diagnostics : [{ code: "evaluation_error", path: resource.type }],
       };
     }
   }

@@ -139,12 +139,11 @@ export type ActorRef<S extends TorideSchema = DefaultSchema> = {
 export type ResourceRef<
   S extends TorideSchema = DefaultSchema,
   R extends S["resources"] = S["resources"],
-> = {
-  readonly type: R;
+> = { [T in R]: {
+  readonly type: T;
   readonly id: string;
-  /** Pre-fetched attributes. Inline values take precedence over resolver results. */
-  readonly attributes?: S["resourceAttributeMap"][R];
-};
+  readonly attributes?: ResolverData<S, T>;
+} }[R];
 
 /** Optional per-check configuration. */
 export interface CheckOptions {
@@ -159,8 +158,9 @@ export interface BatchCheckItem<S extends TorideSchema = DefaultSchema> {
 
 /**
  * Per-type resolver function.
- * Called when the engine needs attributes not available inline.
- * Called at most once per unique resource per evaluation (cached).
+ * Called on the first resource-data lookup for a ref in an evaluation.
+ * A registered resolver is called even when the ref includes inline data.
+ * Each evaluation caches the returned observation.
  *
  * Registering a resolver is **optional** per resource type. When no resolver is
  * registered, inline {@link ResourceRef.attributes} are used as the sole data
@@ -177,7 +177,46 @@ export type ResourceResolver<
   R extends S["resources"] = S["resources"],
 > = (
   ref: ResourceRef<S, R>,
-) => Promise<Record<string, unknown>>;
+) => Promise<ResolverData<S, R> | null>;
+
+export type RelationRef<S extends TorideSchema, T extends string> = {
+  readonly type: T;
+  readonly id: string;
+  readonly attributes?: T extends S["resources"]
+    ? ResolverData<S, T>
+    : T extends S["actorTypes"]
+      ? ObservedAttributes<S["actorAttributeMap"][T]>
+      : Record<string, unknown>;
+};
+
+export type ObservedAttributes<T> = {
+  readonly [K in keyof T]?: T[K] extends readonly unknown[]
+    ? T[K] | null
+    : T[K] extends Record<string, unknown>
+      ? ObservedAttributes<T[K]> | null
+      : T[K] | null;
+};
+
+export type ResolverData<
+  S extends TorideSchema = DefaultSchema,
+  R extends S["resources"] = S["resources"],
+> = string extends S["resources"]
+  ? Record<string, unknown>
+  : string extends keyof S["relationMap"][R]
+    ? ObservedAttributes<S["resourceAttributeMap"][R]>
+    : ObservedAttributes<Omit<S["resourceAttributeMap"][R], keyof S["relationMap"][R]>> & {
+      readonly [K in keyof S["relationMap"][R]]?:
+        | RelationRef<S, S["relationMap"][R][K]>
+        | readonly RelationRef<S, S["relationMap"][R][K]>[]
+        | null;
+    };
+
+export type EvaluationOutcome = "true" | "false" | "indeterminate";
+
+export interface EvaluationDiagnostic {
+  readonly code: "missing_value" | "resolver_error" | "invalid_relation" | "conflicting_observation" | "cycle" | "depth_limit" | "custom_evaluator" | "evaluation_error";
+  readonly path: string;
+}
 
 /**
  * Map of resource type names to their resolver functions.
@@ -185,8 +224,9 @@ export type ResourceResolver<
  * Not all types need resolvers. Types without a registered resolver use
  * **default resolver** behavior (also called "trivial resolution"): the engine
  * reads attribute values directly from the inline {@link ResourceRef.attributes}
- * passed at the call site. Fields not present inline resolve to `undefined`,
- * causing conditions that reference them to fail (default-deny).
+ * passed at the call site. Omitted fields are unavailable observations.
+ * An indeterminate permit cannot grant access, and an indeterminate forbid
+ * prevents access unless its role guard or condition is known false.
  *
  * This mirrors GraphQL's default field resolver pattern, where an unresolved
  * field simply returns `parent[fieldName]` — here, inline attributes play the
@@ -404,6 +444,7 @@ export interface MatchedRule {
   readonly matched: boolean;
   readonly rule: Rule;
   readonly resolvedValues: Record<string, unknown>;
+  readonly outcome?: EvaluationOutcome;
 }
 
 /** Full decision trace from explain(). */
@@ -416,6 +457,7 @@ export interface ExplainResult<
   readonly grantedPermissions: S["permissionMap"][R][];
   readonly matchedRules: MatchedRule[];
   readonly finalDecision: string;
+  readonly diagnostics?: readonly EvaluationDiagnostic[];
 }
 
 /** Audit event for authorization checks. */

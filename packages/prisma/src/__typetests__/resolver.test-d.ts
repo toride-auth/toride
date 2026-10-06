@@ -1,71 +1,77 @@
-import { expectType, expectAssignable } from "tsd";
-import type { TorideSchema, DefaultSchema, ResourceRef } from "toride";
+import { expectType, expectAssignable, expectError } from "tsd";
+import type { TorideSchema, ResourceRef, ResolverData, ResourceResolver } from "toride";
 import { createPrismaResolver } from "../../dist/index.js";
-
-// ─── Test Schema ─────────────────────────────────────────────────
 
 interface TestSchema extends TorideSchema {
   resources: "Document" | "Organization";
-  actions: "read" | "write" | "delete" | "manage";
-  actorTypes: "User";
-  permissionMap: {
-    Document: "read" | "write" | "delete";
-    Organization: "manage" | "read";
-  };
-  roleMap: {
-    Document: "editor" | "viewer";
-    Organization: "admin" | "member";
-  };
   resourceAttributeMap: {
     Document: { status: string; ownerId: string };
     Organization: { plan: string };
   };
-  actorAttributeMap: {
-    User: { email: string };
-  };
   relationMap: {
     Document: { org: "Organization" };
-    Organization: Record<string, string>;
+    Organization: {};
   };
 }
 
-// ─── T036: Typed Prisma resolver narrows return type ─────────────
-
-// With explicit schema + resource type, return type narrows
-const docResolver = createPrismaResolver<TestSchema, "Document">(
-  {} as any,
-  "Document",
+const client = {
+  document: { findUnique: async () => ({ status: "draft" }) },
+  organization: { findUnique: async () => ({ plan: "free" }) },
+};
+const docResolver = createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: { status: true } },
 );
-const docResult = docResolver({} as ResourceRef<TestSchema, "Document">);
-expectType<Promise<{ status: string; ownerId: string }>>(docResult);
-
-// Organization resolver narrows to Organization attributes
-const orgResolver = createPrismaResolver<TestSchema, "Organization">(
-  {} as any,
-  "Organization",
+expectType<Promise<ResolverData<TestSchema, "Document"> | null>>(
+  docResolver({ type: "Document", id: "doc-1" }),
 );
-const orgResult = orgResolver({} as ResourceRef<TestSchema, "Organization">);
-expectType<Promise<{ plan: string }>>(orgResult);
+expectAssignable<ResourceResolver<TestSchema, "Document">>(docResolver);
 
-// ─── T036: modelName is typed as R ──────────────────────────────
-
-// modelName parameter accepts the resource type string
-const resolverWithSelect = createPrismaResolver<TestSchema, "Document">(
-  {} as any,
-  "Document",
-  { select: { status: true } },
+const orgResolver = createPrismaResolver<TestSchema, "Organization", "organization">(client, "organization");
+expectType<Promise<ResolverData<TestSchema, "Organization"> | null>>(
+  orgResolver({ type: "Organization", id: "org-1" }),
 );
-expectType<
-  (ref: ResourceRef<TestSchema, "Document">) => Promise<{ status: string; ownerId: string }>
->(resolverWithSelect);
 
-// ─── T036: Default schema preserves backward compatibility ───────
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: { missing: true } },
+));
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  { document: { findUnique: async () => ({ status: 123 }) } }, "document",
+));
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  { document: { findUnique: async () => ({ org: { type: "Document", id: "bad" } }) } }, "document",
+));
+expectError(docResolver({ type: "Organization", id: "org-1" }));
 
-// When using default schema with a string variable, R infers as string
-const modelName: string = "anyModel";
-const defaultResolver = createPrismaResolver({} as any, modelName);
-const defaultResult = defaultResolver({} as ResourceRef);
-expectType<Promise<Record<string, unknown>>>(defaultResult);
+const partialResult = await docResolver({ type: "Document", id: "doc-1" });
+expectError<ResolverData<TestSchema, "Document">>(partialResult);
+if (partialResult !== null) {
+  expectType<string | null | undefined>(partialResult.status);
+  expectType<string | null | undefined>(partialResult.ownerId);
+  expectError<string>(partialResult.ownerId);
+}
 
-// Default resolver is assignable to a function returning Record<string, unknown>
-expectAssignable<(ref: ResourceRef) => Promise<Record<string, unknown>>>(defaultResolver);
+const logicalClient = { Document: client.document };
+expectAssignable<ResourceResolver<TestSchema, "Document">>(
+  createPrismaResolver<TestSchema, "Document">(logicalClient, "Document"),
+);
+const defaultResolver = createPrismaResolver(client, "document");
+expectType<Promise<Record<string, unknown> | null>>(defaultResolver({} as ResourceRef));
+
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: { status: true, org: true } },
+));
+const relationSelection = { status: true, org: true };
+expectError(createPrismaResolver<TestSchema, "Document", "document">(
+  client, "document", { select: relationSelection },
+));
+
+interface NoRelationSchema extends TorideSchema {
+  resources: "Document";
+  resourceAttributeMap: { Document: { status: string } };
+  relationMap: { Document: Record<string, never> };
+}
+expectAssignable<ResourceResolver<NoRelationSchema, "Document">>(
+  createPrismaResolver<NoRelationSchema, "Document", "document">(
+    client, "document", { select: { status: true } },
+  ),
+);

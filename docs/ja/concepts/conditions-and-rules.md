@@ -161,7 +161,7 @@ const allowed = await engine.can(actor, "read", resource, {
 });
 ```
 
-環境値にも **null に対する厳格な評価規則**が適用されます。参照した `$env` の値が指定されていない場合、条件は `false` になります（フェイルクローズ）。
+省略した環境値と `undefined` は取得できない値です。条件は判定不能になります。関連する禁止条件が判定不能なら、アクセスを拒否します。明示的な `null` は既知の不在です。
 
 ### 参照同士の比較 {#cross-references}
 
@@ -196,7 +196,7 @@ const allowed = await engine.can(actor, "read", resource, {
 | `lte` | 以下 | `{ lte: 100 }` |
 | `in` | 値が配列に含まれる | `{ in: ["active", "review"] }` |
 | `includes` | 配列が値を含む | `{ includes: "admin" }` |
-| `exists` | フィールドが存在する（null/undefined ではない） | `{ exists: true }` |
+| `exists` | 既知の値が存在するか、既知の不在かを確認する | `{ exists: true }` |
 | `startsWith` | 文字列が指定の文字列で始まる | `{ startsWith: "proj-" }` |
 | `endsWith` | 文字列が指定の文字列で終わる | `{ endsWith: ".md" }` |
 | `contains` | 文字列が部分文字列を含む | `{ contains: "draft" }` |
@@ -331,27 +331,26 @@ const engine = new Toride({
             - $resource.publishDate: { exists: true }
 ```
 
-深い入れ子によるサービス拒否を防ぐため、深さには上限があります（デフォルトは 10 階層）。上限を超えると、条件は `false` になります（フェイルクローズ）。
+深い入れ子によるサービス拒否を防ぐため、深さには上限があります（デフォルトは 10 階層）。上限を超えると、対象の条件は判定不能になり、`explain()` は `depth_limit` を報告します。その条件だけではアクセスを許可できません。関連する禁止条件が判定不能なら、アクセスを拒否します。
 
-## null に対する厳格な評価規則 {#strict-null-semantics}
+## 不在と判定不能 {#strict-null-semantics}
 
-Toride はすべての条件評価で、次の規則を適用します。
+条件には true、false、判定不能の 3 つの結果があります。
 
-- **左辺**（参照パス）が `undefined` または `null` になる場合、条件は `false` です。
-- **右辺**が `undefined` または `null` になる場合、条件は `false` です。
-- 欠落した属性は、欠落した属性同士を含め、何にも一致しません。
+| 観測したデータ | 通常の比較 | `exists: true` | `exists: false` |
+| --- | --- | --- | --- |
+| 存在する値 | 演算子の規則で評価 | true | false |
+| 明示的な `null`、または null の親 | false | false | true |
+| 省略したキー、または `undefined` | 判定不能 | 判定不能 | 判定不能 |
+| リゾルバーのエラー、不正な関係、未登録の評価関数 | 判定不能 | 判定不能 | 判定不能 |
 
-これにより、データの欠落が誤ってアクセス許可につながらない、フェイルクローズのモデルを実現します。
+この区別はアクター属性、環境値、インライン属性、部分的なリゾルバーデータに共通です。null との通常の比較は、`eq` も `neq` も false です。`exists: false` は既知の不在だけを満たします。フィールドの省略で不在を表していた場合は、明示的な `null` に移行してください。
 
-```yaml
-    # If $resource.deletedAt is undefined, this condition is false (forbid does NOT match)
-    # Use the exists operator to explicitly check for missing fields
-    rules:
-      - effect: forbid
-        permissions: [read]
-        when:
-          $resource.deletedAt: { exists: true }
-```
+`any` は true の子があれば true です。true の子がなく、判定不能の子があれば判定不能です。`all` は false の子があれば false です。false の子がなく、判定不能の子があれば判定不能です。
+
+アクセスには、権限付与または permit が true で、関連する forbid がすべて false であることが必要です。ロールの条件にも同じ規則を適用します。禁止ルールのロール条件が判定不能でも、禁止を無視しません。`explain()` は結果と診断コード、パスを返します。
+
+`contains`、`startsWith`、`endsWith` はそれぞれ部分文字列、接頭辞、接尾辞を評価します。実行時は JavaScript の文字列演算を使います。クエリ変換では、データベースの照合順序、大文字小文字、ワイルドカードがこの意味と一致する必要があります。アダプターが一致を保証できない操作は、明示的なエラーになります。
 
 ## 多重度：many と ANY による評価 {#cardinality-many-and-any-semantics}
 
@@ -370,6 +369,10 @@ resources:
 ```
 
 YAML では、関係は常に型名の文字列で記述します。one と many のどちらになるかは、実行時のリゾルバーの戻り値で決まります。配列を返すと many の関係として扱います。Project に 3 人のメンバーがいて、少なくとも 1 人の `department` が `engineering` なら、条件は成立します。
+
+関係をたどる `exists: true` は、少なくとも 1 つの既知の値が存在する場合に true です。空の関係配列は既知の不在です。スカラー配列フィールドの `[]` は存在する値です。取得できない要素は `exists: false` の根拠になりません。
+
+同じ many 関係に別々の条件を書く場合、それぞれ異なる関連行で成立しても一致します。関連先の派生ロールの条件は、1 つの関連行の中で全体を評価します。クエリ変換では、物理的な多重度をアダプターに明示します。
 
 ## 完全な例 {#complete-example}
 

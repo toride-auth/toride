@@ -161,7 +161,7 @@ const allowed = await engine.can(actor, "read", resource, {
 });
 ```
 
-Environment values follow **strict null semantics**: if a referenced `$env` value is not provided, the condition evaluates to `false` (fail-closed).
+An omitted environment value or `undefined` is unavailable, so the condition is indeterminate. A relevant indeterminate forbid prevents access. Explicit `null` is known absence.
 
 ### Cross-References
 
@@ -196,7 +196,7 @@ For comparisons beyond simple equality, use operator objects:
 | `lte` | Less than or equal | `{ lte: 100 }` |
 | `in` | Value is in array | `{ in: ["active", "review"] }` |
 | `includes` | Array contains value | `{ includes: "admin" }` |
-| `exists` | Field exists (not null/undefined) | `{ exists: true }` |
+| `exists` | Tests known presence or known absence | `{ exists: true }` |
 | `startsWith` | String starts with | `{ startsWith: "proj-" }` |
 | `endsWith` | String ends with | `{ endsWith: ".md" }` |
 | `contains` | String contains substring | `{ contains: "draft" }` |
@@ -331,27 +331,26 @@ Combinators can be nested to express complex logic:
             - $resource.publishDate: { exists: true }
 ```
 
-Nesting depth is limited (default: 10 levels) to prevent denial-of-service through deeply nested expressions. Beyond the limit, the condition evaluates to `false` (fail-closed).
+Nesting depth is limited (default: 10 levels) to prevent denial-of-service through deeply nested expressions. Beyond the limit, the affected condition is indeterminate, and `explain()` reports `depth_limit`. It cannot grant access by itself. A relevant indeterminate forbid prevents access.
 
-## Strict Null Semantics
+## Absence and indeterminate results {#strict-null-semantics}
 
-Toride follows strict null semantics for all condition evaluation:
+A condition has one of three results, true, false, or indeterminate.
 
-- If the **left-hand side** (reference path) resolves to `undefined` or `null`, the condition is `false`
-- If the **right-hand side** resolves to `undefined` or `null`, the condition is `false`
-- Missing attributes never match anything, including each other
+| Observed data | Ordinary comparison | `exists: true` | `exists: false` |
+| --- | --- | --- | --- |
+| Present value | Uses the operator's rules | true | false |
+| Explicit `null`, or a null ancestor | false | false | true |
+| Omitted key, or `undefined` | Indeterminate | Indeterminate | Indeterminate |
+| Resolver error, invalid relation, or missing evaluator | Indeterminate | Indeterminate | Indeterminate |
 
-This ensures a fail-closed security model: missing data never accidentally grants access.
+The same distinction applies to actor attributes, environment values, inline attributes, and partial resolver data. Ordinary comparisons against null are false, including `eq` and `neq`. `exists: false` matches only known absence. If you used omission to represent absence, supply explicit `null` when you migrate.
 
-```yaml
-    # If $resource.deletedAt is undefined, this condition is false (forbid does NOT match)
-    # Use the exists operator to explicitly check for missing fields
-    rules:
-      - effect: forbid
-        permissions: [read]
-        when:
-          $resource.deletedAt: { exists: true }
-```
+`any` is true when a child is true. If no child is true and a child is indeterminate, `any` is indeterminate. `all` is false when a child is false. If no child is false and a child is indeterminate, `all` is indeterminate.
+
+Access requires a true grant or permit and every relevant forbid to be false. Role guards use the same rules. An indeterminate role guard does not remove a forbid. `explain()` reports the outcomes, diagnostic codes, and paths.
+
+`contains`, `startsWith`, and `endsWith` test a substring, prefix, and suffix respectively. Runtime uses JavaScript string operations. Query translation must establish the same case, collation, and wildcard behavior for its database. An adapter throws for operations it cannot translate exactly.
 
 ## Cardinality: Many and ANY Semantics
 
@@ -370,6 +369,10 @@ resources:
 ```
 
 The YAML syntax for relations is always a plain type name. Whether a relation is "one" or "many" is determined at runtime by the resolver -- if it returns an array, Toride treats it as a many relation. If the Project has three members and at least one has `department: "engineering"`, the condition matches.
+
+For a traversed relation, `exists: true` means that at least one known present leaf exists. An empty relation array is known absence. A scalar array field containing `[]` is present. Unavailable elements do not establish `exists: false`.
+
+Separate conditions on a many relation can match different related rows. A derived role's complete condition is evaluated within one related row. Query adapters require an explicit physical cardinality mapping.
 
 ## Complete Example
 

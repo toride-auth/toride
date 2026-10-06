@@ -191,8 +191,7 @@ describe("US1: Per-Type Attribute Resolver", () => {
     expect(documentResolver).toHaveBeenCalledTimes(1);
   });
 
-  // Verify shared cache across permittedActions
-  it("shares cache across permittedActions evaluations", async () => {
+  it("isolates observations across permittedActions evaluations", async () => {
     const documentResolver = vi.fn<ResourceResolver>(async () => {
       return { status: "draft", locked: false };
     });
@@ -206,13 +205,12 @@ describe("US1: Per-Type Attribute Resolver", () => {
 
     const permitted = await engine.permittedActions(actor, resource);
 
-    // permittedActions checks read, update, delete — should call resolver only once
-    expect(documentResolver).toHaveBeenCalledTimes(1);
-    expect(permitted).toContain("update");
+    expect(documentResolver).toHaveBeenCalledTimes(2);
+    expect(permitted).toEqual(["update"]);
   });
 
   // Verify shared cache across canBatch
-  it("shares cache across canBatch evaluations", async () => {
+  it("isolates resolver results across canBatch evaluations", async () => {
     const documentResolver = vi.fn<ResourceResolver>(async () => {
       return { status: "draft", locked: false };
     });
@@ -228,8 +226,7 @@ describe("US1: Per-Type Attribute Resolver", () => {
       { action: "update", resource: { type: "Document", id: "doc1" } },
     ]);
 
-    // Same resource in all checks — resolver called once
-    expect(documentResolver).toHaveBeenCalledTimes(1);
+    expect(documentResolver).toHaveBeenCalledTimes(2);
     expect(results).toEqual([true, true]);
   });
 

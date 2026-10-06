@@ -10,7 +10,6 @@ import type {
   ResourceBlock,
   ResolvedRolesDetail,
 } from "../types.js";
-import { CycleError, DepthLimitError } from "../types.js";
 import { AttributeCache } from "./cache.js";
 
 describe("cycle detection and depth limits", () => {
@@ -49,7 +48,7 @@ describe("cycle detection and depth limits", () => {
   // ─── Cycle Detection ──────────────────────────────────────────────
 
   describe("cycle detection", () => {
-    it("throws CycleError when A references B which references A", async () => {
+    it("records a cycle when A references B which references A", async () => {
       // A derives admin from B's admin on relation "parent"
       // B derives admin from A's admin on relation "parent"
       const policy: Policy = {
@@ -87,12 +86,11 @@ describe("cycle detection and depth limits", () => {
       const resourceA: ResourceRef = { type: "ResourceA", id: "a1" };
       const blockA = policy.resources["ResourceA"]!;
 
-      await expect(
-        resolveRoles(actor, resourceA, cache, blockA, policy),
-      ).rejects.toThrow(CycleError);
+      await resolveRoles(actor, resourceA, cache, blockA, policy);
+      expect(cache.diagnostics).toContainEqual({ code: "cycle", path: expect.any(String) });
     });
 
-    it("throws CycleError with the cycle path", async () => {
+    it("records the role path of the cycle", async () => {
       const policy: Policy = {
         version: "1",
         actors: { User: { attributes: {} } },
@@ -128,14 +126,8 @@ describe("cycle detection and depth limits", () => {
       const resourceA: ResourceRef = { type: "ResourceA", id: "a1" };
       const blockA = policy.resources["ResourceA"]!;
 
-      try {
-        await resolveRoles(actor, resourceA, cache, blockA, policy);
-        expect.fail("Should have thrown CycleError");
-      } catch (e) {
-        expect(e).toBeInstanceOf(CycleError);
-        const cycleError = e as CycleError;
-        expect(cycleError.path).toContain("ResourceA:a1");
-      }
+      await resolveRoles(actor, resourceA, cache, blockA, policy);
+      expect(cache.diagnostics).toContainEqual({ code: "cycle", path: "ResourceA.admin" });
     });
 
     it("handles self-referencing relation (A -> A)", async () => {
@@ -164,16 +156,15 @@ describe("cycle detection and depth limits", () => {
       const folderRef: ResourceRef = { type: "Folder", id: "f1" };
       const folderBlock = policy.resources["Folder"]!;
 
-      await expect(
-        resolveRoles(actor, folderRef, cache, folderBlock, policy),
-      ).rejects.toThrow(CycleError);
+      await resolveRoles(actor, folderRef, cache, folderBlock, policy);
+      expect(cache.diagnostics).toContainEqual({ code: "cycle", path: expect.any(String) });
     });
   });
 
   // ─── Depth Limit ───────────────────────────────────────────────────
 
   describe("depth limit", () => {
-    it("throws DepthLimitError when chain exceeds default depth of 5", async () => {
+    it("records a depth failure when chain exceeds default depth of 5", async () => {
       // Create a chain: Res0 -> Res1 -> Res2 -> Res3 -> Res4 -> Res5 -> Res6
       const resources: Record<string, ResourceBlock> = {};
       const attrs: Record<string, Record<string, unknown>> = {};
@@ -209,9 +200,8 @@ describe("cycle detection and depth limits", () => {
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
-      await expect(
-        resolveRoles(actor, startRef, cache, startBlock, policy),
-      ).rejects.toThrow(DepthLimitError);
+      await resolveRoles(actor, startRef, cache, startBlock, policy);
+      expect(cache.diagnostics).toContainEqual({ code: "depth_limit", path: expect.any(String) });
     });
 
     it("succeeds when chain is within depth limit", async () => {
@@ -296,12 +286,11 @@ describe("cycle detection and depth limits", () => {
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
-      await expect(
-        resolveRoles(actor, startRef, cache, startBlock, policy, { maxDerivedRoleDepth: 2 }),
-      ).rejects.toThrow(DepthLimitError);
+      await resolveRoles(actor, startRef, cache, startBlock, policy, { maxDerivedRoleDepth: 2 });
+      expect(cache.diagnostics).toContainEqual({ code: "depth_limit", path: expect.any(String) });
     });
 
-    it("DepthLimitError has correct limit and limitType", async () => {
+    it("records the role at the depth limit", async () => {
       const resources: Record<string, ResourceBlock> = {};
       const attrs: Record<string, Record<string, unknown>> = {};
 
@@ -336,15 +325,8 @@ describe("cycle detection and depth limits", () => {
       const startRef: ResourceRef = { type: "Res0", id: "r0" };
       const startBlock = policy.resources["Res0"]!;
 
-      try {
-        await resolveRoles(actor, startRef, cache, startBlock, policy);
-        expect.fail("Should have thrown DepthLimitError");
-      } catch (e) {
-        expect(e).toBeInstanceOf(DepthLimitError);
-        const dErr = e as DepthLimitError;
-        expect(dErr.limit).toBe(5);
-        expect(dErr.limitType).toBe("derivation");
-      }
+      await resolveRoles(actor, startRef, cache, startBlock, policy);
+      expect(cache.diagnostics).toContainEqual({ code: "depth_limit", path: "Res6.admin" });
     });
   });
 });

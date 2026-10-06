@@ -15,6 +15,7 @@ import type {
   EvaluatorFn,
   Resolvers,
 } from "../types.js";
+import { evaluateConditionOutcome } from "./condition.js";
 import { AttributeCache } from "./cache.js";
 
 describe("evaluateCondition", () => {
@@ -30,7 +31,6 @@ describe("evaluateCondition", () => {
       maxConditionDepth?: number;
       maxCombinatorDepth?: number;
       customEvaluators?: Record<string, EvaluatorFn>;
-      ruleEffect?: "permit" | "forbid";
     },
   ) => Promise<boolean>;
 
@@ -232,9 +232,9 @@ describe("evaluateCondition", () => {
       expect(await evaluateCondition(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy)).toBe(false);
     });
 
-    it("exists: false when property is undefined", async () => {
+    it("does not establish absence from an omitted property", async () => {
       const condition: ConditionExpression = { "$resource.nonexistent": { exists: false } };
-      expect(await evaluateCondition(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy)).toBe(true);
+      expect(await evaluateCondition(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy)).toBe(false);
     });
 
     it("exists: false when property is defined", async () => {
@@ -462,20 +462,18 @@ describe("evaluateCondition", () => {
       expect(
         await evaluateCondition(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy, {
           customEvaluators: { throwEval: throwingEval },
-          ruleEffect: "permit",
         }),
       ).toBe(false);
     });
 
-    it("fail-closed on custom evaluator error (forbid rule) -> true (deny)", async () => {
+    it("preserves custom evaluator errors as indeterminate", async () => {
       const throwingEval: EvaluatorFn = async () => { throw new Error("boom"); };
       const condition: ConditionExpression = { "$resource.status": { custom: "throwEval" } };
       expect(
-        await evaluateCondition(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy, {
+        await evaluateConditionOutcome(condition, actor, resource, defaultCache, env, minimalBlock, minimalPolicy, {
           customEvaluators: { throwEval: throwingEval },
-          ruleEffect: "forbid",
         }),
-      ).toBe(true);
+      ).toBe("indeterminate");
     });
   });
 

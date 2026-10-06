@@ -1,399 +1,109 @@
 ---
-description: buildConstraints()、制約 AST のノード型、ConstraintAdapter、translateConstraints()、ORM アダプターによるクエリ段階の絞り込みを説明します。
+description: 正確な権限制約、リソースの範囲を維持する変換、非対応の操作、件数とページングの規則を説明します。
 ---
 
 # 部分評価 {#partial-evaluation}
 
-部分評価は、認可ルールをクエリの制約に変換する仕組みです。全レコードを読み込んで 1 件ずつ権限を確認する代わりに、**データ層に認可条件を組み込めます**。データソースがデータベースの場合は、クエリ段階で絞り込む WHERE 句を生成します。これにより「自分が閲覧できるプロジェクトをすべて取得する」といったクエリを効率的に処理できます。
+`buildConstraints()` はリソース型に対する権限判定を制約に変換します。`translateConstraints()` はその制約をアダプターのクエリ表現に変換します。公開 API の呼び出し手順は変わりません。
 
-## 課題 {#the-problem}
-
-一覧の認可を単純に実装すると、すべてのレコードを読み込み、アプリケーションのコードで絞り込むことになります。
-
-```typescript
-// Slow: loads every project, then checks each one
-const allProjects = await db.project.findMany();
-const visible = [];
-for (const project of allProjects) {
-  if (await engine.can(actor, "read", { type: "Project", id: project.id })) {
-    visible.push(project);
-  }
-}
-```
-
-この方式は件数が増えると非効率です。プロジェクトが 10,000 件あれば、権限チェックも 10,000 回必要です。
-
-## 解決策：`buildConstraints()` {#the-solution-buildconstraints}
-
-`buildConstraints()` は特定のリソースインスタンスを指定せず、アクターのロールとルールを**部分的に**評価します。アクセス可能なリソースの条件を表す**制約 AST**を生成し、それをデータベースの WHERE 句へ変換します。
-
-```typescript
-const result = await engine.buildConstraints(actor, "read", "Project");
-```
-
-結果は次の 3 通りです。
-
-| 結果 | 意味 | 処理 |
-|--------|---------|--------|
-| `{ ok: true, constraint: null }` | この型の**すべての**リソースにアクセス可能 | WHERE 句は不要 |
-| `{ ok: false }` | この型の**どの**リソースにもアクセス不可 | 空の結果を返す |
-| `{ ok: true, constraint: Constraint }` | 制約に一致するリソースにアクセス可能 | WHERE 句に変換 |
-
-### 結果の処理 {#handling-the-result}
-
-```typescript
-const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (!result.ok) {
-  // Actor has no access at all
-  return [];
-}
-
-if (result.constraint === null) {
-  // Actor can see everything
-  return await db.project.findMany();
-}
-
-// Translate constraints to a database query
-const where = engine.translateConstraints(result.constraint, adapter);
-return await db.project.findMany({ where });
-```
-
-## 制約 AST {#the-constraint-ast}
-
-結果の `constraint` が null でない場合、その値は制約ノードのツリーです。各ノードが、リソースの満たすべき条件を表します。
-
-### 葉ノード {#leaf-nodes}
-
-| 型 | 説明 | 例 |
-|------|-------------|---------|
-| `field_eq` | フィールドが値と等しい | `{ type: "field_eq", field: "status", value: "active" }` |
-| `field_neq` | フィールドが値と等しくない | `{ type: "field_neq", field: "status", value: "archived" }` |
-| `field_gt` | より大きい | `{ type: "field_gt", field: "priority", value: 3 }` |
-| `field_gte` | 以上 | `{ type: "field_gte", field: "priority", value: 3 }` |
-| `field_lt` | より小さい | `{ type: "field_lt", field: "count", value: 100 }` |
-| `field_lte` | 以下 | `{ type: "field_lte", field: "count", value: 100 }` |
-| `field_in` | 値が配列に含まれる | `{ type: "field_in", field: "status", values: ["active", "review"] }` |
-| `field_exists` | フィールドが存在する | `{ type: "field_exists", field: "assigneeId", exists: true }` |
-| `field_includes` | 配列が値を含む | `{ type: "field_includes", field: "tags", value: "featured" }` |
-| `field_contains` | 文字列が部分文字列を含む | `{ type: "field_contains", field: "name", value: "draft" }` |
-
-### 複合ノード {#composite-nodes}
-
-| 型 | 説明 |
-|------|-------------|
-| `and` | すべての子が true |
-| `or` | 少なくとも 1 つの子が true |
-| `not` | 子が false |
-| `relation` | 関連リソースに対する制約 |
-| `has_role` | アクターがリソース上のロールを持つ（ロール割り当てとの結合が必要） |
-| `always` | 常に true（この経路ではアクセス制限なし） |
-| `never` | 常に false（この経路ではアクセス不可） |
-
-### 制約の構築方法 {#how-constraints-are-built}
-
-指定されたアクター、操作、リソース型について、エンジンはすべての導出経路を調べます。
-
-1. アクターが持ち得るロールを評価します。既知のアクター属性や環境値は実際の値に置き換えます。
-2. そのうち、要求された操作を付与するロールを確認します。
-3. 権限を付与する各経路から、その条件を表す制約を生成します。
-4. すべての経路を OR で結合します。いずれかの経路で許可されれば十分です。
-5. forbid ルールを NOT 制約として適用します。
-6. 冗長なノードの除去や、子が 1 つの AND/OR の簡約を行います。
-
-アクター属性と環境値は、部分評価時に**実際の値に置き換えられます**。たとえば派生ロールが `$actor.department: "engineering"` を要求し、アクターの department が `"engineering"` なら、その条件は `true` に解決され、出力の制約には残りません。AST に残るのは `$resource` の条件だけです。
-
-## 制約アダプター {#constraint-adapters}
-
-**制約アダプター**は、制約 AST をデータストアのクエリ形式に変換します。Prisma と Drizzle 向けのアダプターが用意されており、独自実装も可能です。
-
-### アダプターのインターフェース {#the-adapter-interface}
-
-```typescript
-interface ConstraintAdapter<TQueryMap extends Record<string, unknown>> {
-  translate(constraint: LeafConstraint): TQueryMap[string];
-  relation(field: string, resourceType: string, childQuery: TQueryMap[string]): TQueryMap[string];
-  hasRole(actorId: string, actorType: string, role: string): TQueryMap[string];
-  unknown(name: string): TQueryMap[string];
-  and(queries: TQueryMap[string][]): TQueryMap[string];
-  or(queries: TQueryMap[string][]): TQueryMap[string];
-  not(query: TQueryMap[string]): TQueryMap[string];
-}
-```
-
-| メソッド | 対象 | 役割 |
-|--------|-----------|---------|
-| `translate` | 葉の制約ノード | フィールド比較をクエリ構文に変換 |
-| `relation` | 関係の制約 | 関連リソースへの結合や入れ子のクエリを構築 |
-| `hasRole` | has_role 制約 | ロール割り当てテーブルへのサブクエリを構築 |
-| `unknown` | 不明な制約ノード | 変換できないカスタム評価関数を処理 |
-| `and` | AND ノード | クエリを AND で結合 |
-| `or` | OR ノード | クエリを OR で結合 |
-| `not` | NOT ノード | クエリを否定 |
-
-### `translateConstraints()` の使用 {#using-translateconstraints}
-
-アダプターを用意したら、`translateConstraints()` に渡します。
-
-```typescript
-import { createPrismaAdapter } from "@toride/prisma";
-
-const adapter = createPrismaAdapter();
-
-const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (result.ok && result.constraint !== null) {
-  const where = engine.translateConstraints(result.constraint, adapter);
-  const projects = await prisma.project.findMany({ where });
-}
-```
-
-### Prisma での使用 {#using-with-prisma}
-
-`@toride/prisma` パッケージには、そのまま使えるアダプターが用意されています。
-
-```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter } from "@toride/prisma";
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: { /* ... */ },
-});
-
-const adapter = createPrismaAdapter({
-  relationMapping: {
-    project: "project",        // Maps constraint field to Prisma relation
-    org: "organization",       // Rename if Prisma relation differs
-  },
-});
-
-const actor = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering" },
-};
-
-const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (!result.ok) {
-  return [];
-}
-
-if (result.constraint === null) {
-  return await prisma.project.findMany();
-}
-
-const where = engine.translateConstraints(result.constraint, adapter);
-const projects = await prisma.project.findMany({ where });
-// Prisma generates SQL with the authorization constraints baked in
-```
-
-詳細は [Prisma 連携ガイド](/ja/integrations/prisma)を参照してください。
-
-### Drizzle での使用 {#using-with-drizzle}
-
-`@toride/drizzle` パッケージには、Drizzle ORM 向けのアダプターが用意されています。
-
-```typescript
-import { createDrizzleAdapter } from "@toride/drizzle";
-import { projects } from "./schema";
-
-const adapter = createDrizzleAdapter(projects, {
-  relations: {
-    org: { table: organizations, foreignKey: "orgId" },
-  },
-});
-
-const result = await engine.buildConstraints(actor, "read", "Project");
-
-if (result.ok && result.constraint !== null) {
-  const where = engine.translateConstraints(result.constraint, adapter);
-  // Use the where clause with Drizzle's query builder
-}
-```
-
-詳細は [Drizzle 連携ガイド](/ja/integrations/drizzle)を参照してください。
-
-### 独自アダプターの実装 {#writing-a-custom-adapter}
-
-他のデータベースや ORM に対応するには、`ConstraintAdapter` インターフェースを実装します。
-
-```typescript
-import type { ConstraintAdapter, LeafConstraint } from "toride";
-
-type MongoQuery = Record<string, unknown>;
-type MongoQueryMap = Record<string, MongoQuery>;
-
-const mongoAdapter: ConstraintAdapter<MongoQueryMap> = {
-  translate(constraint: LeafConstraint): MongoQuery {
-    switch (constraint.type) {
-      case "field_eq":
-        return { [constraint.field]: constraint.value };
-      case "field_neq":
-        return { [constraint.field]: { $ne: constraint.value } };
-      case "field_gt":
-        return { [constraint.field]: { $gt: constraint.value } };
-      case "field_in":
-        return { [constraint.field]: { $in: constraint.values } };
-      // ... handle other constraint types
-      default:
-        return {};
-    }
-  },
-
-  relation(field, _resourceType, childQuery) {
-    // MongoDB uses dot notation for nested documents
-    return Object.fromEntries(
-      Object.entries(childQuery).map(([k, v]) => [`${field}.${k}`, v]),
-    );
-  },
-
-  hasRole(actorId, _actorType, role) {
-    return {
-      roleAssignments: {
-        $elemMatch: { userId: actorId, role },
-      },
-    };
-  },
-
-  unknown(_name) {
-    return {}; // Ignore unknown constraints
-  },
-
-  and(queries) {
-    return { $and: queries };
-  },
-
-  or(queries) {
-    return { $or: queries };
-  },
-
-  not(query) {
-    return { $not: query };
-  },
-};
-```
-
-## 環境コンテキスト {#environment-context}
-
-`can()` と同様に、`buildConstraints()` に環境値を渡せます。
+## 結果を使ったクエリ {#query-with-the-result}
 
 ```typescript
 const result = await engine.buildConstraints(actor, "read", "Project", {
-  env: { currentTime: Date.now() },
+	env: { tenantId },
 });
+
+if (!result.ok) return [];
+
+const where = result.constraint === null
+	? undefined
+	: engine.translateConstraints(result.constraint, adapter);
+
+return prisma.project.findMany({ where, orderBy: { id: "asc" }, take: 20 });
 ```
 
-部分評価時に環境値は実際の値に置き換えられます。そのため、出力される制約の `$env.currentTime` は具体的な値になります。
+| 結果 | 意味 |
+| --- | --- |
+| `{ ok: false }` | この判定を満たすリソースはない |
+| `{ ok: true, constraint: null }` | リソースに対するフィルターは不要 |
+| `{ ok: true, constraint }` | 完全な変換済み述語を適用する |
 
-## 完全な例 {#complete-example}
+制約付きの結果は `ResourceConstraint<R>` を含みます。必須の `rootResourceType` によって、`result.constraint` を取り出した後もリソース型を維持します。変換結果の型はその入力から推論します。リソースの範囲がない手書き AST は拒否します。
 
-ポリシー、エンジンの設定、データの絞り込みを組み合わせた一連の例です。
+## 正確性とデータの対応 {#exactness-and-data-correspondence}
 
-```yaml
-# policy.yaml
-version: "1"
+コンパイラーは実行時と同じ条件の規則で、権限付与、permit、ロール条件、forbid を組み合わせます。アクセスには許可が true、禁止が false であることが必要です。省略したアクター属性や環境値は取得できない値です。AND から消えたり、禁止を無効にしたりしません。
 
-actors:
-  User:
-    attributes:
-      department: string
-      isSuperAdmin: boolean
+関連ロールは、関係先の実際の導出条件を再帰的にコンパイルします。ロール割り当てテーブルを暗黙に参照しません。関係ノードは、関連行が存在し、子の条件全体を満たすことを表します。子が `always` でも関連行の存在が必要です。many 関係の別々の条件は異なる行で成立しても一致します。関連ロールの条件全体は 1 行の中で評価します。
 
-global_roles:
-  superadmin:
-    actor_type: User
-    when:
-      $actor.isSuperAdmin: true
+アダプターのマッピングは、完全なデータベース値が宣言されたリゾルバーの観測値と対応することを表明します。任意の非同期リゾルバーコードや外部サービスの障害をクエリに変換するものではありません。同じ完全なデータベースの状態に対して、クエリ結果と実行時の判定を比較してください。
 
-resources:
-  Project:
-    roles: [viewer, editor, admin]
-    permissions: [read, update, delete]
-
-    relations:
-      org: Organization
-
-    grants:
-      viewer: [read]
-      editor: [read, update]
-      admin: [all]
-
-    derived_roles:
-      - role: admin
-        from_global_role: superadmin
-      - role: viewer
-        when:
-          $resource.isPublic: true
-      - role: viewer
-        actor_type: User
-        when:
-          $actor.department: $resource.department
-
-    rules:
-      - effect: forbid
-        permissions: [read, update, delete]
-        when:
-          $resource.archived: true
-```
+権限フィルターは `take`、`skip`、`limit`、`offset` より前に適用します。同じ述語を行の選択、件数、ページに使います。取得したページをアプリケーションで絞り込んでも、権限に基づく正しい件数や完全なページは保証できません。
 
 ```typescript
-import { readFileSync } from "node:fs";
-import { Toride, loadYaml } from "toride";
-import { createPrismaAdapter } from "@toride/prisma";
-
-const engine = new Toride({
-  policy: await loadYaml(readFileSync("./policy.yaml", "utf-8")),
-  resolvers: {
-    Project: async (ref) => {
-      const project = await prisma.project.findUnique({
-        where: { id: ref.id },
-      });
-      return project ?? {};
-    },
-  },
-});
-
-const adapter = createPrismaAdapter();
-
-async function listProjects(actor) {
-  const result = await engine.buildConstraints(actor, "read", "Project");
-
-  if (!result.ok) {
-    return [];
-  }
-
-  if (result.constraint === null) {
-    return await prisma.project.findMany();
-  }
-
-  const where = engine.translateConstraints(result.constraint, adapter);
-  return await prisma.project.findMany({ where });
-}
-
-// A regular user sees projects in their department + public projects (minus archived)
-const alice = {
-  type: "User",
-  id: "alice",
-  attributes: { department: "engineering", isSuperAdmin: false },
-};
-const aliceProjects = await listProjects(alice);
-
-// A superadmin sees all non-archived projects
-const admin = {
-  type: "User",
-  id: "admin",
-  attributes: { department: "ops", isSuperAdmin: true },
-};
-const adminProjects = await listProjects(admin);
+if (!result.ok) return { total: 0, rows: [] };
+const where = result.constraint === null
+	? undefined
+	: engine.translateConstraints(result.constraint, adapter);
+const [total, rows] = await prisma.$transaction([
+	prisma.project.count({ where }),
+	prisma.project.findMany({ where, orderBy: { id: "asc" }, skip: 20, take: 20 }),
+]);
+return { total, rows };
 ```
 
-## 次に読むページ {#what-s-next}
+## 非対応の制約 {#unsupported-constraints}
 
-- [条件とルール](/ja/concepts/conditions-and-rules)：制約の元になる条件式を理解します。
-- [ロールと関係](/ja/concepts/roles-and-relations)：導出パターンから制約の経路が生成される仕組みを学びます。
-- [クライアント側の権限ヒント](/ja/concepts/client-side-hints)：権限スナップショットをフロントエンドに渡します。
-- [Prisma 連携](/ja/integrations/prisma)：Prisma アダプターの詳細です。
-- [Drizzle 連携](/ja/integrations/drizzle)：Drizzle アダプターの詳細です。
+標準の変換は、完全な述語を返すか `UnsupportedConstraintError` をスローします。データベースへの問い合わせ前に変換してください。判定に関係するカスタム条件、未マッピングの式、正確性を確認していないフィールド間比較、再帰的なロール構造、アダプターが対応しない操作を無制限のフィルターに置き換えません。
+
+`$resource.project.isPublic: $env.required` のように関係をたどる条件では、静的な比較値を取得できない場合、コンパイラーは非対応とします。null の one 関係と空の many 関係は実行時に異なる観測値になり、コンパイラーは物理的な多重度を持たないためです。判定に関係する条件として残る場合、変換はエラーになります。`buildConstraints()` の前に、必要なアクター属性や環境値を渡してください。
+
+変換エラーを捕捉して `{}` に置き換えないでください。権限付き一覧操作を非対応として処理するか、ポリシーまたはマッピングを対応する正確な形式に変更します。個別の判定には引き続き `can()` を使えます。
+
+## 制約ノード {#constraint-nodes}
+
+| ノード | 意味 |
+| --- | --- |
+| `field_eq`、`field_neq` | 等値比較、不等値比較 |
+| `field_gt`、`field_gte`、`field_lt`、`field_lte` | 順序比較 |
+| `field_in`、`field_nin` | 含有、非含有 |
+| `field_exists` | 既知の存在、既知の不在 |
+| `field_includes` | スカラー配列、または明示的に対応づけた仮想フィールドの含有 |
+| `field_contains` | リテラルの部分文字列 |
+| `field_starts_with` | リテラルの接頭辞 |
+| `field_ends_with` | リテラルの接尾辞 |
+| `and`、`or`、`not` | 論理結合 |
+| `relation` | 宣言された関係先に対する `quantifier: "any"` |
+| `always`、`never` | 関係の中を含めた定数 |
+
+旧形式の手書き `has_role` と `unknown` ノードは変換時にエラーになります。判定に関係するカスタム条件が `unknown` として残る場合もエラーになります。標準アダプターは割り当ての保存先を推測せず、不明な条件を無視しません。
+
+## アダプターの契約 {#adapter-contract}
+
+各コールバックは最後の引数に `ConstraintContext` を受け取ります。`context.resourceType` によって現在のモデルのフィールド、関係、仮想フィールドのマッピングを選びます。関係の子を変換する際は宣言された関係先のコンテキストに切り替えます。関係コールバック自身は関係元のコンテキストを受け取ります。
+
+```typescript
+interface ConstraintAdapter<TQueryMap extends Record<string, unknown>> {
+	translate(constraint: LeafConstraint, context: ConstraintContext): TQueryMap[string];
+	relation(field: string, resourceType: string, childQuery: TQueryMap[string], context: ConstraintContext): TQueryMap[string];
+	and(queries: TQueryMap[string][], context: ConstraintContext): TQueryMap[string];
+	or(queries: TQueryMap[string][], context: ConstraintContext): TQueryMap[string];
+	not(query: TQueryMap[string], context: ConstraintContext): TQueryMap[string];
+	always(context: ConstraintContext): TQueryMap[string];
+	never(context: ConstraintContext): TQueryMap[string];
+}
+```
+
+カスタムアダプターは常に true または false を返す述語を実装する必要があります。通常の比較は null で false です。否定はその述語全体の補集合を表します。null でない値との等値比較を否定した場合は、null の行も含みます。SQL の `NOT (nullable_column = value)` だけではこの契約を満たしません。
+
+関係には、関係元、関係先、物理フィールドまたは結合、多重度の明示的なマッピングが必要です。ポリシーの関係宣言は文字列のままです。仮想フィールドはリソースごとに区別し、同名でも異なるマッピングを指定できます。
+
+`contains`、`startsWith`、`endsWith` を別々に維持します。データベースの大文字小文字、Unicode、照合順序、ワイルドカードは JavaScript と異なる場合があります。正確な変換を確認できない操作は、アダプターまたはネイティブクエリへの変換処理が拒否する必要があります。
+
+対応するマッピングと制限は [Prisma アダプター](/ja/integrations/prisma)と [Drizzle の操作記述](/ja/integrations/drizzle)を参照してください。
+
+## 移行 {#migration}
+
+`can()`、`explain()`、`buildConstraints()`、`translateConstraints()` と `ok` の分岐は維持します。制約を保存または受け渡す際は `rootResourceType` を保持してください。リソースごとのアダプターマッピングを追加します。カスタムアダプターにはコンテキストと定数のコールバック、および別々の接頭辞と接尾辞ノードへの対応を追加し、`hasRole` と `unknown` のコールバックを削除します。問い合わせ前に非対応の変換エラーを処理してください。
+
+既知の不在には明示的な `null` を使います。必要なアクター属性や環境値がない場合は判定不能です。[条件とルール](/ja/concepts/conditions-and-rules#strict-null-semantics)と[リゾルバーの移行](/ja/concepts/resolvers#migration)も参照してください。

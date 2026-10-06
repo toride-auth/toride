@@ -218,7 +218,7 @@ global_roles:
   it("permittedActions returns all actions for superadmin via derived owner", async () => {
     const policy = await loadYaml(POLICY_YAML);
     const resolvers: Resolvers = {
-      Project: async () => ({ org: { type: "Organization", id: "org1" } }),
+      Project: async () => ({ org: { type: "Organization", id: "org1" }, archived: false }),
     };
     const engine = new Toride({ policy, resolvers });
     const actor: ActorRef = {

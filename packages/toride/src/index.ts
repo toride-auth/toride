@@ -31,6 +31,11 @@ export type {
   ActorRef,
   ResourceRef,
   ResourceResolver,
+  ResolverData,
+  RelationRef,
+  ObservedAttributes,
+  EvaluationOutcome,
+  EvaluationDiagnostic,
   Resolvers,
   Policy,
   TorideOptions,
@@ -81,6 +86,8 @@ export type { ClientResourceRef } from "./client.js";
 // ─── Constraint AST Types (T016) ─────────────────────────────────
 export type {
   Constraint,
+  ResourceConstraint,
+  ConstraintContext,
   LeafConstraint,
   ConstraintResult,
   ConstraintAdapter,
@@ -92,3 +99,5 @@ export { parseInlineTests, parseTestFile } from "./testing/test-parser.js";
 export { runTestCases } from "./testing/test-runner.js";
 export type { TestResult } from "./testing/test-runner.js";
 export type { TestFileResult } from "./testing/test-parser.js";
+
+export { UnsupportedConstraintError } from "./partial/constraint-types.js";
