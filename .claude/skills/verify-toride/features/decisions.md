@@ -27,6 +27,7 @@ Preconditions:
 - **Check absence.** The explicit-null, present-value, omitted-field, and throwing `exists:false` cases return `[true, false, false, false]`.
 - **Check related absence.** A known clear, known blocked, and null Project resolver return `[true,false,false]` when a permit compares the related ID. Both rule orders produce that result. A missing environment operand under a forbid denies a null one relation but allows an empty many traversal, returning `[false,true]`.
 - **Check roles and helpers.** Global and local `gte:2` roles return `[true, true, false, false]` at levels 3 and 1. Supplied true, false, and omitted environment values return `[true, false, false]` for both derivation routes. Public, private, and wrongly typed related resources return `[true, false, false]`. The allowed resource reports `['viewer']` and `['read']`.
+- **Check traversal context.** Both role orders deny at depth 2 and allow at depth 3, for permits and forbids; each shallow explanation includes `depth_limit` at `Tail.tail`. An independent route through a cyclic graph allows in both role orders, returning `[true,true]`.
 - **Retain proof.** Read `decisions.json` and `drive-decisions.log` in the run directory. Require every case to pass and the drive to exit 0.
 
 ## Gotchas
@@ -37,3 +38,4 @@ Preconditions:
 - A healthy allow must accompany each failure denial; blanket denial is insufficient proof.
 - Explanation evidence must survive resolver failure without exposing arbitrary raw error or data payloads.
 - Role derivation and ordinary rules are separate public routes and both need coverage.
+- A role outcome depends on its remaining traversal depth and visited path. A result observed on another branch cannot decide it.

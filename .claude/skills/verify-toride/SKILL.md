@@ -65,7 +65,11 @@ SQL proof includes `queries-fixture.json`, `queries-translations.json`, and `que
 
 An unavailable actor or environment operand on a traversed resource path requires explicit rejection when relevant to the query. Null one relations and empty many traversals have different runtime outcomes. Related ID checks require an observed resource row, in either rule order.
 
+Role checks must preserve each traversal's depth and visited path. Permitted actions and snapshots must preserve individual decisions in either permission order, including when another action observes absence.
+
 Type proof includes generated files, each consumer fixture, compiler diagnostics, and CLI transcripts. A valid consumer must compile. Each negative fixture must fail compilation. Passing only the negative fixtures could conceal a broken dependency or declaration.
+
+Native Prisma selection proof generates the real client and compiles an otherwise-identical positive consumer. Selected-field and relation selection negatives must show their intended diagnostics; an unrelated invalid client argument is insufficient.
 
 The evidence directory is a local artifact. No command sends messages, contacts authorization services, opens accounts, or writes an application database. Package installation contacts the package registry. Launch writes built files in this checkout. Drives write their owned temporary clients and databases.
 

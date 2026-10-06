@@ -32,3 +32,4 @@ Preconditions:
 - A plain object passed to native Drizzle `.where()` is not a native equality predicate. The callback sends SQL and parameters to SQLite without repairing the helper's query.
 - Mapping `{}` to a missing row hides the difference between absent and partial data.
 - Mocked query-builder calls do not establish that the resolver retrieves the requested ID.
+- Declared relations require a custom resolver that constructs typed resource refs. Raw native relation selections are rejected by the helper's public type boundary.

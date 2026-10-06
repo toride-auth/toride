@@ -96,6 +96,41 @@ if (feature === 'decisions') {
       return results;
     });
   }
+  await proof.check('derived-role-depth-preserves-each-traversal-context', { roleOrders: [['warm', 'viewer'], ['viewer', 'warm']], effects: ['permit', 'forbid'], maxDepth: [2, 3] }, { shallow: [false, false, false, false], deep: [true, true, true, true], depthDiagnostics: [true, true, true, true] }, async () => {
+    const shallow = [], deep = [], depthDiagnostics = [];
+    for (const effect of ['permit', 'forbid']) {
+      for (const roles of [['warm', 'viewer'], ['viewer', 'warm']]) {
+        const input = { version: '1', actors: { User: { attributes: { enabled: 'boolean' } } }, resources: {
+          Document: { roles, permissions: ['read'], relations: { fast: 'Member', middle: 'Bridge' }, derived_roles: [{ role: 'warm', from_role: 'member', on_relation: 'fast' }, { role: 'viewer', from_role: 'bridge', on_relation: 'middle' }], ...(effect === 'permit' ? { grants: { viewer: ['read'] } } : { rules: [{ effect: 'permit', permissions: ['read'], when: {} }, { effect: 'forbid', permissions: ['read'], roles: ['viewer'], when: {} }] }) },
+          Bridge: { roles: ['bridge'], permissions: ['read'], relations: { member: 'Member' }, derived_roles: [{ role: 'bridge', from_role: 'member', on_relation: 'member' }] },
+          Member: { roles: ['member'], permissions: ['read'], relations: { tail: 'Tail' }, derived_roles: [{ role: 'member', from_role: 'tail', on_relation: 'tail' }] },
+          Tail: { roles: ['tail'], permissions: ['read'], derived_roles: [{ role: 'tail', when: { '$actor.enabled': effect === 'permit' } }] },
+        } };
+        const loaded = await loadJson(JSON.stringify(input));
+        const resolvers = { Document: async () => ({ fast: { type: 'Member', id: 'm1' }, middle: { type: 'Bridge', id: 'b1' } }), Bridge: async () => ({ member: { type: 'Member', id: 'm1' } }), Member: async () => ({ tail: { type: 'Tail', id: 't1' } }) };
+        const limited = new Toride({ policy: loaded, resolvers, maxDerivedRoleDepth: 2 });
+        const explanation = await limited.explain(actor, 'read', ref);
+        shallow.push(await limited.can(actor, 'read', ref));
+        depthDiagnostics.push(explanation.allowed === false && explanation.diagnostics.some((entry) => entry.code === 'depth_limit' && entry.path === 'Tail.tail'));
+        deep.push(await new Toride({ policy: loaded, resolvers, maxDerivedRoleDepth: 3 }).can(actor, 'read', ref));
+      }
+    }
+    return { shallow, deep, depthDiagnostics };
+  });
+  await proof.check('role-cycle-assumptions-stay-within-their-branch', { roleOrders: [['warm', 'viewer'], ['viewer', 'warm']], cycle: 'A -> Target -> A', independentRoute: 'B -> Target -> A' }, [true, true], async () => {
+    const results = [];
+    for (const roles of [['warm', 'viewer'], ['viewer', 'warm']]) {
+      const input = { version: '1', actors: { User: { attributes: {} } }, resources: {
+        Document: { roles, permissions: ['read'], relations: { a: 'A', b: 'B' }, derived_roles: [{ role: 'warm', from_role: 'member', on_relation: 'a' }, { role: 'viewer', from_role: 'member', on_relation: 'b' }], grants: { viewer: ['read'] } },
+        A: { roles: ['member'], permissions: ['read'], relations: { target: 'Target' }, derived_roles: [{ role: 'member', from_role: 'member', on_relation: 'target' }, { role: 'member', when: {} }] },
+        B: { roles: ['member'], permissions: ['read'], relations: { target: 'Target' }, derived_roles: [{ role: 'member', from_role: 'member', on_relation: 'target' }] },
+        Target: { roles: ['member'], permissions: ['read'], relations: { a: 'A' }, derived_roles: [{ role: 'member', from_role: 'member', on_relation: 'a' }] },
+      } };
+      const instance = new Toride({ policy: await loadJson(JSON.stringify(input)), resolvers: { Document: async () => ({ a: { type: 'A', id: 'a1' }, b: { type: 'B', id: 'b1' } }), A: async () => ({ target: { type: 'Target', id: 't1' } }), B: async () => ({ target: { type: 'Target', id: 't1' } }), Target: async () => ({ a: { type: 'A', id: 'a1' } }) } });
+      results.push(await instance.can(actor, 'read', ref));
+    }
+    return results;
+  });
 } else if (feature === 'fields-batch-client') {
   const instance = await engine({ grants: { viewer: ['read'] }, derived_roles: [{ role: 'viewer', when: { '$actor.enabled': true } }], rules: [forbid], field_access: { secret: { read: ['viewer'] } } });
   const clear = { ...ref, id: 'clear', attributes: { blocked: false } };
@@ -113,5 +148,24 @@ if (feature === 'decisions') {
       return { single: await Promise.all(refs.map((target) => instance.can(actor, 'read', target))), forward: await instance.canBatch(actor, refs.map((target) => ({ action: 'read', resource: target }))), reverse: await instance.canBatch(actor, [...refs].reverse().map((target) => ({ action: 'read', resource: target }))) };
     });
   }
+  const actionExpected = { single: [true, false], actions: ['inspect'], snapshot: { 'Document:d1': ['inspect'] }, client: [true, false] };
+  await proof.check('action-enumeration-isolates-observations', { permissionOrders: [['inspect', 'read'], ['read', 'inspect']], projectValues: [null, { value: null }] }, [actionExpected, actionExpected, actionExpected, actionExpected], async () => {
+    const results = [];
+    for (const absent of [true, false]) {
+      for (const permissions of [['inspect', 'read'], ['read', 'inspect']]) {
+        const input = { version: '1', actors: { User: { attributes: {} } }, resources: {
+          Document: { roles: ['viewer'], permissions, relations: { project: 'Project' }, derived_roles: [{ role: 'viewer', from_role: 'viewer', on_relation: 'project' }], rules: [{ effect: 'permit', permissions: ['inspect'], when: { '$resource.project.value': { exists: false } } }, { effect: 'permit', permissions: ['read'], when: {} }, { effect: 'forbid', permissions: ['read'], roles: ['viewer'], when: {} }] },
+          Project: { roles: ['viewer'], permissions: ['read'], attributes: { value: 'string' }, derived_roles: [{ role: 'viewer', when: {} }] },
+        } };
+        const instance = new Toride({ policy: await loadJson(JSON.stringify(input)), resolvers: { Document: async () => ({ project: { type: 'Project', id: 'p1' } }), Project: async () => absent ? null : { value: null } } });
+        const single = await Promise.all(['inspect', 'read'].map((action) => instance.can(actor, action, ref)));
+        const actions = await instance.permittedActions(actor, ref);
+        const snapshot = await instance.snapshot(actor, [ref]);
+        const client = new TorideClient(snapshot);
+        results.push({ single, actions, snapshot, client: ['inspect', 'read'].map((action) => client.can(action, ref)) });
+      }
+    }
+    return results;
+  });
 } else throw new Error(`Unknown runtime feature ${feature}`);
 proof.finish();

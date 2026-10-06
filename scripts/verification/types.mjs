@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { generateTypes } from '@toride/codegen';
 import { loadJson, loadYaml } from 'toride';
@@ -41,6 +42,19 @@ await proof.check('codegen-cli-and-api', input, { exitCode: 0, matchesApi: true 
 const examplePolicy = readFileSync(join(root, 'examples/prisma-app/policy.yaml'), 'utf8');
 writeFileSync(join(scratch, 'example-generated.ts'), generateTypes(await loadYaml(examplePolicy)));
 writeFileSync(join(evidence, 'example-generated.ts'), readFileSync(join(scratch, 'example-generated.ts')));
+await proof.check('native-prisma-client-generation', { schema: 'examples/prisma-app/verification/schema.prisma', engine: 'js' }, { ready: true }, async () => {
+  const { createDatabase } = await import(pathToFileURL(join(root, 'examples/prisma-app/verification/database.mjs')).href);
+  const client = await createDatabase({ scratch, evidence, feature: 'types-and-policy', events: [] });
+  await client.$disconnect();
+  return { ready: true };
+});
+const nativeInput = { version: '1', actors: { User: { attributes: {} } }, resources: {
+  Document: { roles: [], permissions: ['read'], attributes: { tenant: 'string', blocked: 'boolean' }, relations: { project: 'Project' } },
+  Project: { roles: [], permissions: ['read'], attributes: { isPublic: 'boolean' } },
+} };
+const nativeGenerated = generateTypes(await loadJson(JSON.stringify(nativeInput)));
+writeFileSync(join(scratch, 'native-generated.ts'), nativeGenerated);
+writeFileSync(join(evidence, 'native-generated.ts'), nativeGenerated);
 const prelude = `import { Toride, type ResourceResolver, type ConstraintAdapter } from 'toride';
 import { createPrismaResolver, createPrismaAdapter } from '@toride/prisma';
 import { type GeneratedSchema } from './generated.js';
@@ -49,6 +63,11 @@ const actor = { type: 'User' as const, id: 'u1', attributes: { enabled: true } }
 type QueryMap = { Document: { tenant?: string }; Organization: { plan?: string } };
 declare const adapter: ConstraintAdapter<QueryMap>;
 `;
+const nativePrelude = `import { type PrismaClient } from './generated/index.js';
+import { type GeneratedSchema as NativeGeneratedSchema } from './native-generated.js';
+declare const nativeClient: PrismaClient;
+`;
+const nativeSelectedHelper = `const resolver=createPrismaResolver<NativeGeneratedSchema,'Document','document'>(nativeClient,'document',{select:{tenant:true}});`;
 const cases = [
   { id: 'valid-generated-consumer', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({tenant:'alpha', org:{type:'Organization',id:'o1'}});\nengine.can(actor,'read',{type:'Document',id:'d1'});\nasync function query(){const result=await engine.buildConstraints(actor,'read','Document');if(result.ok && result.constraint){const where:{tenant?:string}=engine.translateConstraints(result.constraint,adapter);}}`, positive: true },
   { id: 'reject-wrong-resolver-attribute', source: `const resolver: ResourceResolver<GeneratedSchema,'Document'> = async () => ({tenant:123});` },
@@ -56,17 +75,24 @@ const cases = [
   { id: 'reject-wrong-actor-attribute', source: `engine.can({type:'User',id:'u1',attributes:{enabled:'yes'}},'read',{type:'Document',id:'d1'});` },
   { id: 'reject-wrong-action-resource', source: `engine.can(actor,'manage',{type:'Document',id:'d1'});` },
   { id: 'reject-cross-resource-translation', source: `async function run(){const result=await engine.buildConstraints(actor,'read','Document'); if(result.ok && result.constraint) { engine.translateConstraints<'Organization',QueryMap>(result.constraint,adapter); }}` },
-  { id: 'reject-selected-helper-complete-claim', source: `const resolver=createPrismaResolver<GeneratedSchema,'Document'>({},'Document',{select:{tenant:true}}); async function run(){ const selected=await resolver({type:'Document',id:'d1'}); if(selected){const blocked:boolean=selected.blocked;} }` },
+  { id: 'valid-native-selected-helper-consumer', native: true, source: `${nativeSelectedHelper} async function run(){ const selected=await resolver({type:'Document',id:'d1'}); if(selected && selected.blocked!==null){const blocked:boolean|undefined=selected.blocked;} }`, positive: true },
+  { id: 'reject-selected-helper-complete-claim', native: true, source: `${nativeSelectedHelper} async function run(){ const selected=await resolver({type:'Document',id:'d1'}); if(selected && selected.blocked!==null){const blocked:boolean=selected.blocked;} }`, diagnostic: /Type 'boolean \| undefined' is not assignable to type 'boolean'/ },
+  { id: 'reject-native-helper-relation-selection', native: true, source: `createPrismaResolver<NativeGeneratedSchema,'Document','document'>(nativeClient,'document',{select:{tenant:true,project:true}});`, diagnostic: /Type 'true' is not assignable to type 'undefined'/ },
+  { id: 'reject-native-helper-variable-relation-selection', native: true, source: `const selection={tenant:true,project:true}; createPrismaResolver<NativeGeneratedSchema,'Document','document'>(nativeClient,'document',{select:selection});`, diagnostic: /Types of property 'project' are incompatible/ },
   { id: 'reject-wrong-scalar-binding', source: `createPrismaAdapter<GeneratedSchema>({fields:{Document:{tenant:{field:'tenant',type:'boolean',nullable:false}}}});` },
   { id: 'reject-wrong-relation-binding', source: `createPrismaAdapter<GeneratedSchema>({relations:{Document:{org:{field:'org',resourceType:'Document',cardinality:'one'}}}});` },
 ];
 for (const test of cases) {
   const file = join(scratch, `${test.id}.ts`);
-  writeFileSync(file, prelude + test.source + '\n');
-  writeFileSync(join(evidence, `${test.id}.ts`), prelude + test.source + '\n');
-  await proof.check(test.id, { source: test.source }, test.positive ? { exitCode: 0, hasDiagnostic: false } : { exitCode: 2, hasDiagnostic: true }, async () => {
+  const source = prelude + (test.native ? nativePrelude : '') + test.source + '\n';
+  writeFileSync(file, source);
+  writeFileSync(join(evidence, `${test.id}.ts`), source);
+  const expected = test.positive ? { exitCode: 0, hasDiagnostic: false } : { exitCode: 2, hasDiagnostic: true };
+  if (test.diagnostic) expected.expectedDiagnostic = true;
+  await proof.check(test.id, { source: test.source, nativeClient: Boolean(test.native), expectedDiagnostic: test.diagnostic?.source }, expected, async () => {
     const result = invoke(test.id, process.execPath, [join(root, 'node_modules/typescript/bin/tsc'), '--noEmit', '--strict', '--skipLibCheck', '--target', 'ES2022', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', file, join(scratch, 'example-generated.ts')]);
-    return { exitCode: result.status, hasDiagnostic: /error TS\d+:/.test(result.stdout + result.stderr) };
+    const diagnostics = result.stdout + result.stderr;
+    return { exitCode: result.status, hasDiagnostic: /error TS\d+:/.test(diagnostics), ...(test.diagnostic ? { expectedDiagnostic: test.diagnostic.test(diagnostics) } : {}) };
   });
 }
 proof.finish();
