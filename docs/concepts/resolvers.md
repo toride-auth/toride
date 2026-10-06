@@ -69,6 +69,8 @@ See [conditions and rules](/concepts/conditions-and-rules#strict-null-semantics)
 
 Inline fields take precedence over resolver fields for the same ref. Within one decision, contradictory inline observations for the same identity are rejected. Treat inline data as trusted authorization input.
 
+`permittedActions()` captures one policy and uses a separate resolver and absence cache for each action. Cache isolation can increase resolver requests while preserving individual `can()` decisions.
+
 `canBatch()` evaluates each item with an independent cache because a resolver can inspect the entire ref, including inline data. Batch results therefore follow individual decisions without depending on item order. This can increase resolver requests. Cache data in your own data layer only when its keys capture every input that affects the result.
 
 ## Migration

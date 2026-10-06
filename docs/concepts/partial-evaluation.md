@@ -56,6 +56,8 @@ return { total, rows };
 
 Standard translation returns a complete predicate or throws `UnsupportedConstraintError`. Translate before issuing the database query. A relevant custom condition, unbound expression, unverified field-to-field comparison, recursive role schema, or unsupported adapter operation cannot become an unrestricted filter.
 
+The compiler marks a traversed condition such as `$resource.project.isPublic: $env.required` as unsupported when the static operand is unavailable. A null one relation and an empty many relation produce different runtime observations, and the compiler lacks physical cardinality. If this condition remains relevant, translation throws. Supply the required actor or environment value before `buildConstraints()`.
+
 Do not catch a translation error and substitute `{}`. Handle the error as an unsupported authorized-list operation, or change the policy or mapping to a supported exact form. Runtime `can()` remains available for individual decisions.
 
 ## Constraint nodes

@@ -99,7 +99,7 @@ const projectResolver = createPrismaResolver<GeneratedSchema, "Project", "projec
 	{ select: { status: true, archived: true } },
 );
 ```
-The helper calls `findUnique({ where: { id: ref.id }, select })`. It returns `ResolverData<GeneratedSchema, "Project"> | null` asynchronously. A missing row returns `null`. Selected-out attributes are unavailable. The helper does not claim complete policy attributes or create relation refs from foreign keys. Use a custom typed resolver for virtual arrays and declared relation refs.
+The helper calls `findUnique({ where: { id: ref.id }, select })`. It returns `ResolverData<GeneratedSchema, "Project"> | null` asynchronously. A missing row returns `null`. Selected-out attributes are unavailable. `select` is for scalar attributes and `id`. With a typed schema, TypeScript rejects declared relation keys. The helper does not claim complete policy attributes or create typed relation refs from raw related rows or foreign keys. Use a custom typed resolver for virtual arrays and declared relation refs.
 
 ## Verify local changes
 
@@ -116,6 +116,6 @@ The commands build and import public packages, then compare literal expected IDs
 
 Replace the old flat `relationMapping` option with source-scoped `relations` and explicit target and cardinality. Add `fields` for every scalar used by a relevant constraint, including IDs used by relation identity. Remove implicit `roleAssignmentTable` and `roleAssignmentFields` options. Represent stored assignments through policy attributes and explicit virtual mappings instead.
 
-Add scalar and cardinality semantics to virtual mappings. Return `null` for missing rows and regenerate resolver bindings. Keep `buildConstraints()`, `translateConstraints()`, and the `ok` result branches.
+Add scalar and cardinality semantics to virtual mappings. Return `null` for missing rows and regenerate resolver bindings. Move declared relation selections to custom resolvers that construct refs with the declared `type` and `id`. Keep `buildConstraints()`, `translateConstraints()`, and the `ok` result branches.
 
 See [partial evaluation](/concepts/partial-evaluation) and [resolvers](/concepts/resolvers).

@@ -99,7 +99,7 @@ const projectResolver = createPrismaResolver<GeneratedSchema, "Project", "projec
 	{ select: { status: true, archived: true } },
 );
 ```
-ヘルパーは `findUnique({ where: { id: ref.id }, select })` を呼び出します。`ResolverData<GeneratedSchema, "Project"> | null` を非同期で返します。行がない場合は `null` です。選択から除いた属性は取得できない値です。完全なポリシー属性を返すとは保証せず、外部キーから関係の参照を作りません。仮想配列や宣言された関係の参照には、型付きのカスタムリゾルバーを使ってください。
+ヘルパーは `findUnique({ where: { id: ref.id }, select })` を呼び出します。`ResolverData<GeneratedSchema, "Project"> | null` を非同期で返します。行がない場合は `null` です。選択から除いた属性は取得できない値です。`select` はスカラー属性と `id` の選択に使います。型付きスキーマでは、宣言された関係のキーを TypeScript が拒否します。完全なポリシー属性を返すとは保証せず、生の関連行や外部キーから型付きの関係の参照を作りません。仮想配列や宣言された関係の参照には、型付きのカスタムリゾルバーを使ってください。
 
 ## ローカル変更の検証 {#verify-local-changes}
 
@@ -116,6 +116,6 @@ scripts/verification/verify.sh check types-and-policy /tmp/toride-type-evidence
 
 旧形式の平坦な `relationMapping` を、関係元ごとの `relations` に変更し、関係先と多重度を指定します。判定に関係する制約が使うすべてのスカラーを `fields` に追加してください。関係先との同一性に使う ID も含めます。暗黙の `roleAssignmentTable` と `roleAssignmentFields` オプションを削除します。保存した割り当ては、ポリシー属性と明示的な仮想マッピングで表現してください。
 
-仮想マッピングにスカラーと多重度の意味を追加します。行がない場合は `null` を返し、リゾルバーの型を再生成してください。`buildConstraints()`、`translateConstraints()`、`ok` の分岐は維持します。
+仮想マッピングにスカラーと多重度の意味を追加します。行がない場合は `null` を返し、リゾルバーの型を再生成してください。宣言された関係の選択は、関係先の `type` と `id` を持つ参照を構築するカスタムリゾルバーに移します。`buildConstraints()`、`translateConstraints()`、`ok` の分岐は維持します。
 
 [部分評価](/ja/concepts/partial-evaluation)と[リゾルバー](/ja/concepts/resolvers)も参照してください。

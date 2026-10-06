@@ -331,7 +331,7 @@ Combinators can be nested to express complex logic:
             - $resource.publishDate: { exists: true }
 ```
 
-Nesting depth is limited (default: 10 levels) to prevent denial-of-service through deeply nested expressions. Beyond the limit, the condition evaluates to `false` (fail-closed).
+Nesting depth is limited (default: 10 levels) to prevent denial-of-service through deeply nested expressions. Beyond the limit, the affected condition is indeterminate, and `explain()` reports `depth_limit`. It cannot grant access by itself. A relevant indeterminate forbid prevents access.
 
 ## Absence and indeterminate results {#strict-null-semantics}
 

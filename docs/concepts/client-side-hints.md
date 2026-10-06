@@ -62,10 +62,10 @@ This object is JSON-serializable. Send it to the client via your API response, S
 
 ### How `snapshot()` Works
 
-Under the hood, `snapshot()` calls `permittedActions()` for each resource in the list. It evaluates all roles, grants, and [rules](/concepts/conditions-and-rules) for the actor on each resource, collecting every permitted action. The result is a complete picture of what the actor can do on those specific resource instances.
+`snapshot()` calls `permittedActions()` for each distinct root resource identity. It evaluates equal duplicate root refs once and rejects conflicting duplicate inline attributes. It evaluates all roles, grants, and [rules](/concepts/conditions-and-rules) for the actor on each resource, collecting every permitted action. The result is a complete picture of what the actor can do on those specific resource instances.
 
 ```typescript
-// These are equivalent:
+// For distinct resource identities:
 const snapshot = await engine.snapshot(actor, resources);
 
 // Manual equivalent:
@@ -234,7 +234,9 @@ Snapshots are point-in-time. If permissions change (e.g., a role is revoked), th
 
 - **O(n * m)** where n is the number of resources and m is the average number of permissions per resource type
 - Role resolution and condition evaluation happen for each resource
-- Resolver calls are cached within a single `permittedActions()` call
+- Resolver calls are cached within each action decision, without sharing attributes or absence observations across actions
+
+`permittedActions()` captures one policy for its action list, then evaluates each action with an independent cache. Each action uses the same decision rules as `can()` and does not reuse earlier actions' observations. This can increase resolver calls.
 
 For large resource lists, consider paginating and only generating snapshots for the visible page.
 

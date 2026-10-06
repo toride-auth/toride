@@ -62,10 +62,10 @@ const snapshot = await engine.snapshot(actor, [
 
 ### `snapshot()` の仕組み {#how-snapshot-works}
 
-内部では、一覧の各リソースについて `permittedActions()` を呼び出します。アクターのロール、grants、[ルール](/ja/concepts/conditions-and-rules)をすべて評価し、許可された操作を集めます。これにより、指定した各リソースインスタンスでアクターができる操作を把握できます。
+`snapshot()` はルートのリソース識別子ごとに `permittedActions()` を呼び出します。同じインライン属性を持つ重複した参照は 1 回だけ評価し、矛盾する属性を持つ重複は拒否します。アクターのロール、grants、[ルール](/ja/concepts/conditions-and-rules)をすべて評価し、許可された操作を集めます。これにより、指定した各リソースインスタンスでアクターができる操作を把握できます。
 
 ```typescript
-// These are equivalent:
+// For distinct resource identities:
 const snapshot = await engine.snapshot(actor, resources);
 
 // Manual equivalent:
@@ -234,9 +234,11 @@ async function getServerSideProps(context) {
 
 - 計算量は **O(n * m)** です。n はリソース数、m はリソース型あたりの平均権限数です。
 - リソースごとにロール解決と条件評価を行います。
-- 1 回の `permittedActions()` 呼び出し内では、リゾルバーの呼び出し結果がキャッシュされます。
+- リゾルバーの結果はアクションごとの判定内でキャッシュします。属性や不在の観測をアクション間で共有しません。
 
 リソース数が多い場合は、ページネーションを使い、表示中のページだけのスナップショットを生成することを検討してください。
+
+`permittedActions()` は操作一覧に使うポリシーを 1 回取得し、各アクションを独立したキャッシュで評価します。各アクションは `can()` と同じ規則で判定し、先に評価したアクションの観測値を再利用しません。リゾルバーの呼び出し回数が増える場合があります。
 
 `canBatch()` の各項目は独立したキャッシュを使います。リゾルバーがインライン属性を参照する場合でも、入力順序で判定結果が変わりません。共有キャッシュを使う場合よりリゾルバーの呼び出し回数が増えることがあります。1 回の判定内で同じ識別子に矛盾するインラインデータを渡した場合は拒否します。
 
