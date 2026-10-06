@@ -7,7 +7,6 @@ export interface ConditionOptions {
   readonly maxConditionDepth?: number;
   readonly maxCombinatorDepth?: number;
   readonly customEvaluators?: Record<string, EvaluatorFn>;
-  readonly ruleEffect?: "permit" | "forbid";
   readonly actorOnly?: boolean;
 }
 type Values = { kind: "scalar"; value: unknown } | { kind: "traversal"; values: unknown[] };

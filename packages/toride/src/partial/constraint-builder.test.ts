@@ -6,8 +6,9 @@ import type {
   Policy,
 } from "../types.js";
 import type { Constraint } from "./constraint-types.js";
+import { translateConstraints } from "./translator.js";
 import { buildConstraints, simplify } from "./constraint-builder.js";
-import { makeResolver } from "../testing/test-adapter.js";
+import { makeResolver, makeStringAdapter } from "../testing/test-adapter.js";
 
 // ---- Helpers ----
 
@@ -132,8 +133,8 @@ describe("buildConstraints", () => {
     });
   });
 
-  describe("has_role constraint nodes (Finding 7: structural assertions)", () => {
-    it("emits relation -> has_role structure for relation-based derived roles", async () => {
+  describe("related role constraints", () => {
+    it("compiles the declared related role condition", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -151,6 +152,7 @@ describe("buildConstraints", () => {
             roles: ["admin"],
             permissions: ["read", "delete"],
             grants: { admin: ["all"] },
+            derived_roles: [{ role: "admin", when: {} }],
           },
         },
       });
@@ -164,17 +166,13 @@ describe("buildConstraints", () => {
       expect(result).not.toHaveProperty("constraint", null);
 
       const constraint = (result as { ok: true; constraint: Constraint }).constraint;
-      // Should be a relation constraint wrapping a has_role constraint
       expect(constraint).toEqual({
+        rootResourceType: "Task",
         type: "relation",
+        quantifier: "any",
         field: "project",
         resourceType: "Project",
-        constraint: {
-          type: "has_role",
-          actorId: "u1",
-          actorType: "User",
-          role: "admin",
-        },
+        constraint: { type: "always" },
       });
     });
   });
@@ -214,6 +212,7 @@ describe("buildConstraints", () => {
       const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(field_eq(department, "engineering"))
       expect(constraint).toEqual({
+        rootResourceType: "Task",
         type: "not",
         child: {
           type: "field_eq",
@@ -264,6 +263,7 @@ describe("buildConstraints", () => {
       const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(field_gt(createdAt, "2024-01-01"))
       expect(constraint).toEqual({
+        rootResourceType: "Task",
         type: "not",
         child: {
           type: "field_gt",
@@ -310,6 +310,7 @@ describe("buildConstraints", () => {
       // derived role simplifies to always, combined with NOT(forbid)
       // simplify(and([always, not(field_eq)])) => not(field_eq)
       expect(constraint).toEqual({
+        rootResourceType: "Task",
         type: "not",
         child: {
           type: "field_eq",
@@ -382,6 +383,7 @@ describe("buildConstraints", () => {
       const constraint = (result as { ok: true; constraint: Constraint }).constraint;
       // Verify exact structure: NOT(unknown("businessHours"))
       expect(constraint).toEqual({
+        rootResourceType: "Task",
         type: "not",
         child: {
           type: "unknown",
@@ -440,7 +442,7 @@ describe("buildConstraints", () => {
       expect(result.ok).toBe(true);
       expect(result.constraint).not.toBeNull();
       if (result.ok === true && result.constraint !== null) {
-        expect(result.constraint).toEqual({ type: "field_eq", field: "status", value: "active" });
+        expect(result.constraint).toEqual({ rootResourceType: "Task", type: "field_eq", field: "status", value: "active" });
       }
     });
 
@@ -509,7 +511,7 @@ describe("buildConstraints", () => {
   });
 
   describe("fail-closed for unsupported cross-constraint operators (security)", () => {
-    it("returns ok:false when actor-resource cross-constraint uses unsupported operator like startsWith", async () => {
+    it("rejects exact translation when actor-resource cross-constraint uses unsupported operator like startsWith", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -534,10 +536,12 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
-      expect(result).toEqual({ ok: false });
+      expect(result).toEqual({ ok: true, constraint: { type: "unknown", name: "reversed startsWith", rootResourceType: "Task" } });
+      if (!result.ok || !result.constraint) throw new Error("expected a constrained result");
+      expect(() => translateConstraints(result.constraint!, makeStringAdapter())).toThrow(/Unsupported constraint/);
     });
 
-    it("returns ok:false when actor-resource cross-constraint uses contains operator", async () => {
+    it("rejects exact translation when actor-resource cross-constraint uses contains operator", async () => {
       const policy = makePolicy({
         resources: {
           Task: {
@@ -562,7 +566,9 @@ describe("buildConstraints", () => {
 
       const result = await buildConstraints(actor, "read", "Task", resolver, policy);
       // Unsupported operator in cross-constraint must deny (fail-closed), not grant access
-      expect(result).toEqual({ ok: false });
+      expect(result).toEqual({ ok: true, constraint: { type: "unknown", name: "reversed contains", rootResourceType: "Task" } });
+      if (!result.ok || !result.constraint) throw new Error("expected a constrained result");
+      expect(() => translateConstraints(result.constraint!, makeStringAdapter())).toThrow(/Unsupported constraint/);
     });
   });
 

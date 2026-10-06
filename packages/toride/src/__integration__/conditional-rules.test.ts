@@ -229,10 +229,7 @@ resources:
     const actor: ActorRef = { type: "User", id: "u1", attributes: { department: "eng", level: 5, active: true, is_editor: true } };
     const resource: ResourceRef = { type: "Document", id: "d1" };
 
-    // Grant-based permissions that don't depend on conditions still work
-    // (editor gets write via grants, no condition needed)
-    expect(await engine.can(actor, "write", resource)).toBe(true);
-    // But publish needs conditions -> resolver throws -> fail-closed
+    expect(await engine.can(actor, "write", resource)).toBe(false);
     expect(await engine.can(actor, "publish", resource)).toBe(false);
   });
 

@@ -255,7 +255,7 @@ describe("US2: Inline Attributes on ResourceRef", () => {
       expect(documentResolver).toHaveBeenCalledTimes(1);
     });
 
-    it("canBatch shares cache: inline attributes are used across batch items", async () => {
+    it("canBatch isolates each decision while preserving inline attributes", async () => {
       const documentResolver = vi.fn<ResourceResolver>(async () => {
         return { status: "published" };
       });
@@ -280,8 +280,7 @@ describe("US2: Inline Attributes on ResourceRef", () => {
 
       // Both should be true because inline status: "draft" takes precedence
       expect(results).toEqual([true, true]);
-      // Resolver called at most once (same cache key)
-      expect(documentResolver).toHaveBeenCalledTimes(1);
+      expect(documentResolver).toHaveBeenCalledTimes(2);
     });
 
     it("resolver error with inline attributes still denies (fail-closed)", async () => {

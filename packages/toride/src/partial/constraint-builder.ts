@@ -39,7 +39,7 @@ export async function buildConstraints(actor: ActorRef, action: string, resource
       case "all": return logic.all(node.children.map(child => compileCondition(child, type, actorOnly)));
       case "any": return logic.any(node.children.map(child => compileCondition(child, type, actorOnly)));
       case "unavailable": return known("indeterminate");
-      case "custom": return actorOnly ? known("indeterminate") : unsupported(`custom evaluator ${node.name}`);
+      case "custom": return actorOnly ? known("indeterminate") : unsupported(node.name);
       case "predicate": {
         const dynamic = (value: Operand) => !actorOnly && value.kind === "reference" && value.scope === "resource";
         const leftDynamic = dynamic(node.left), rightDynamic = dynamic(node.right);

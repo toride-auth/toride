@@ -212,7 +212,7 @@ describe("US1: Per-Type Attribute Resolver", () => {
   });
 
   // Verify shared cache across canBatch
-  it("shares cache across canBatch evaluations", async () => {
+  it("isolates resolver results across canBatch evaluations", async () => {
     const documentResolver = vi.fn<ResourceResolver>(async () => {
       return { status: "draft", locked: false };
     });
@@ -228,8 +228,7 @@ describe("US1: Per-Type Attribute Resolver", () => {
       { action: "update", resource: { type: "Document", id: "doc1" } },
     ]);
 
-    // Same resource in all checks — resolver called once
-    expect(documentResolver).toHaveBeenCalledTimes(1);
+    expect(documentResolver).toHaveBeenCalledTimes(2);
     expect(results).toEqual([true, true]);
   });
 

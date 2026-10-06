@@ -13,27 +13,27 @@ describe("translateConstraints", () => {
 
   it("translates field_eq leaf", () => {
     const c: Constraint = { type: "field_eq", field: "status", value: "active" };
-    expect(translateConstraints(c, adapter)).toBe('status = "active"');
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe('status = "active"');
   });
 
   it("translates field_neq leaf", () => {
     const c: Constraint = { type: "field_neq", field: "status", value: "deleted" };
-    expect(translateConstraints(c, adapter)).toBe('status != "deleted"');
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe('status != "deleted"');
   });
 
   it("translates field_gt leaf", () => {
     const c: Constraint = { type: "field_gt", field: "priority", value: 5 };
-    expect(translateConstraints(c, adapter)).toBe("priority > 5");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("priority > 5");
   });
 
   it("translates field_in leaf", () => {
     const c: Constraint = { type: "field_in", field: "status", values: ["a", "b"] };
-    expect(translateConstraints(c, adapter)).toBe('status IN ["a","b"]');
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe('status IN ["a","b"]');
   });
 
   it("translates field_exists leaf", () => {
     const c: Constraint = { type: "field_exists", field: "deletedAt", exists: false };
-    expect(translateConstraints(c, adapter)).toBe("deletedAt IS NULL");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("deletedAt IS NULL");
   });
 
   it("translates and combinator", () => {
@@ -44,7 +44,7 @@ describe("translateConstraints", () => {
         { type: "field_eq", field: "b", value: 2 },
       ],
     };
-    expect(translateConstraints(c, adapter)).toBe("(a = 1 AND b = 2)");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("(a = 1 AND b = 2)");
   });
 
   it("translates or combinator", () => {
@@ -55,7 +55,7 @@ describe("translateConstraints", () => {
         { type: "field_eq", field: "b", value: 2 },
       ],
     };
-    expect(translateConstraints(c, adapter)).toBe("(a = 1 OR b = 2)");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("(a = 1 OR b = 2)");
   });
 
   it("translates not combinator", () => {
@@ -63,32 +63,33 @@ describe("translateConstraints", () => {
       type: "not",
       child: { type: "field_eq", field: "archived", value: true },
     };
-    expect(translateConstraints(c, adapter)).toBe("NOT(archived = true)");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("NOT(archived = true)");
   });
 
   it("translates relation constraint", () => {
     const c: Constraint = {
       type: "relation",
+      quantifier: "any",
       field: "projectId",
       resourceType: "Project",
       constraint: { type: "field_eq", field: "active", value: true },
     };
-    expect(translateConstraints(c, adapter)).toBe("projectId -> Project(active = true)");
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe("projectId -> Project(active = true)");
   });
 
-  it("translates has_role constraint", () => {
+  it("rejects legacy role-assignment constraints", () => {
     const c: Constraint = {
       type: "has_role",
       actorId: "u1",
       actorType: "User",
       role: "admin",
     };
-    expect(translateConstraints(c, adapter)).toBe("HAS_ROLE(User:u1, admin)");
+    expect(() => translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toThrow(/legacy has_role/);
   });
 
-  it("translates unknown constraint", () => {
+  it("rejects unknown custom constraints", () => {
     const c: Constraint = { type: "unknown", name: "businessHours" };
-    expect(translateConstraints(c, adapter)).toBe("UNKNOWN(businessHours)");
+    expect(() => translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toThrow(/businessHours/);
   });
 
   it("translates nested structure", () => {
@@ -99,7 +100,7 @@ describe("translateConstraints", () => {
           type: "or",
           children: [
             { type: "field_eq", field: "public", value: true },
-            { type: "has_role", actorId: "u1", actorType: "User", role: "viewer" },
+            { type: "field_eq", field: "viewer", value: true },
           ],
         },
         {
@@ -108,16 +109,16 @@ describe("translateConstraints", () => {
         },
       ],
     };
-    expect(translateConstraints(c, adapter)).toBe(
-      '((public = true OR HAS_ROLE(User:u1, viewer)) AND NOT(deleted = true))',
+    expect(translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toBe(
+      '((public = true OR viewer = true) AND NOT(deleted = true))',
     );
   });
 
-  it("throws on always/never nodes (should not reach adapter)", () => {
+  it("translates constant nodes", () => {
     const always: Constraint = { type: "always" };
     const never: Constraint = { type: "never" };
-    expect(() => translateConstraints(always, adapter)).toThrow();
-    expect(() => translateConstraints(never, adapter)).toThrow();
+    expect(translateConstraints({ ...always, rootResourceType: "Task" }, adapter)).toBe("TRUE");
+    expect(translateConstraints({ ...never, rootResourceType: "Task" }, adapter)).toBe("FALSE");
   });
 
   it("throws on excessively deep constraint ASTs (Finding 10)", () => {
@@ -126,7 +127,7 @@ describe("translateConstraints", () => {
     for (let i = 0; i < 150; i++) {
       c = { type: "not", child: c };
     }
-    expect(() => translateConstraints(c, adapter)).toThrow(/maximum recursion depth/);
+    expect(() => translateConstraints({ ...c, rootResourceType: "Task" }, adapter)).toThrow(/maximum constraint depth/);
   });
 });
 
