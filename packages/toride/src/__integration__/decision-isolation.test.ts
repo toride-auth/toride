@@ -5,6 +5,67 @@ import type { Policy } from "../index.js";
 const actor = { type: "User", id: "u1", attributes: { enabled: true } };
 const document = { type: "Document", id: "d1" };
 
+it("denies access when a resource identity getter fails", async () => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: [], permissions: ["read"], rules: [{ effect: "permit", permissions: ["read"], when: {} }] },
+  } };
+  const engine = new Toride({ policy });
+  const inaccessible = { type: "Document", get id(): string { throw new Error("unavailable identity"); } };
+  expect(await engine.can(actor, "read", inaccessible)).toBe(false);
+  const explanation = await engine.explain(actor, "read", inaccessible);
+  expect(explanation.allowed).toBe(false);
+  expect(explanation.diagnostics).toContainEqual({ code: "evaluation_error", path: "Document" });
+});
+
+function afterMicrotasks(remaining: number, action: () => void): void {
+  queueMicrotask(() => remaining === 0 ? action() : afterMicrotasks(remaining - 1, action));
+}
+
+it.each(["rule", "role"] as const)("preserves delayed custom observations before a forbid %s", async scope => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: scope === "rule" ? {
+      roles: [], permissions: ["read"], rules: [
+        { effect: "permit", permissions: ["read"], when: { "$resource.value": { custom: "schedule" } } },
+        { effect: "forbid", permissions: ["read"], when: { "$env.blocked": true } },
+      ],
+    } : {
+      roles: ["warm", "blocked"], permissions: ["read"],
+      derived_roles: [
+        { role: "warm", when: { "$resource.value": { custom: "schedule" } } },
+        { role: "blocked", when: { "$env.blocked": true } },
+      ],
+      rules: [{ effect: "permit", permissions: ["read"], when: {} }, { effect: "forbid", permissions: ["read"], roles: ["blocked"], when: {} }],
+    },
+  } };
+  const engine = new Toride({ policy, customEvaluators: { schedule: async (_actor, _resource, env) => { afterMicrotasks(scope === "rule" ? 4 : 5, () => { env.blocked = true; }); return true; } } });
+  expect(await engine.can(actor, "read", document, { env: { blocked: false } })).toBe(false);
+  const explanation = await engine.explain(actor, "read", document, { env: { blocked: false } });
+  expect(explanation.allowed).toBe(false);
+  expect(explanation.matchedRules[1].outcome).toBe("true");
+});
+
+it("preserves operand observation order beside a custom condition", async () => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: [], permissions: ["read"], rules: [{ effect: "permit", permissions: ["read"], when: { all: [
+      { "$actor.enabled": "$env.ready" },
+      { "$resource.value": { custom: "markReady" } },
+    ] } }] },
+  } };
+  const engine = new Toride({ policy, customEvaluators: { markReady: async (_actor, _resource, env) => { env.ready = true; return true; } } });
+  expect(await engine.can(actor, "read", document, { env: { ready: false } })).toBe(true);
+});
+
+it("preserves comparison order for mutable operands beside an async custom condition", async () => {
+  const policy: Policy = { version: "1", actors: { User: { attributes: {} } }, resources: {
+    Document: { roles: [], permissions: ["read"], rules: [{ effect: "permit", permissions: ["read"], when: { all: [
+      { "$actor.enabled": { in: "$env.allowed" } },
+      { "$resource.value": { custom: "allowLater" } },
+    ] } }] },
+  } };
+  const engine = new Toride({ policy, customEvaluators: { allowLater: async (_actor, _resource, env) => { await Promise.resolve(); (env.allowed as boolean[]).push(true); return true; } } });
+  expect(await engine.can(actor, "read", document, { env: { allowed: [] } })).toBe(true);
+});
+
 it.each([
   { effect: "permit", roles: ["warm", "viewer"] },
   { effect: "permit", roles: ["viewer", "warm"] },
