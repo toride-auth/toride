@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Toride, UnsupportedConstraintError } from "toride";
 import { createPrismaAdapter, createPrismaResolver } from "./index.js";
 
 const document = { resourceType: "Document" };
@@ -47,8 +48,8 @@ describe("Prisma exact translation boundary", () => {
   it("keeps equal virtual names scoped to their current resources", () => {
     const adapter = createPrismaAdapter({
       virtualFields: {
-        Document: { viewer_ids: { relation: "documentMembers", matchField: "userId" } },
-        Project: { viewer_ids: { relation: "projectMembers", matchField: "userId" } },
+        Document: { viewer_ids: { relation: "documentMembers", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" } },
+        Project: { viewer_ids: { relation: "projectMembers", matchField: "userId", cardinality: "many", valueType: "string", stringComparison: "binary" } },
       },
     });
     expect(adapter.translate({ type: "field_includes", field: "viewer_ids", value: "u1" }, document))
@@ -57,11 +58,37 @@ describe("Prisma exact translation boundary", () => {
       .toEqual({ projectMembers: { some: { userId: "u1" } } });
   });
 
+  it("preserves Boolean constants under composition", () => {
+    const adapter = createPrismaAdapter(options);
+    const yes = adapter.always(document);
+    const no = adapter.never(document);
+    expect(adapter.not(yes, document)).toEqual({ OR: [] });
+    expect(adapter.not(no, document)).toEqual({});
+    expect(adapter.not(adapter.not(yes, document), document)).toEqual({});
+    expect(adapter.not(adapter.not(no, document), document)).toEqual({ OR: [] });
+    expect(adapter.or([yes, no], document)).toEqual({});
+    expect(adapter.and([yes, no], document)).toEqual({ OR: [] });
+  });
+
   it("rejects uncertified string matching", () => {
     const adapter = createPrismaAdapter(options);
     expect(() => adapter.translate({ type: "field_contains", field: "status", value: "blocked" }, document))
       .toThrow(/string|semantics|unsupported/i);
   });
+  it("rejects legacy unknown and role-storage nodes through the public pipeline", () => {
+    const engine = new Toride({ policy: {
+      version: "1", actors: { User: { attributes: {} } },
+      resources: { Document: { roles: [], permissions: ["read"] } },
+    } });
+    const adapter = createPrismaAdapter(options);
+    expect(engine.translateConstraints({ type: "field_gt", field: "priority", value: 5, rootResourceType: "Document" }, adapter))
+      .toEqual({ priority: { gt: 5 } });
+    expect(() => engine.translateConstraints({ type: "unknown", name: "custom", rootResourceType: "Document" }, adapter))
+      .toThrow(UnsupportedConstraintError);
+    expect(() => engine.translateConstraints({ type: "has_role", actorId: "u1", actorType: "OtherActor", role: "viewer", rootResourceType: "Document" }, adapter))
+      .toThrow(UnsupportedConstraintError);
+  });
+
 });
 
 describe("Prisma resolver absence", () => {
