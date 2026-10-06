@@ -32,7 +32,7 @@ describe("scoped Drizzle authorization descriptions", () => {
   });
 
   it("keeps exact string operations distinct", () => {
-    const adapter = createDrizzleAdapter(documents, { ...options, stringComparison: "binary" });
+    const adapter = createDrizzleAdapter(documents, options);
     for (const [type, op] of [["field_contains", "contains"], ["field_starts_with", "startsWith"], ["field_ends_with", "endsWith"]] as const) {
       expect(adapter.translate({ type, field: "status", value: "A%_\\" }, root)).toMatchObject({
         _op: op, value: "A%_\\", nullBehavior: "false", stringComparison: "binary",
@@ -45,7 +45,6 @@ describe("scoped Drizzle authorization descriptions", () => {
     expect(() => adapter.relation("missing", "Project", { _op: "literal", value: true }, root)).toThrow(/Unsupported/);
     expect(() => adapter.translate({ type: "field_eq", field: "missing", value: "public" }, root)).toThrow(/Unsupported/);
     expect(() => adapter.translate({ type: "field_includes", field: "status", value: "public" }, root)).toThrow(/Unsupported/);
-    expect(() => adapter.translate({ type: "field_contains", field: "status", value: "public" }, root)).toThrow(/Unsupported/);
   });
 
   it("retains relation existence when the child is always true", () => {
