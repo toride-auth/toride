@@ -165,3 +165,21 @@ it("keeps one captured policy across a resource's permitted actions", async () =
   expect(await engine.permittedActions(actor, document)).toEqual(["read", "write"]);
   expect(await engine.permittedActions(actor, document)).toEqual([]);
 });
+
+it.each([false, true])("does not match the intrinsic ID of an absent related resource with reversed rules=%s", async reverse => {
+  const rules = [permit({ "$resource.project.id": "gone" }), { effect: "forbid" as const, permissions: ["read"], when: { "$resource.project.blocked": true } }];
+  const p = policy({ relations: { project: "Project" }, rules: reverse ? [...rules].reverse() : rules });
+  const absent = new Toride({ policy: p, resolvers: { Document: async () => ({ project: { type: "Project", id: "gone" } }), Project: async () => null } });
+  const explanation = await absent.explain(actor, "read", document);
+  expect(explanation.allowed).toBe(false);
+  expect(explanation.matchedRules.find(rule => rule.effect === "permit")?.outcome).toBe("false");
+  const present = new Toride({ policy: p, resolvers: { Document: async () => ({ project: { type: "Project", id: "gone" } }), Project: async () => ({ blocked: false }) } });
+  expect(await present.can(actor, "read", document)).toBe(true);
+});
+
+it("retains an independent permit when another permit references an absent related ID", async () => {
+  const engine = new Toride({ policy: policy({ relations: { project: "Project" }, rules: [permit(), permit({ "$resource.project.id": "gone" }), { effect: "forbid", permissions: ["read"], when: { "$resource.project.blocked": true } }] }), resolvers: { Document: async () => ({ project: { type: "Project", id: "gone" } }), Project: async () => null } });
+  const explanation = await engine.explain(actor, "read", document);
+  expect(explanation.allowed).toBe(true);
+  expect(explanation.matchedRules.map(rule => rule.outcome)).toEqual(["true", "false", "false"]);
+});

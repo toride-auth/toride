@@ -95,3 +95,43 @@ it("rejects traversal on the right-hand resource operand", async () => {
   if (!result.ok || !result.constraint) throw new Error("expected an explicit unsupported constraint");
   expect(() => engine.translateConstraints(result.constraint!, adapter)).toThrow(/Unsupported constraint/);
 });
+
+it.each(["permit", "forbid"] as const)("rejects ambiguous absent-relation false sets for an unavailable operand in a %s", async effect => {
+  const engine = new Toride({ policy: policy({ relations: { project: "Project" }, rules: [
+    ...(effect === "forbid" ? [permit()] : []),
+    { effect, permissions: ["read"], when: { "$resource.project.value": "$env.missing" } },
+  ] }) });
+  const references = [
+    { type: "Document", id: "null", attributes: { project: null } },
+    { type: "Document", id: "empty", attributes: { project: [] } },
+    { type: "Document", id: "one", attributes: { project: { type: "Project", id: "p1", attributes: { value: "present" } } } },
+    { type: "Document", id: "many", attributes: { project: [{ type: "Project", id: "p1", attributes: { value: "present" } }, { type: "Project", id: "p2", attributes: { value: null } }] } },
+  ];
+  expect(await Promise.all(references.map(ref => engine.can(actor, "read", ref)))).toEqual(effect === "permit" ? [false, false, false, false] : [false, true, false, false]);
+  const result = await engine.buildConstraints(actor, "read", "Document");
+  if (!result.ok || !result.constraint) throw new Error("expected an explicit unsupported predicate");
+  expect(() => engine.translateConstraints(result.constraint!, adapter)).toThrow(/Unsupported constraint/);
+});
+
+it.each(["permit", "forbid"] as const)("keeps exact null, empty, one, and many controls for a known operand in a %s", async effect => {
+  const engine = new Toride({ policy: policy({ relations: { project: "Project" }, rules: [
+    ...(effect === "forbid" ? [permit()] : []),
+    { effect, permissions: ["read"], when: { "$resource.project.value": "match" } },
+  ] }) });
+  const rows = [
+    { id: "null", project: null },
+    { id: "empty", project: [] },
+    { id: "one", project: { id: "p1", value: "match" } },
+    { id: "many", project: [{ id: "p2", value: null }, { id: "p3", value: "match" }] },
+    { id: "other", project: { id: "p4", value: "other" } },
+  ];
+  const expected = effect === "permit" ? ["one", "many"] : ["null", "empty", "other"];
+  expect(await selected(engine, rows)).toEqual(expected);
+  const ref = (row: { id: string; value: unknown }) => ({ type: "Project", id: row.id, attributes: { value: row.value } });
+  const actual: string[] = [];
+  for (const row of rows) {
+    const project = row.project === null ? null : Array.isArray(row.project) ? row.project.map(ref) : ref(row.project);
+    if (await engine.can(actor, "read", { type: "Document", id: row.id, attributes: { project } })) actual.push(row.id);
+  }
+  expect(actual).toEqual(expected);
+});
