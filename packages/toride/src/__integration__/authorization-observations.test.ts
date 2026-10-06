@@ -108,3 +108,17 @@ it.each(["permit", "forbid"] as const)("keeps custom condition depth in %s compi
   const deep = new Toride({ policy: p, maxConditionDepth: 2 });
   expect(await deep.can(actor, "read", reference)).toBe(effect === "permit");
 });
+
+it("invalidates an earlier related role when a later condition observes the target is absent", async () => {
+  const engine = new Toride({ policy: policy({ relations: { project: "Project" }, grants: { viewer: ["read"] }, derived_roles: [{ role: "viewer", from_role: "viewer", on_relation: "project" }], rules: [{ effect: "forbid", permissions: ["read"], when: { "$resource.project.blocked": true } }] }, { derived_roles: [{ role: "viewer", when: {} }] }), resolvers: { Document: async () => ({ project: { type: "Project", id: "gone" } }), Project: async () => null } });
+  const result = await engine.explain(actor, "read", document);
+  expect(result.allowed).toBe(false);
+  expect(result.resolvedRoles.derived).toEqual([]);
+});
+
+it("evaluates duplicate snapshot refs once before recording their permissions", async () => {
+  let reads = 0;
+  const engine = new Toride({ policy: policy({ rules: [permit({ "$resource.allowed": true })] }), resolvers: { Document: async () => ({ allowed: ++reads === 1 }) } });
+  expect(await engine.snapshot(actor, [document, document])).toEqual({ "Document:d1": ["read"] });
+  expect(reads).toBe(1);
+});
