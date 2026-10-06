@@ -92,7 +92,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
 
   /**
    * T069: Check all declared permissions for a resource and return permitted ones.
-   * Uses one cache across the resource's per-action evaluations.
+   * Each action uses independent observations under one captured policy.
    */
   async permittedActions<R extends S["resources"]>(
     actor: ActorRef<S>,
@@ -101,12 +101,12 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
   ): Promise<S["permissionMap"][R][]> {
     const a = actor as ActorRef;
     const r = resource as ResourceRef;
-    const resourceBlock = this.policy.resources[r.type];
+    const policy = this.policy;
+    const resourceBlock = policy.resources[r.type];
     if (!resourceBlock) {
       return [];
     }
 
-    const sharedCache = new AttributeCache(this.resolvers, this.policy);
     const permitted: string[] = [];
 
     for (const action of resourceBlock.permissions) {
@@ -115,7 +115,7 @@ export class Toride<S extends TorideSchema = DefaultSchema> {
         action,
         r,
         options,
-        sharedCache,
+        new AttributeCache(this.resolvers, policy),
       );
       if (result.allowed) {
         permitted.push(action);

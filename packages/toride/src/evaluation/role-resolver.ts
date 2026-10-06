@@ -25,7 +25,8 @@ export async function resolveRoleOutcomes(actor: ActorRef, resource: ResourceRef
     const key = JSON.stringify([ref.type, ref.id, name]);
     if (visited.has(key)) { cache.report("cycle", `${ref.type}.${name}`); return () => "indeterminate"; }
     if (depth > maxDepth) { cache.report("depth_limit", `${ref.type}.${name}`); return () => "indeterminate"; }
-    const stored = memo.get(key);
+    const memoKey = JSON.stringify([key, depth, [...visited].sort()]);
+    const stored = memo.get(memoKey);
     if (stored) return stored;
     const branch = new Set(visited).add(key);
     const computation = async (): Promise<RoleOutcome> => {
@@ -79,7 +80,7 @@ export async function resolveRoleOutcomes(actor: ActorRef, resource: ResourceRef
       return () => cache.isAbsent(ref) ? "false" : any(results.map(result => result()));
     };
     const result = computation();
-    memo.set(key, result);
+    memo.set(memoKey, result);
     return result;
   };
   const names = new Set([...block.roles, ...(block.derived_roles ?? []).map(entry => entry.role)]);

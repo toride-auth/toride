@@ -228,7 +228,7 @@ describe("US2: Inline Attributes on ResourceRef", () => {
 
   // ─── Edge Cases ──────────────────────────────────────────────────
   describe("Edge cases", () => {
-    it("shared cache: inline attributes from first call are used for subsequent calls", async () => {
+    it("preserves inline attributes in independent permittedActions evaluations", async () => {
       const documentResolver = vi.fn<ResourceResolver>(async () => {
         return { status: "published", owner_id: "u1" };
       });
@@ -239,20 +239,16 @@ describe("US2: Inline Attributes on ResourceRef", () => {
 
       const engine = createToride({ policy, resolvers });
 
-      // First check provides inline status: "draft"
       const resource1: ResourceRef = {
         type: "Document",
         id: "doc1",
         attributes: { status: "draft" },
       };
 
-      // permittedActions shares a cache across all action checks for the same resource
       const permitted = await engine.permittedActions(actor, resource1);
 
-      // update should be permitted (status: "draft" from inline wins)
-      expect(permitted).toContain("update");
-      // Resolver called at most once (cached)
-      expect(documentResolver).toHaveBeenCalledTimes(1);
+      expect(permitted).toEqual(["update", "delete"]);
+      expect(documentResolver).toHaveBeenCalledTimes(2);
     });
 
     it("canBatch isolates each decision while preserving inline attributes", async () => {
