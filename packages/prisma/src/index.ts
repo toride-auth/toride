@@ -235,7 +235,6 @@ export function createPrismaAdapter<
     always,
     never,
   };
-  // Query map shapes are supplied by the application, while this adapter emits Prisma's object format.
   return adapter as unknown as ConstraintAdapter<TQueryMap>;
 }
 
